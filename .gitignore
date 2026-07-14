@@ -10,3 +10,8 @@ web/_qa/
 web/_preview.html
 DESIGN.md
 web/praxis-soft-aurora.html
+
+# praxis dogfood output (machine-local)
+CLAUDE.md
+.claude/
+npx
