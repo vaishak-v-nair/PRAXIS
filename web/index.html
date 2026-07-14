@@ -58,6 +58,8 @@ section{padding:clamp(54px,8vh,86px) 0}
 .cmd b{color:var(--rose);font-weight:600}
 .cmd:hover{background:var(--rose);color:#fff}
 .cmd:hover b{color:#fff}
+.cmd.cp,.run.cp{background:var(--sage)!important;border-color:var(--sage)!important;color:#fff!important}
+.cmd.cp b,.run.cp b{color:#fff!important}
 .ghostlink{font-style:italic;font-size:1rem;color:var(--body);text-decoration:none;border-bottom:1px solid var(--hair);padding-bottom:2px;transition:color .2s,border-color .2s}
 .ghostlink:hover{color:var(--rose);border-color:var(--rose)}
 
@@ -265,7 +267,7 @@ footer .fcol a:hover{color:var(--rose)}
       <a href="#faq">FAQ</a>
       <a href="https://github.com/vaishak-v-nair/PRAXIS">GitHub</a>
     </div>
-    <a class="cmd" href="#start"><b>$</b>praxis init</a>
+    <a class="cmd" href="#start"><b>$</b>install</a>
   </div>
 </nav>
 
@@ -288,7 +290,7 @@ footer .fcol a:hover{color:var(--rose)}
       <h1 class="rv in">Your AI never forgets your <em>project.</em></h1>
       <p class="sub rv d1">Praxis gives Claude Code a durable, local memory — it opens every session already knowing your architecture, your decisions, and <i>why that one file is strange.</i></p>
       <div class="hero-cta rv d2">
-        <a class="cmd" href="#start"><b>$</b>praxis init</a>
+        <a class="cmd" href="#start" data-copy="npx praxis-memory init" title="Click to copy"><b>$</b><span class="cmdtxt">npx praxis-memory init</span></a>
         <a class="ghostlink" href="#loop">How it works &rarr;</a>
       </div>
       <p class="facts rv d3">0 bytes uploaded<b>&#10022;</b>$0 added cost<b>&#10022;</b>MIT open source</p>
@@ -315,7 +317,7 @@ footer .fcol a:hover{color:var(--rose)}
     <h2 class="h2 rv d1">A memory layer for your AI pair-programmer.</h2>
     <p class="lead rv d2">Claude Code is brilliant for a session, then forgets everything when it closes. Praxis fixes that. It is a small open-source tool that distills each coding session into durable project memory — the decisions, constraints and reasons — and hands it back to Claude automatically the next time you open your project.</p>
     <div class="chips">
-      <div class="chip rv d1"><div class="ct">$ the CLI</div><p>One command sets up the hooks. <b>praxis init</b> and the loop is running — nothing else to configure.</p></div>
+      <div class="chip rv d1"><div class="ct">$ the CLI</div><p>One command sets up the hooks. <b>npx praxis-memory init</b> and the loop is running — nothing else to configure.</p></div>
       <div class="chip rv d2"><div class="ct">&#9998; the memory file</div><p><b>.praxis/memory.md</b> — plain markdown in your repo. Redacted, size-capped, readable by any tool or teammate.</p></div>
       <div class="chip rv d3"><div class="ct">&#9673; the companion</div><p><b>praxis status</b> — the axolotl as a status bar for session health. A desktop tray build is next on the roadmap.</p></div>
     </div>
@@ -488,7 +490,8 @@ footer .fcol a:hover{color:var(--rose)}
   <div class="wrap">
     <h2 class="rv">Give Claude a <em>memory.</em></h2>
     <p class="sub rv d1">One command. Every session after remembers.</p>
-    <div class="run rv d2"><b>$</b>&nbsp;npx praxis-memory init</div>
+    <div class="run rv d2" data-copy="npx praxis-memory init" title="Click to copy" style="cursor:pointer"><b>$</b>&nbsp;<span class="cmdtxt">npx praxis-memory init</span></div>
+    <p class="fineprint rv d2" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--card-dim);margin-top:12px">click to copy</p>
     <div class="links rv d3"><a class="tlink" href="https://github.com/vaishak-v-nair/PRAXIS">View the source on GitHub &rarr;</a></div>
   </div>
 </section>
@@ -523,6 +526,21 @@ var io=('IntersectionObserver' in window)?new IntersectionObserver(function(es){
 },{rootMargin:'0px 0px -6% 0px',threshold:.08}):null;
 document.querySelectorAll('.rv').forEach(function(el){io?io.observe(el):el.classList.add('in');});
 setTimeout(function(){document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in');});},1600);
+
+/* click-to-copy install commands */
+document.querySelectorAll('[data-copy]').forEach(function(el){
+  el.addEventListener('click',function(ev){
+    ev.preventDefault();
+    var txt=el.getAttribute('data-copy'),t=el.querySelector('.cmdtxt');
+    function done(){
+      if(!t)return;
+      el.classList.add('cp');t.textContent='copied ✓';
+      setTimeout(function(){el.classList.remove('cp');t.textContent=txt;},1400);
+    }
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(txt).then(done,done);
+    else done();
+  });
+});
 
 var nav=document.getElementById('nav');
 function onScroll(){nav.classList.toggle('sc',scrollY>40);railTick();}
