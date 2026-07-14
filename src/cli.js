@@ -7,6 +7,7 @@ import { status } from './commands/status.js';
 import { capture } from './commands/capture.js';
 import { feedback } from './commands/feedback.js';
 import { projectPaths } from './lib/paths.js';
+import { banner, slashHelp, bold, grey } from './lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,18 +21,15 @@ function version() {
 }
 
 function help() {
-  console.log(`
-PRAXIS — give Claude Code a memory. Never re-explain your project again.
+  console.log('\n' + banner(version(), slashHelp()) + '\n');
+  console.log(`  ${bold('Usage')}
+  ${bold('npx praxis-memory')}   set up PRAXIS here ${grey('(or show status if already set up)')}
+  ${bold('praxis init')}         set up PRAXIS in the current project
+  ${bold('praxis status')}       what PRAXIS remembers, and session health
+  ${bold('praxis feedback')}     the two questions that shape what gets built next
+  ${grey('praxis capture      (internal) called by the Claude Code Stop hook')}
 
-Usage:
-  npx praxis-memory  Set up PRAXIS here (or show status if already set up)
-  praxis init        Set up PRAXIS in the current project
-  praxis status      Show what PRAXIS remembers here
-  praxis feedback    The two questions that shape PRAXIS's future
-  praxis capture     (internal) called by the Claude Code Stop hook
-  praxis --version
-
-Local-first. No server. No account. Nothing leaves your machine.
+  ${grey('Local-first. No server. No account. Nothing leaves your machine.')}
 `);
 }
 

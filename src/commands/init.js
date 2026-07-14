@@ -5,6 +5,17 @@ import { projectPaths } from '../lib/paths.js';
 import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchSettings } from '../lib/settings.js';
+import { banner, slashHelp, sage, rose, bold, grey, dim } from '../lib/ui.js';
+import { readFileSync } from 'node:fs';
+
+function pkgVersion() {
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    return JSON.parse(readFileSync(path.join(here, '..', '..', 'package.json'), 'utf8')).version;
+  } catch {
+    return '0.0.0';
+  }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES = path.join(__dirname, '..', 'templates');
@@ -46,15 +57,17 @@ export async function init() {
 
   ensureGitignore(p.root);
 
-  console.log('\n  PRAXIS initialized.\n');
-  for (const d of done) console.log('   + ' + d);
+  console.log('\n' + banner(pkgVersion(), slashHelp()) + '\n');
+  console.log('  ' + bold('Memory is set up.') + '\n');
+  for (const d of done) console.log('  ' + sage('✓') + ' ' + d);
   console.log(`
-  Next:
-   - Open this project in Claude Code — your memory loads automatically.
-   - End a session and PRAXIS logs it. Run  /praxis-save  for a rich summary.
-   - Check it anytime:  praxis status
+  ${bold('Next steps')}
+  ${grey('1.')} Open this project in Claude Code — your memory loads automatically.
+  ${grey('2.')} End a session and PRAXIS logs it. Type ${rose('/praxis-save')} for a rich summary.
+  ${grey('3.')} ${bold('praxis status')} — see what it remembers, any time.
 
-  Auto-capture needs \`praxis\` on your PATH. If it is not, use /praxis-save.
+  ${dim('tip: auto-capture needs `praxis` on your PATH (npm i -g praxis-memory);')}
+  ${dim('     without it, /praxis-save covers you.')}
 `);
 }
 
