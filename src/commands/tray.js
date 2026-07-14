@@ -65,10 +65,12 @@ export async function tray(args = []) {
   fs.mkdirSync(path.join(trayDir, 'anim'), { recursive: true });
   fs.copyFileSync(path.join(TRAY_SRC, 'tray.ps1'), path.join(trayDir, 'tray.ps1'));
   for (const s of STATES) {
-    fs.copyFileSync(
-      path.join(TRAY_SRC, 'icons', `${s}.ico`),
-      path.join(trayDir, 'icons', `${s}.ico`),
-    );
+    for (const suffix of ['', '2']) {
+      fs.copyFileSync(
+        path.join(TRAY_SRC, 'icons', `${s}${suffix}.ico`),
+        path.join(trayDir, 'icons', `${s}${suffix}.ico`),
+      );
+    }
     fs.copyFileSync(path.join(TRAY_SRC, 'anim', `${s}.gif`), path.join(trayDir, 'anim', `${s}.gif`));
   }
 

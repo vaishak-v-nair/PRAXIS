@@ -74,7 +74,7 @@ bar — its state *is* your session's state:
 |:--:|:--:|:--:|:--:|:--:|
 | context fresh | filling up | limit reached | moving context | context recovered |
 
-On Windows it lives in your system tray — `praxis tray` — changing emotion with the real state of your session. macOS and Linux are next; `praxis status` covers every platform meanwhile.
+On Windows it starts with the very first install and lives in your system tray: the axolotl breathes slowly, and only its glow changes with your session state — green healthy, amber filling, red at the limit, blue switching, gold restored. It pushes a toast at the moments that matter and stays silent otherwise. Left-click opens a popover: the animated mascot, live memory stats, your recent session entries and a suggestion. macOS and Linux are next; `praxis status` covers every platform meanwhile.
 
 ## Commands
 

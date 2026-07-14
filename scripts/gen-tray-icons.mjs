@@ -62,19 +62,59 @@ for (const [state, [file, page, pages]] of Object.entries(SEGMENTS)) {
   console.log(out, Math.round(fs.statSync(out).size / 1024) + ' KB');
 }
 
+// ---- tray icons: SAME idle mascot in every state, only the GLOW changes ----
+// (vision doc: "the axolotl's own body color never changes — only the glow
+// around it". Two intensities per state so the tray icon can breathe.)
+const GLOW = {
+  happy: '#ef6f95',
+  idle: '#5fbd85',
+  warning: '#f0b545',
+  limit: '#e8543f',
+  switching: '#5aa5ee',
+  restored: '#e8bd55',
+};
+
+function glowSvg(size, color, strength) {
+  const r = Math.round(size * 0.48);
+  const c = size / 2;
+  return Buffer.from(
+    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+      <defs><radialGradient id="g"><stop offset="0%" stop-color="${color}" stop-opacity="${strength}"/>
+      <stop offset="65%" stop-color="${color}" stop-opacity="${strength * 0.45}"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0"/></radialGradient></defs>
+      <circle cx="${c}" cy="${c}" r="${r}" fill="url(#g)"/></svg>`,
+  );
+}
+
 fs.mkdirSync(OUT, { recursive: true });
-for (const [state, src] of Object.entries(SOURCES)) {
-  const base = Array.isArray(src) ? sharp(src[0], { page: src[1] }) : sharp(src);
-  const master = await base.png().toBuffer();
-  const pngs = [];
-  for (const size of SIZES) {
-    const buf = await sharp(master)
-      .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .png()
-      .toBuffer();
-    pngs.push({ size, buf });
+const mascotMaster = await sharp('assets/mascot-idle.png').png().toBuffer();
+for (const [state, color] of Object.entries(GLOW)) {
+  for (const [suffix, strength] of [
+    ['', 0.55], // soft breath
+    ['2', 0.95], // strong breath
+  ]) {
+    const pngs = [];
+    for (const size of SIZES) {
+      const body = await sharp(mascotMaster)
+        .resize(Math.round(size * 0.92), Math.round(size * 0.92), {
+          fit: 'contain',
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        })
+        .png()
+        .toBuffer();
+      const buf = await sharp({
+        create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+      })
+        .composite([
+          { input: await sharp(glowSvg(size, color, strength)).png().toBuffer(), left: 0, top: 0 },
+          { input: body, gravity: 'centre' },
+        ])
+        .png()
+        .toBuffer();
+      pngs.push({ size, buf });
+    }
+    const file = path.join(OUT, `${state}${suffix}.ico`);
+    fs.writeFileSync(file, ico(pngs));
+    console.log(file, Math.round(fs.statSync(file).size / 1024) + ' KB');
   }
-  const file = path.join(OUT, `${state}.ico`);
-  fs.writeFileSync(file, ico(pngs));
-  console.log(file, Math.round(fs.statSync(file).size / 1024) + ' KB');
 }

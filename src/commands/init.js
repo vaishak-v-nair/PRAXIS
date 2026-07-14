@@ -7,6 +7,7 @@ import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchSettings } from '../lib/settings.js';
 import { bigBanner, sage, rose, bold, grey, dim } from '../lib/ui.js';
+import { tray } from './tray.js';
 import { readFileSync } from 'node:fs';
 
 function pkgVersion() {
@@ -31,7 +32,7 @@ export async function init() {
   if (!fs.existsSync(p.configFile)) {
     fs.writeFileSync(
       p.configFile,
-      JSON.stringify({ capture: true, maxLogBytes: 16384, redact: true }, null, 2) + '\n',
+      JSON.stringify({ capture: true, maxLogBytes: 16384, redact: true, tray: true }, null, 2) + '\n',
     );
   }
   done.push('.praxis/memory.md + config.json');
@@ -80,6 +81,22 @@ export async function init() {
   console.log('\n' + bigBanner(pkgVersion()) + '\n');
   console.log('  ' + bold('Memory is set up.') + '\n');
   for (const d of done) console.log('  ' + sage('✓') + ' ' + d);
+
+  // the tray companion starts with the very first install — no second command
+  let trayWanted = process.platform === 'win32';
+  try {
+    const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
+    if (cfg.tray === false) trayWanted = false;
+  } catch {
+    /* default on */
+  }
+  if (trayWanted) {
+    try {
+      await tray([]);
+    } catch {
+      /* the tray is a bonus, never a blocker */
+    }
+  }
   console.log(`
   ${bold('Next steps')}
   ${grey('1.')} Open this project in Claude Code — your memory loads automatically.

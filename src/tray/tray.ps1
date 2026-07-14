@@ -117,11 +117,15 @@ $STATECOLOR = @{
   limit = '#e0604d'; switching = '#6aa5e0'; restored = '#d9ad55'
 }
 
-# preload icons
+# preload icons — two glow intensities per state, so the icon can breathe
 $icons = @{}
 foreach ($n in @('idle', 'warning', 'limit', 'switching', 'restored', 'happy')) {
-  $p = Join-Path $IconDir ($n + '.ico')
-  if (Test-Path $p) { $icons[$n] = New-Object System.Drawing.Icon($p) }
+  $soft = Join-Path $IconDir ($n + '.ico')
+  $strong = Join-Path $IconDir ($n + '2.ico')
+  $pair = @()
+  if (Test-Path $soft) { $pair += New-Object System.Drawing.Icon($soft) }
+  if (Test-Path $strong) { $pair += New-Object System.Drawing.Icon($strong) } elseif ($pair.Count -eq 1) { $pair += $pair[0] }
+  if ($pair.Count -gt 0) { $icons[$n] = $pair }
 }
 
 if ($Once) {
@@ -258,9 +262,17 @@ $panel.add_Deactivate({ $panel.Hide() })
 
 # ---------- tray icon ----------
 $ni = New-Object System.Windows.Forms.NotifyIcon
-$ni.Icon = $icons['happy']
+$ni.Icon = $icons['happy'][1]
 $ni.Text = 'PRAXIS'
 $ni.Visible = $true
+
+# toasts pushed at the moments that matter (vision: notifications ARE the
+# product for most people; the popover is for looking deeper)
+$TOAST = @{
+  warning  = 'Memory is filling - 60% of the cap used. Praxis keeps it trimmed.'
+  limit    = 'Memory is near its cap. Praxis trims the oldest entries - /praxis-save the essentials.'
+  restored = 'Context written back. The next session opens pre-briefed.'
+}
 
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $header = $menu.Items.Add('PRAXIS - starting...')
@@ -292,23 +304,24 @@ $ni.add_MouseUp({
 })
 
 $script:lastName = ''
-$script:warnedLimit = $false
+$script:breath = 0
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 2000
 $timer.add_Tick({
   $s = $null
   if ($panel.Visible) { $s = Refresh-Panel } else { $s = Get-PraxisState }
   if ($s.name -ne $script:lastName) {
-    if ($icons.ContainsKey($s.name)) { $ni.Icon = $icons[$s.name] }
-    if ($s.name -eq 'limit' -and -not $script:warnedLimit) {
+    # push a toast only when ENTERING a state that matters
+    if ($script:lastName -ne '' -and $TOAST.ContainsKey($s.name)) {
       $ni.BalloonTipTitle = 'PRAXIS'
-      $ni.BalloonTipText = 'Memory is near its cap. Praxis will keep it trimmed - or raise maxLogBytes in .praxis/config.json.'
+      $ni.BalloonTipText = $TOAST[$s.name]
       $ni.ShowBalloonTip(4000)
-      $script:warnedLimit = $true
     }
-    if ($s.name -ne 'limit') { $script:warnedLimit = $false }
     $script:lastName = $s.name
   }
+  # slow breath: alternate glow intensity every tick
+  $script:breath = 1 - $script:breath
+  if ($icons.ContainsKey($s.name)) { $ni.Icon = $icons[$s.name][$script:breath] }
   $tip = 'PRAXIS - ' + $s.label + ' - ' + $s.kb + ' KB - ' + $projName
   if ($tip.Length -gt 63) { $tip = $tip.Substring(0, 63) }
   $ni.Text = $tip
