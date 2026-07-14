@@ -21,7 +21,7 @@ function version() {
 }
 
 function help() {
-  console.log('\n' + banner(version(), slashHelp()) + '\n');
+  console.log('\n' + bigBanner(version()) + '\n');
   console.log(`  ${bold('Usage')}
   ${bold('npx praxis-memory')}   set up PRAXIS here ${grey('(or show status if already set up)')}
   ${bold('praxis init')}         set up PRAXIS in the current project

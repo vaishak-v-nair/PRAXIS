@@ -19,7 +19,9 @@ and hands it back to Claude automatically the next time you open the project.
 npx praxis-memory
 ```
 
-*One command. It sets up the hooks, the memory file, everything — then every session after remembers.*
+*One command — same on **Windows, macOS and Linux** (Node 18+). It sets up the hooks, the memory file, everything — then every session after remembers.*
+
+**Two doors:** before Claude, it's the terminal — `npx praxis-memory`. Inside Claude Code, it's the slash — type `/` and the `/praxis-*` commands are right there.
 
 </div>
 
@@ -101,7 +103,10 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `.praxis/config.json` | Local settings: capture on/off, size cap, redaction |
 | `CLAUDE.md` | A managed `PRAXIS:START/END` block. **Your own content is never touched.** |
 | `.claude/settings.json` | A `Stop` hook, merged in without disturbing existing hooks |
-| `.claude/commands/` | `/praxis-save`, `/praxis-status` slash commands |
+| `.claude/commands/` | The five `/praxis-*` slash commands, project-scoped |
+| `~/.claude/commands/` | The same five, user-wide — so `/` shows them in **every** project |
+
+> `/` menu looks empty? Restart the open Claude Code session — it loads commands at start.
 
 ## Safety
 

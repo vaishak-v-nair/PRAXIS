@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
@@ -62,9 +63,21 @@ export async function init() {
   }
   done.push('.claude/commands — /praxis-save · /praxis-status · /praxis-remember · /praxis-forget · /praxis-recap');
 
+  // user-scope commands: make /praxis-* visible in EVERY project, not just this one
+  try {
+    const userCmds = path.join(os.homedir(), '.claude', 'commands');
+    fs.mkdirSync(userCmds, { recursive: true });
+    for (const name of slashCmds) {
+      fs.copyFileSync(path.join(TEMPLATES, name), path.join(userCmds, name));
+    }
+    done.push('~/.claude/commands — the same five, available in every project');
+  } catch {
+    /* user scope is best-effort */
+  }
+
   ensureGitignore(p.root);
 
-  console.log('\n' + banner(pkgVersion(), slashHelp()) + '\n');
+  console.log('\n' + bigBanner(pkgVersion()) + '\n');
   console.log('  ' + bold('Memory is set up.') + '\n');
   for (const d of done) console.log('  ' + sage('✓') + ' ' + d);
   console.log(`
@@ -72,6 +85,9 @@ export async function init() {
   ${grey('1.')} Open this project in Claude Code — your memory loads automatically.
   ${grey('2.')} End a session and PRAXIS logs it. Type ${rose('/praxis-save')} for a rich summary.
   ${grey('3.')} ${bold('praxis status')} — see what it remembers, any time.
+
+  ${dim('If a Claude Code session is already open, restart it (or start a new')}
+  ${dim('session) so the / menu picks up the new commands.')}
 
   ${dim('tip: auto-capture needs `praxis` on your PATH (npm i -g praxis-memory);')}
   ${dim('     without it, /praxis-save covers you.')}

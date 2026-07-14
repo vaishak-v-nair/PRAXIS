@@ -232,6 +232,10 @@ nav .cmd{padding:9px 17px;font-size:12px}
 .band .run{display:inline-block;font-family:var(--mono);font-size:14px;color:var(--card-ink);border:1px solid var(--card-hair);border-radius:999px;padding:14px 28px;margin-top:28px;background:rgba(236,228,214,.05)}
 .band .run b{color:var(--rose)}
 .band .links{margin-top:22px}
+.band .doors{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:26px}
+.band .doors span{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:var(--card-dim)}
+.band .doors b{color:var(--rose);font-weight:600}
+.band .doors em{font-style:normal;color:var(--card-ink)}
 .band .tlink{font-style:italic;font-size:.98rem;color:var(--card-dim);text-decoration:none;border-bottom:1px solid var(--card-hair);padding-bottom:2px}
 .band .tlink:hover{color:var(--card-ink)}
 
@@ -478,6 +482,14 @@ footer .fcol a:hover{color:var(--rose)}
         <p>Claude Code today. Because the memory is one portable markdown file, it is readable by any editor, agent, or AI coding assistant — support for more tools is planned, and the format will stay plain markdown.</p>
       </details>
       <details>
+        <summary>Does it work on Windows, macOS and Linux?</summary>
+        <p>Yes — the same single command everywhere: <code>npx praxis-memory</code>. The only requirement is Node 18+, which Claude Code itself already needs, so if Claude runs on your machine, Praxis does too.</p>
+      </details>
+      <details>
+        <summary>I typed / and don't see the Praxis commands</summary>
+        <p>Three usual causes. Run the setup first (<code>npx praxis-memory</code> in your project). If a Claude Code session was already open during setup, restart it — the <code>/</code> menu loads at session start. And setup installs the commands both in the project and user-wide (<code>~/.claude/commands</code>), so after one setup they appear in every project.</p>
+      </details>
+      <details>
         <summary>Is the tray app available now?</summary>
         <p>The companion ships in the CLI today — <code>praxis status</code> reports session health and what the memory holds. The desktop tray version shown above is the design it's growing into, next on the roadmap after v0.1.</p>
       </details>
@@ -491,7 +503,11 @@ footer .fcol a:hover{color:var(--rose)}
     <h2 class="rv">Give Claude a <em>memory.</em></h2>
     <p class="sub rv d1">One command. Every session after remembers.</p>
     <div class="run rv d2" data-copy="npx praxis-memory" title="Click to copy" style="cursor:pointer"><b>$</b>&nbsp;<span class="cmdtxt">npx praxis-memory</span></div>
-    <p class="fineprint rv d2" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--card-dim);margin-top:12px">click to copy</p>
+    <p class="fineprint rv d2" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--card-dim);margin-top:12px">click to copy &middot; windows, macos &amp; linux &middot; node 18+</p>
+    <div class="doors rv d3">
+      <span><b>1</b>&nbsp; before Claude — run it once in your terminal</span>
+      <span><b>2</b>&nbsp; inside Claude — type <em>/</em> &nbsp;&rarr;&nbsp; /praxis-recap &middot; /praxis-save &middot; /praxis-remember &middot; /praxis-forget &middot; /praxis-status</span>
+    </div>
     <div class="links rv d3"><a class="tlink" href="https://github.com/vaishak-v-nair/PRAXIS">View the source on GitHub &rarr;</a></div>
   </div>
 </section>

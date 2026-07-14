@@ -11,3 +11,5 @@ Remove this from the project's PRAXIS memory: **$ARGUMENTS**
 4. Delete the matching content. If removing it leaves a section empty, tidy the section.
 5. If the fact was *superseded* rather than wrong, prefer replacing it with the current truth over plain deletion.
 6. Confirm in one line what was forgotten.
+
+If `.praxis/memory.md` does not exist in this project, stop and tell the user to run `npx praxis-memory` here first — one command, works on Windows, macOS and Linux.
