@@ -1,0 +1,12 @@
+node_modules/
+*.log
+npm-debug.log*
+.DS_Store
+
+# Local dogfood artifacts
+.praxis/
+.gstack/
+web/_qa/
+web/_preview.html
+DESIGN.md
+web/praxis-soft-aurora.html

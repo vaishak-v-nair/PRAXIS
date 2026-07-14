@@ -1,0 +1,119 @@
+import fs from 'node:fs';
+import { projectPaths } from '../lib/paths.js';
+import { ensureMemory, addSessionEntry } from '../lib/memory.js';
+
+// Called by the Claude Code Stop hook. Reads the hook's JSON from stdin,
+// derives a lightweight deterministic summary of the session, and appends it to
+// .praxis/memory.md. MUST NOT crash the user's session — every path exits 0.
+
+function stripBom(s) {
+  return typeof s === 'string' && s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
+}
+
+function readStdin() {
+  return new Promise((resolve) => {
+    if (process.stdin.isTTY) return resolve('');
+    let data = '';
+    let done = false;
+    const finish = () => {
+      if (!done) {
+        done = true;
+        resolve(data);
+      }
+    };
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (c) => (data += c));
+    process.stdin.on('end', finish);
+    process.stdin.on('error', finish);
+    setTimeout(finish, 1500); // never hang the session on a stuck pipe
+  });
+}
+
+function collectFilePaths(obj, out, depth = 0) {
+  if (!obj || typeof obj !== 'object' || depth > 8) return;
+  if (typeof obj.file_path === 'string') out.add(obj.file_path);
+  for (const v of Object.values(obj)) collectFilePaths(v, out, depth + 1);
+}
+
+function summarizeTranscript(transcriptPath) {
+  const files = new Set();
+  let turns = 0;
+  try {
+    const lines = stripBom(fs.readFileSync(transcriptPath, 'utf8')).split('\n').filter(Boolean);
+    turns = lines.length;
+    for (const line of lines) {
+      try {
+        collectFilePaths(JSON.parse(line), files);
+      } catch {
+        /* skip unparseable line */
+      }
+    }
+  } catch {
+    /* transcript unreadable — degrade gracefully */
+  }
+  return { files: [...files], turns };
+}
+
+function shorten(file, cwd) {
+  try {
+    const rel = file.startsWith(cwd) ? file.slice(cwd.length).replace(/^[\\/]/, '') : file;
+    return rel.replace(/\\/g, '/'); // OS-neutral in the memory file
+  } catch {
+    return file;
+  }
+}
+
+export async function capture() {
+  try {
+    const raw = await readStdin();
+    let data = {};
+    try {
+      data = JSON.parse(stripBom(raw).trim() || '{}');
+    } catch {
+      /* no/invalid payload */
+    }
+
+    const cwd = typeof data.cwd === 'string' ? data.cwd : process.cwd();
+    const p = projectPaths(cwd);
+    if (!fs.existsSync(p.praxisDir)) {
+      process.exit(0); // not a PRAXIS project — nothing to do
+    }
+    ensureMemory(p.memoryFile);
+
+    let files = [];
+    let turns = 0;
+    if (typeof data.transcript_path === 'string') {
+      ({ files, turns } = summarizeTranscript(data.transcript_path));
+    }
+
+    const rel = files.map((f) => shorten(f, cwd));
+    const body = [
+      rel.length
+        ? `- Files touched: ${rel.slice(0, 20).join(', ')}${rel.length > 20 ? ` (+${rel.length - 20} more)` : ''}`
+        : '- (no file changes detected)',
+      turns ? `- Transcript lines: ${turns}` : null,
+      '- Run `/praxis-save` for a richer, decision-level summary.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    let maxBytes = 16384;
+    let redactOn = true;
+    try {
+      const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
+      if (Number.isFinite(cfg.maxLogBytes)) maxBytes = cfg.maxLogBytes;
+      if (cfg.redact === false) redactOn = false;
+      if (cfg.capture === false) process.exit(0);
+    } catch {
+      /* use defaults */
+    }
+
+    addSessionEntry(p.memoryFile, `${new Date().toISOString()} - session`, body, {
+      maxBytes,
+      redact: redactOn,
+    });
+  } catch {
+    // Swallow everything — a hook must never break the session.
+  }
+  process.exit(0);
+}
