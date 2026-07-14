@@ -5,7 +5,7 @@ import { projectPaths } from '../lib/paths.js';
 import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchSettings } from '../lib/settings.js';
-import { banner, slashHelp, sage, rose, bold, grey, dim } from '../lib/ui.js';
+import { bigBanner, sage, rose, bold, grey, dim } from '../lib/ui.js';
 import { readFileSync } from 'node:fs';
 
 function pkgVersion() {
@@ -50,10 +50,17 @@ export async function init() {
 
   // slash commands
   fs.mkdirSync(p.commandsDir, { recursive: true });
-  for (const name of ['praxis-save.md', 'praxis-status.md']) {
+  const slashCmds = [
+    'praxis-save.md',
+    'praxis-status.md',
+    'praxis-remember.md',
+    'praxis-forget.md',
+    'praxis-recap.md',
+  ];
+  for (const name of slashCmds) {
     fs.copyFileSync(path.join(TEMPLATES, name), path.join(p.commandsDir, name));
   }
-  done.push('.claude/commands/praxis-save.md + praxis-status.md');
+  done.push('.claude/commands — /praxis-save · /praxis-status · /praxis-remember · /praxis-forget · /praxis-recap');
 
   ensureGitignore(p.root);
 

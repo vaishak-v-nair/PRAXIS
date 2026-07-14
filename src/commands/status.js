@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
-import { banner, slashHelp, sage, amber, red, rose, bold, grey, dim, timeAgo } from '../lib/ui.js';
+import { banner, bigBanner, sage, amber, red, rose, bold, grey, dim, timeAgo } from '../lib/ui.js';
 
 function pkgVersion() {
   try {
@@ -41,7 +41,7 @@ export function status() {
         ? amber('●') + ' filling up'
         : red('●') + ' near the cap';
 
-  console.log('\n' + banner(pkgVersion(), slashHelp()) + '\n');
+  console.log('\n' + bigBanner(pkgVersion(), [grey((bytes / 1024).toFixed(1) + ' KB · ' + health)]) + '\n');
   console.log('  ' + grey('memory   ') + path.relative(p.root, p.memoryFile));
   console.log(
     '  ' +

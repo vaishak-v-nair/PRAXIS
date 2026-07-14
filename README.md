@@ -83,6 +83,16 @@ praxis status        # what Praxis remembers, and session health
 praxis feedback      # the two questions that shape what gets built next
 ```
 
+Inside Claude Code, type `/` and the Praxis commands appear:
+
+| Command | What it does |
+|---------|--------------|
+| `/praxis-recap` | catch me up on this project |
+| `/praxis-save` | rich session summary, written by Claude |
+| `/praxis-remember` | save a fact or decision right now |
+| `/praxis-forget` | remove outdated info from memory |
+| `/praxis-status` | memory at a glance |
+
 ## What Praxis writes, and where
 
 | Path | What |

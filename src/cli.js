@@ -7,7 +7,7 @@ import { status } from './commands/status.js';
 import { capture } from './commands/capture.js';
 import { feedback } from './commands/feedback.js';
 import { projectPaths } from './lib/paths.js';
-import { banner, slashHelp, bold, grey } from './lib/ui.js';
+import { bigBanner, bold, grey } from './lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
