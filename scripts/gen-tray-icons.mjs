@@ -42,6 +42,26 @@ function ico(pngs) {
   return Buffer.concat([header, ...entries, ...pngs.map((p) => p.buf)]);
 }
 
+// ---- animated GIFs for the popover panel (PictureBox plays GIFs natively) ----
+const ANIM_OUT = 'src/tray/anim';
+const SEGMENTS = {
+  idle: ['assets/tray/flow-alpha.webp', 0, 14],
+  warning: ['assets/tray/flow-alpha.webp', 14, 14],
+  limit: ['assets/tray/flow-alpha.webp', 28, 14],
+  switching: ['assets/tray/flow-alpha.webp', 42, 14],
+  restored: ['assets/tray/flow-alpha.webp', 56, 14],
+  happy: ['assets/tray/happy-alpha.webp', 0, 30],
+};
+fs.mkdirSync(ANIM_OUT, { recursive: true });
+for (const [state, [file, page, pages]] of Object.entries(SEGMENTS)) {
+  const out = path.join(ANIM_OUT, `${state}.gif`);
+  await sharp(file, { page, pages, animated: true })
+    .resize(170, null)
+    .gif({ loop: 0, effort: 7 })
+    .toFile(out);
+  console.log(out, Math.round(fs.statSync(out).size / 1024) + ' KB');
+}
+
 fs.mkdirSync(OUT, { recursive: true });
 for (const [state, src] of Object.entries(SOURCES)) {
   const base = Array.isArray(src) ? sharp(src[0], { page: src[1] }) : sharp(src);

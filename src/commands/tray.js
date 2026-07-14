@@ -60,14 +60,16 @@ export async function tray(args = []) {
     return;
   }
 
-  // stage the host script + icons into the project
+  // stage the host script + icons + panel animations into the project
   fs.mkdirSync(path.join(trayDir, 'icons'), { recursive: true });
+  fs.mkdirSync(path.join(trayDir, 'anim'), { recursive: true });
   fs.copyFileSync(path.join(TRAY_SRC, 'tray.ps1'), path.join(trayDir, 'tray.ps1'));
   for (const s of STATES) {
     fs.copyFileSync(
       path.join(TRAY_SRC, 'icons', `${s}.ico`),
       path.join(trayDir, 'icons', `${s}.ico`),
     );
+    fs.copyFileSync(path.join(TRAY_SRC, 'anim', `${s}.gif`), path.join(trayDir, 'anim', `${s}.gif`));
   }
 
   const psArgs = [
@@ -82,6 +84,8 @@ export async function tray(args = []) {
     p.root,
     '-IconDir',
     path.join(trayDir, 'icons'),
+    '-AnimDir',
+    path.join(trayDir, 'anim'),
     '-PidFile',
     pidFile,
   ];
