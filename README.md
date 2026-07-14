@@ -74,7 +74,7 @@ bar — its state *is* your session's state:
 |:--:|:--:|:--:|:--:|:--:|
 | context fresh | filling up | limit reached | moving context | context recovered |
 
-Today it lives in the CLI — `praxis status` — with a desktop tray build next on the roadmap.
+On Windows it lives in your system tray — `praxis tray` — changing emotion with the real state of your session. macOS and Linux are next; `praxis status` covers every platform meanwhile.
 
 ## Commands
 
@@ -82,6 +82,7 @@ Today it lives in the CLI — `praxis status` — with a desktop tray build next
 npx praxis-memory    # set up here (or show status, if already set up)
 praxis init          # explicit setup
 praxis status        # what Praxis remembers, and session health
+praxis tray          # the axolotl in your system tray (Windows; --stop to quit)
 praxis feedback      # the two questions that shape what gets built next
 ```
 
@@ -120,7 +121,8 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 ## Roadmap
 
 - **v0.1 (now)** — local memory for Claude Code: capture loop, `/praxis-save`, `praxis status`.
-- **v0.2** — the desktop tray companion, and an MCP server (queryable memory).
+- **v0.2 (now)** — the tray companion on Windows: `praxis tray`.
+- **v0.3** — tray for macOS/Linux, and an MCP server (queryable memory).
 - **Later** — cross-tool support, richer summarization.
 
 ## Develop

@@ -6,6 +6,7 @@ import { init } from './commands/init.js';
 import { status } from './commands/status.js';
 import { capture } from './commands/capture.js';
 import { feedback } from './commands/feedback.js';
+import { tray } from './commands/tray.js';
 import { projectPaths } from './lib/paths.js';
 import { bigBanner, bold, grey } from './lib/ui.js';
 
@@ -26,6 +27,7 @@ function help() {
   ${bold('npx praxis-memory')}   set up PRAXIS here ${grey('(or show status if already set up)')}
   ${bold('praxis init')}         set up PRAXIS in the current project
   ${bold('praxis status')}       what PRAXIS remembers, and session health
+  ${bold('praxis tray')}         the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
   ${bold('praxis feedback')}     the two questions that shape what gets built next
   ${grey('praxis capture      (internal) called by the Claude Code Stop hook')}
 
@@ -47,6 +49,9 @@ switch (cmd) {
     break;
   case 'feedback':
     feedback();
+    break;
+  case 'tray':
+    await tray(process.argv.slice(3));
     break;
   case '-v':
   case '--version':

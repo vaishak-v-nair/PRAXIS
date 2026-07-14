@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { projectPaths } from '../lib/paths.js';
 import { ensureMemory, addSessionEntry } from '../lib/memory.js';
+import { writeState } from '../lib/state.js';
 
 // Called by the Claude Code Stop hook. Reads the hook's JSON from stdin,
 // derives a lightweight deterministic summary of the session, and appends it to
@@ -78,6 +79,7 @@ export async function capture() {
     if (!fs.existsSync(p.praxisDir)) {
       process.exit(0); // not a PRAXIS project — nothing to do
     }
+    writeState(p.praxisDir, 'switching'); // tray: context is being carried over
     ensureMemory(p.memoryFile);
 
     let files = [];
@@ -112,6 +114,7 @@ export async function capture() {
       maxBytes,
       redact: redactOn,
     });
+    writeState(p.praxisDir, 'restored'); // tray: context safely written back
   } catch {
     // Swallow everything — a hook must never break the session.
   }
