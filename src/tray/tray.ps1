@@ -258,7 +258,9 @@ function Show-Panel {
   $panel.Show()
   $panel.Activate()
 }
-$panel.add_Deactivate({ $panel.Hide() })
+if ($env:PRAXIS_TRAY_TEST -ne 'panel') {
+  $panel.add_Deactivate({ $panel.Hide() })
+}
 
 # ---------- tray icon ----------
 $ni = New-Object System.Windows.Forms.NotifyIcon

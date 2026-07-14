@@ -61,6 +61,7 @@ switch (cmd) {
     // Smart default: first run sets up, later runs report.
     if (existsSync(projectPaths().praxisDir)) {
       status();
+      await tray(['--ensure']); // the companion comes back with every run
     } else {
       await init();
     }

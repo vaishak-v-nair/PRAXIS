@@ -6,7 +6,7 @@ import { projectPaths } from '../lib/paths.js';
 import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchSettings } from '../lib/settings.js';
-import { bigBanner, sage, rose, bold, grey, dim } from '../lib/ui.js';
+import { bigBanner, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
 import { tray } from './tray.js';
 import { readFileSync } from 'node:fs';
 
@@ -108,6 +108,8 @@ export async function init() {
 
   ${dim('tip: auto-capture needs `praxis` on your PATH (npm i -g praxis-memory);')}
   ${dim('     without it, /praxis-save covers you.')}
+
+  ${dim('“' + dailyQuote() + '”')}
 `);
 }
 

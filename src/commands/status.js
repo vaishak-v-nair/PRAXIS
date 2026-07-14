@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
-import { banner, bigBanner, sage, amber, red, rose, bold, grey, dim, timeAgo } from '../lib/ui.js';
+import { banner, bigBanner, sage, amber, red, rose, bold, grey, dim, timeAgo, dailyQuote } from '../lib/ui.js';
 
 function pkgVersion() {
   try {
@@ -51,5 +51,6 @@ export function status() {
   console.log('  ' + grey('updated  ') + timeAgo(stat.mtime));
   console.log('  ' + grey('state    ') + health);
   console.log('\n  ' + dim('Loaded into Claude Code automatically via the PRAXIS block in CLAUDE.md.'));
-  console.log('  ' + dim('Inside a session, type ') + rose('/praxis-status') + dim(' or ') + rose('/praxis-save') + dim('.') + '\n');
+  console.log('  ' + dim('Inside a session, type ') + rose('/praxis-status') + dim(' or ') + rose('/praxis-save') + dim('.'));
+  console.log('\n  ' + dim('“' + dailyQuote() + '”') + '\n');
 }

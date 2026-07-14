@@ -43,23 +43,79 @@ function ico(pngs) {
 }
 
 // ---- animated GIFs for the popover panel (PictureBox plays GIFs natively) ----
+// Each emotion is its OWN full source video (assets/source/*.mp4), chroma-keyed
+// to transparency — the complete animation, not a stitched loop segment.
+import ffmpeg from 'ffmpeg-static';
+import { execFileSync } from 'node:child_process';
+import os from 'node:os';
+
 const ANIM_OUT = 'src/tray/anim';
-const SEGMENTS = {
-  idle: ['assets/tray/flow-alpha.webp', 0, 14],
-  warning: ['assets/tray/flow-alpha.webp', 14, 14],
-  limit: ['assets/tray/flow-alpha.webp', 28, 14],
-  switching: ['assets/tray/flow-alpha.webp', 42, 14],
-  restored: ['assets/tray/flow-alpha.webp', 56, 14],
-  happy: ['assets/tray/happy-alpha.webp', 0, 30],
+const VIDEOS = {
+  idle: ['assets/source/idle.mp4', '0.2', 64],
+  warning: ['assets/source/warning.mp4', '0.2', 64],
+  limit: ['assets/source/limit hit.mp4', '0.2', 64],
+  switching: ['assets/source/switching.mp4', '0.1', 28],
+  restored: ['assets/source/restored.mp4', '0.2', 64],
+  happy: ['assets/source/happy.mp4', '0.2', 64],
 };
+
+function despeckle(data, W, H) {
+  const A = Buffer.from(data);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4 + 3;
+      if (A[i] === 0) continue;
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const yy = y + dy,
+            xx = x + dx;
+          if (yy < 0 || yy >= H || xx < 0 || xx >= W) continue;
+          if (A[(yy * W + xx) * 4 + 3] > 40) n++;
+        }
+      if (n < 2) {
+        data[i - 3] = 0;
+        data[i - 2] = 0;
+        data[i - 1] = 0;
+        data[i] = 0;
+      }
+    }
+}
+
 fs.mkdirSync(ANIM_OUT, { recursive: true });
-for (const [state, [file, page, pages]] of Object.entries(SEGMENTS)) {
+for (const [state, [video, ss, maxFrames]] of Object.entries(VIDEOS)) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-anim-'));
+  execFileSync(
+    ffmpeg,
+    ['-y', '-ss', ss, '-i', video,
+      '-vf', 'fps=8,scale=340:-2:flags=lanczos,colorkey=0x000000:0.10:0.05',
+      '-frames:v', String(maxFrames), path.join(tmp, 'f_%03d.png')],
+    { stdio: 'pipe' },
+  );
+  const files = fs.readdirSync(tmp).filter((f) => f.startsWith('f_')).sort();
+  const frames = [];
+  let W = 0,
+    H = 0;
+  for (const f of files) {
+    const { data, info } = await sharp(path.join(tmp, f)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    W = info.width;
+    H = info.height;
+    despeckle(data, W, H);
+    frames.push(
+      await sharp(data, { raw: { width: W, height: H, channels: 4 } }).resize(190, null).raw().toBuffer(),
+    );
+  }
+  const tW = 190,
+    tH = Math.round((H / W) * 190);
   const out = path.join(ANIM_OUT, `${state}.gif`);
-  await sharp(file, { page, pages, animated: true })
-    .resize(170, null)
-    .gif({ loop: 0, effort: 7 })
+  await sharp(Buffer.concat(frames), {
+    raw: { width: tW, height: tH * frames.length, channels: 4, pageHeight: tH },
+  })
+    .gif({ loop: 0, effort: 7, delay: new Array(frames.length).fill(125) })
     .toFile(out);
-  console.log(out, Math.round(fs.statSync(out).size / 1024) + ' KB');
+  fs.rmSync(tmp, { recursive: true, force: true });
+  console.log(out, files.length + ' frames', Math.round(fs.statSync(out).size / 1024) + ' KB');
 }
 
 // ---- tray icons: SAME idle mascot in every state, only the GLOW changes ----

@@ -120,6 +120,65 @@ export function bigBanner(version, leftExtras = []) {
   return [top, ...body, bottom].join('\n');
 }
 
+// One line a day: motivation, humour, and axolotl wisdom. Rotates daily.
+const QUOTES = [
+  'Ship it. The axolotl believes in you.',
+  'Your context died so this memory could live.',
+  'Regrow. Refactor. Repeat.',
+  'Yesterday-you left notes. Today-you is welcome.',
+  'A fresh session is not a fresh start. You have history now.',
+  'The best time to save context was yesterday. Praxis did.',
+  'Slow is smooth. Smooth is shipped.',
+  'Axolotls regrow limbs. You regrow codebases. Same energy.',
+  'Do not "simplify" the load-bearing file. It remembers.',
+  'Every dead end you logged is a road nobody walks twice.',
+  'Memory is a feature. Forgetting is a bug.',
+  'Small commits, long memory, calm mornings.',
+  'You are one /praxis-save away from a better tomorrow.',
+  'The rewrite can wait. The decision log cannot.',
+  'Perfect is the enemy of merged.',
+  'Somewhere, your future self is thanking you for this.',
+  'Context is expensive. Yours is already paid for.',
+  'A gill-bearing amphibian watches over your session. Relax.',
+  'Write it down. Brains are for ideas, not storage.',
+  'The bug was in the part everyone was afraid to touch. Naturally.',
+  'Today is a great day to not re-explain your stack.',
+  'Tests pass, memory saved, coffee hot. Peak existence.',
+  'Be the senior dev your memory file thinks you are.',
+  'Nothing leaves your machine. Except excuses.',
+  'Read the error message. Then read it again. Then believe it.',
+  'Your architecture makes sense. There are notes proving it.',
+  'One command a day keeps amnesia away.',
+  'The axolotl never panics. It just regenerates.',
+  'Scope creep is a limb you did not mean to grow.',
+  'Git remembers what you did. Praxis remembers why.',
+  'It is not tech debt if you wrote down the interest rate.',
+  'Deep work loves a pre-briefed morning.',
+  'The fastest onboarding is the one that already happened.',
+  'Delete boldly. The reasons are backed up.',
+  'Yesterday’s dead end stays dead. That is growth.',
+  'You have survived 100% of your worst sessions.',
+  'An unsaved decision is a future argument.',
+  'Keep the weirdness. Document the weirdness.',
+  'Rubber ducks quack. Axolotls remember.',
+  'Fewer tabs, more shipped.',
+  'The cap is not a wall. It is a haircut.',
+  'Legacy code is just memory nobody wrote down.',
+  'Name things like the next reader is tired. They are.',
+  'A quiet tray icon is a healthy session.',
+  'Progress is measured in decisions kept, not lines written.',
+  'When in doubt, /praxis-recap.',
+  'Your project has lore now. Guard it.',
+  'Big refactor? The memory file goes first, like a lantern.',
+  'Breathe like the axolotl: slowly, and with intent.',
+  'Done today beats perfect someday. The log agrees.',
+];
+
+export function dailyQuote() {
+  const day = Math.floor(Date.now() / 86400000);
+  return QUOTES[day % QUOTES.length];
+}
+
 export function timeAgo(date) {
   const s = Math.max(0, (Date.now() - date.getTime()) / 1000);
   if (s < 60) return 'just now';

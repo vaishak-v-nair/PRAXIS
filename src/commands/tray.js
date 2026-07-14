@@ -19,7 +19,9 @@ function pidAlive(pid) {
 }
 
 export async function tray(args = []) {
+  const ensure = args.includes('--ensure'); // quiet: start if absent, silent if present
   if (process.platform !== 'win32') {
+    if (ensure) return;
     console.log('\n  The tray companion ships for ' + bold('Windows') + ' today.');
     console.log('  macOS and Linux are next on the roadmap — until then, ' + bold('praxis status') + '');
     console.log('  gives you the same session health in the terminal.\n');
@@ -56,8 +58,17 @@ export async function tray(args = []) {
   }
 
   if (!fs.existsSync(p.praxisDir)) {
+    if (ensure) return;
     console.log('\n  PRAXIS is not set up here yet. Run ' + bold('npx praxis-memory') + ' first.\n');
     return;
+  }
+  if (ensure) {
+    try {
+      const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
+      if (cfg.tray === false) return;
+    } catch {
+      /* default on */
+    }
   }
 
   // stage the host script + icons + panel animations into the project
@@ -103,7 +114,9 @@ export async function tray(args = []) {
   try {
     const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
     if (pid && pidAlive(pid)) {
-      console.log('\n  tray companion is already running ' + grey('(praxis tray --stop to stop it)') + '\n');
+      if (!ensure) {
+        console.log('\n  tray companion is already running ' + grey('(praxis tray --stop to stop it)') + '\n');
+      }
       return;
     }
   } catch {
