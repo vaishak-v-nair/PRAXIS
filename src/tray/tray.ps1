@@ -223,15 +223,20 @@ $bMem.add_Click({ if (Test-Path $memoryFile) { Invoke-Item $memoryFile } })
 $bDir.add_Click({ Invoke-Item $ProjectRoot })
 
 $script:animShown = ''
+$script:picStream = $null
 function Refresh-Panel {
   $s = Get-PraxisState
   if ($AnimDir -and $s.name -ne $script:animShown) {
     $gif = Join-Path $AnimDir ($s.name + '.gif')
     if (Test-Path $gif) {
       try {
-        $old = $pic.Image
-        $pic.Image = [System.Drawing.Image]::FromFile($gif)
+        # load via MemoryStream, NOT FromFile — FromFile locks the file for the
+        # image's lifetime and breaks the next `praxis tray` restage (EBUSY)
+        $old = $pic.Image; $oldStream = $script:picStream
+        $script:picStream = New-Object System.IO.MemoryStream(,([System.IO.File]::ReadAllBytes($gif)))
+        $pic.Image = [System.Drawing.Image]::FromStream($script:picStream)
         if ($old) { $old.Dispose() }
+        if ($oldStream) { $oldStream.Dispose() }
         $script:animShown = $s.name
       } catch {}
     }
@@ -361,7 +366,7 @@ $bInk  = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(2
 $bStar = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 239, 111, 149))
 $HALO_OFFSETS = @(@(-1,-1),@(1,-1),@(-1,1),@(1,1),@(0,-2),@(0,2),@(-2,0),@(2,0))
 
-$script:ovGif = $null; $script:ovFrameDim = $null; $script:ovFrames = 0; $script:ovFrame = 0
+$script:ovGif = $null; $script:ovStream = $null; $script:ovFrameDim = $null; $script:ovFrames = 0; $script:ovFrame = 0
 $script:ovLines = @(); $script:ovPhase = 'off'; $script:ovTick = 0; $script:ovTick0 = 0
 $script:ovPinned = $false
 $ovTimer = New-Object System.Windows.Forms.Timer
@@ -419,6 +424,7 @@ function Hide-Overlay {
   $script:ovPhase = 'off'
   try { $script:overlay.Hide() } catch {}
   if ($script:ovGif) { $script:ovGif.Dispose(); $script:ovGif = $null }
+  if ($script:ovStream) { $script:ovStream.Dispose(); $script:ovStream = $null }
 }
 
 function Show-Overlay([string]$state, [string]$message, [bool]$pinned) {
@@ -427,7 +433,10 @@ function Show-Overlay([string]$state, [string]$message, [bool]$pinned) {
     $gif = Join-Path $AnimDir ($state + '.gif')
     if (-not (Test-Path $gif)) { return $false }
     if ($script:ovGif) { $script:ovGif.Dispose() }
-    $script:ovGif = [System.Drawing.Image]::FromFile($gif)
+    if ($script:ovStream) { $script:ovStream.Dispose() }
+    # MemoryStream, not FromFile: never hold a lock on the staged file
+    $script:ovStream = New-Object System.IO.MemoryStream(,([System.IO.File]::ReadAllBytes($gif)))
+    $script:ovGif = [System.Drawing.Image]::FromStream($script:ovStream)
     $script:ovFrameDim = New-Object System.Drawing.Imaging.FrameDimension($script:ovGif.FrameDimensionsList[0])
     $script:ovFrames = $script:ovGif.GetFrameCount($script:ovFrameDim)
     $script:ovFrame = 0

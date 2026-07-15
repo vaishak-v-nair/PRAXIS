@@ -71,18 +71,43 @@ export async function tray(args = []) {
     }
   }
 
-  // stage the host script + icons + panel animations into the project
+  // already running? say so BEFORE staging — the live host may hold these
+  // files open, and restaging is pointless while it runs anyway
+  if (!args.includes('--once')) {
+    try {
+      const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
+      if (pid && pidAlive(pid)) {
+        if (!ensure) {
+          console.log('\n  tray companion is already running ' + grey('(praxis tray --stop to stop it)') + '\n');
+        }
+        return;
+      }
+    } catch {
+      /* not running */
+    }
+  }
+
+  // stage the host script + icons + panel animations into the project.
+  // A copy can hit EBUSY if a dying host still holds a file — if the file is
+  // already there, that is fine; the next clean start restages it.
+  const safeCopy = (src, dest) => {
+    try {
+      fs.copyFileSync(src, dest);
+    } catch (e) {
+      if (!fs.existsSync(dest)) throw e;
+    }
+  };
   fs.mkdirSync(path.join(trayDir, 'icons'), { recursive: true });
   fs.mkdirSync(path.join(trayDir, 'anim'), { recursive: true });
-  fs.copyFileSync(path.join(TRAY_SRC, 'tray.ps1'), path.join(trayDir, 'tray.ps1'));
+  safeCopy(path.join(TRAY_SRC, 'tray.ps1'), path.join(trayDir, 'tray.ps1'));
   for (const s of STATES) {
     for (const suffix of ['', '2']) {
-      fs.copyFileSync(
+      safeCopy(
         path.join(TRAY_SRC, 'icons', `${s}${suffix}.ico`),
         path.join(trayDir, 'icons', `${s}${suffix}.ico`),
       );
     }
-    fs.copyFileSync(path.join(TRAY_SRC, 'anim', `${s}.gif`), path.join(trayDir, 'anim', `${s}.gif`));
+    safeCopy(path.join(TRAY_SRC, 'anim', `${s}.gif`), path.join(trayDir, 'anim', `${s}.gif`));
   }
 
   const psArgs = [
@@ -108,19 +133,6 @@ export async function tray(args = []) {
     const out = execFileSync('powershell.exe', [...psArgs, '-Once'], { encoding: 'utf8' });
     process.stdout.write(out);
     return;
-  }
-
-  // already running?
-  try {
-    const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
-    if (pid && pidAlive(pid)) {
-      if (!ensure) {
-        console.log('\n  tray companion is already running ' + grey('(praxis tray --stop to stop it)') + '\n');
-      }
-      return;
-    }
-  } catch {
-    /* not running */
   }
 
   try {
