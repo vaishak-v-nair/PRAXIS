@@ -41,6 +41,7 @@ if (-not $Once) {
 $memoryFile = Join-Path $ProjectRoot '.praxis\memory.md'
 $configFile = Join-Path $ProjectRoot '.praxis\config.json'
 $stateFile  = Join-Path $ProjectRoot '.praxis\state.json'
+$healthFile = Join-Path $ProjectRoot '.praxis\health.json'
 $startTime  = Get-Date
 $projName   = Split-Path $ProjectRoot -Leaf
 
@@ -84,6 +85,17 @@ function Get-PraxisState {
     if (((Get-Date) - $startTime).TotalSeconds -lt 8) { $name = 'happy'; $label = 'hello!' }
   }
 
+  # session health breadcrumb (written by praxis hud / capture / health):
+  # REAL context fill of the Claude session, if something measured it recently
+  $sess = $null
+  try {
+    $hj = Get-Content -Raw $healthFile | ConvertFrom-Json
+    $hAge = ((Get-Date) - [datetime]$hj.updated).TotalSeconds
+    if ($hAge -lt 900 -and $hj.pct -ge 0) {
+      $sess = @{ pct = [int]$hj.pct; level = [string]$hj.level; id = [string]$hj.sessionId }
+    }
+  } catch {}
+
   $entries = 0
   $recent = @()
   try {
@@ -100,7 +112,7 @@ function Get-PraxisState {
   return @{
     name = $name; label = $label; ratio = $ratio; updated = $updated
     kb = [math]::Round($bytes / 1024, 1); capKb = [math]::Round($cap / 1024, 0)
-    entries = $entries; recent = $recent
+    entries = $entries; recent = $recent; sess = $sess
   }
 }
 
@@ -245,7 +257,10 @@ function Refresh-Panel {
   if ($STATECOLOR.ContainsKey($s.name)) { $c = C $STATECOLOR[$s.name] }
   $stateLbl.Text = [char]0x25CF + ' ' + $s.label
   $stateLbl.ForeColor = $c
-  $sep = '  ' + [char]0x00B7 + '  '; $statsLbl.Text = ('' + $s.kb + ' KB / ' + $s.capKb + ' KB' + $sep + $s.entries + ' entries' + $sep + 'updated ' + $s.updated)
+  $sep = '  ' + [char]0x00B7 + '  '
+  $stats = ('' + $s.kb + ' KB / ' + $s.capKb + ' KB' + $sep + $s.entries + ' entries' + $sep + 'updated ' + $s.updated)
+  if ($s.sess) { $stats = ('session ' + $s.sess.pct + '% full' + $sep + $stats) }
+  $statsLbl.Text = $stats
   $r = $s.recent
   $rec1.Text = ''; $rec2.Text = ''; $rec3.Text = ''
   if ($r.Count -gt 0) { $rec1.Text = ([char]0x00B7 + ' ' + $r[0]) }
@@ -522,6 +537,7 @@ $ni.add_MouseUp({
 
 $script:lastName = ''
 $script:breath = 0
+$script:healthPopped = ''
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 2000
 $timer.add_Tick({
@@ -540,6 +556,21 @@ $timer.add_Tick({
       }
     }
     $script:lastName = $s.name
+  }
+  # the directional nudge: a Claude session measured nearly full pops the
+  # mascot ONCE per session with the exact way out
+  if ($s.sess -and $s.sess.level -eq 'critical') {
+    $popKey = $s.sess.id + ':critical'
+    if ($script:healthPopped -ne $popKey) {
+      $script:healthPopped = $popKey
+      $msg = 'Your Claude session is ' + $s.sess.pct + '% full. praxis switch starts a fresh one - your memory comes along.'
+      $popped = Show-Overlay 'limit' $msg $false
+      if (-not $popped) {
+        $ni.BalloonTipTitle = 'PRAXIS'
+        $ni.BalloonTipText = $msg
+        $ni.ShowBalloonTip(4000)
+      }
+    }
   }
   # slow breath: alternate glow intensity every tick
   $script:breath = 1 - $script:breath

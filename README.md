@@ -89,6 +89,7 @@ seconds. Turn it off any time with `"overlay": false` in `.praxis/config.json`
 npx praxis-memory     # set up here (or show status, if already set up)
 praxis init           # explicit setup
 praxis status         # what Praxis remembers, and session health
+praxis health         # how full is this Claude session, really — and where to go next
 praxis hud            # live view of your Claude session, in plain English (second terminal)
 praxis switch <tool>  # pack a handoff brief and move to gemini / codex / claude / cursor
 praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
@@ -140,13 +141,31 @@ It reads the session transcript file Claude Code already writes — it never
 touches Claude's terminal, so it can't break anything. When Claude asks *you*
 a question, the header turns red so you don't miss it.
 
-## Switching tools
+## Session health, and switching tools
 
-Session filling up? Want a different model on the problem? `praxis switch gemini`
-(or `codex`, `claude`, `cursor`, `antigravity`) packs your project brief and the
-latest session notes into `.praxis/handoff.md` and puts the exact launch command
-on your clipboard. The next tool starts already knowing your project — you never
-re-explain it.
+Claude Code writes its real token usage into every session transcript. `praxis
+health` reads it and tells you — with actual numbers, not guesses — how full
+the current session is, how many times it has been squeezed (compacted), and
+exactly what to do about it:
+
+```
+ Claude Code   ● 91% full (182k of 200k tokens) — critical
+               squeezed 3 times already (each squeeze loses detail)
+
+ What to do
+ Nearly full. Best move: praxis switch gemini — Gemini CLI starts at 0%
+ and your project memory comes along.
+```
+
+Claude is measured deeply; other tools (Gemini CLI, Codex CLI, Cursor,
+Antigravity) are checked shallowly — installed or not — so every suggestion is
+one you can actually take. The HUD shows the same number live in its header,
+and the tray mascot floats up once per session when it turns critical.
+
+`praxis switch gemini` (or `codex`, `claude`, `cursor`, `antigravity`) packs
+your project brief and the latest session notes into `.praxis/handoff.md` and
+puts the exact launch command on your clipboard. The next tool starts already
+knowing your project — you never re-explain it.
 
 ## Safety
 
@@ -163,8 +182,9 @@ re-explain it.
 - **v0.2 (now)** — the tray companion on Windows: `praxis tray`.
 - **v0.3 (now)** — `praxis hud` (live plain-English session view) and `praxis switch` (handoff brief for gemini/codex/claude/cursor).
 - **v0.4 (now)** — the floating mascot: state changes announced by the axolotl itself, no popup box.
-- **v0.5** — tray for macOS/Linux, and an MCP server (queryable memory).
-- **Later** — deeper cross-tool health, richer summarization.
+- **v0.5 (now)** — `praxis health`: real context fill from the transcript, directional switch suggestions, tray nudge at critical.
+- **v0.6** — tray for macOS/Linux, and an MCP server (queryable memory).
+- **Later** — deeper health for the other tools, richer summarization.
 
 ## Develop
 

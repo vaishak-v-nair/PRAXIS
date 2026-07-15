@@ -1,7 +1,9 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { projectPaths } from '../lib/paths.js';
 import { ensureMemory, addSessionEntry } from '../lib/memory.js';
 import { writeState } from '../lib/state.js';
+import { analyzeTranscript, classifyContext, writeHealthFile, DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
 
 // Called by the Claude Code Stop hook. Reads the hook's JSON from stdin,
 // derives a lightweight deterministic summary of the session, and appends it to
@@ -36,21 +38,17 @@ function collectFilePaths(obj, out, depth = 0) {
   for (const v of Object.values(obj)) collectFilePaths(v, out, depth + 1);
 }
 
-function summarizeTranscript(transcriptPath) {
+function summarizeTranscriptText(text) {
   const files = new Set();
   let turns = 0;
-  try {
-    const lines = stripBom(fs.readFileSync(transcriptPath, 'utf8')).split('\n').filter(Boolean);
-    turns = lines.length;
-    for (const line of lines) {
-      try {
-        collectFilePaths(JSON.parse(line), files);
-      } catch {
-        /* skip unparseable line */
-      }
+  const lines = text.split('\n').filter(Boolean);
+  turns = lines.length;
+  for (const line of lines) {
+    try {
+      collectFilePaths(JSON.parse(line), files);
+    } catch {
+      /* skip unparseable line */
     }
-  } catch {
-    /* transcript unreadable — degrade gracefully */
   }
   return { files: [...files], turns };
 }
@@ -85,7 +83,30 @@ export async function capture() {
     let files = [];
     let turns = 0;
     if (typeof data.transcript_path === 'string') {
-      ({ files, turns } = summarizeTranscript(data.transcript_path));
+      let text = '';
+      try {
+        text = stripBom(fs.readFileSync(data.transcript_path, 'utf8'));
+      } catch {
+        /* transcript unreadable — degrade gracefully */
+      }
+      ({ files, turns } = summarizeTranscriptText(text));
+      // session-end health breadcrumb for the tray and `praxis health`
+      const a = analyzeTranscript(text);
+      if (a.contextTokens > 0) {
+        const { pct, level } = classifyContext(a.contextTokens);
+        writeHealthFile(
+          p.praxisDir,
+          {
+            sessionId: path.basename(data.transcript_path, '.jsonl'),
+            contextTokens: a.contextTokens,
+            contextLimit: DEFAULT_CONTEXT_LIMIT,
+            pct,
+            level,
+            compactions: a.compactions,
+          },
+          'capture',
+        );
+      }
     }
 
     const rel = files.map((f) => shorten(f, cwd));

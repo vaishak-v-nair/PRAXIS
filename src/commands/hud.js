@@ -13,6 +13,8 @@ import {
   toolInPlainEnglish,
   whatIsHappening,
 } from '../lib/transcript.js';
+import { classifyContext, DEFAULT_CONTEXT_LIMIT, writeHealthFile } from '../lib/health.js';
+import { projectPaths } from '../lib/paths.js';
 import { rose, sage, amber, blue, red, bold, grey, dim, stripAnsi } from '../lib/ui.js';
 
 const POLL_MS = 250; // re-read the transcript
@@ -79,9 +81,32 @@ export async function hud(args = []) {
     }
   };
 
+  // while the HUD watches, it leaves a live health breadcrumb for the tray
+  const praxisDir = projectPaths().praxisDir;
+  let lastCrumb = 0;
+  const crumb = () => {
+    const st = tail.state;
+    if (!st.contextTokens || Date.now() - lastCrumb < 10000) return;
+    lastCrumb = Date.now();
+    const { pct, level } = classifyContext(st.contextTokens);
+    writeHealthFile(
+      praxisDir,
+      {
+        sessionId: path.basename(tail.file(), '.jsonl'),
+        contextTokens: st.contextTokens,
+        contextLimit: DEFAULT_CONTEXT_LIMIT,
+        pct,
+        level,
+        compactions: st.compactions,
+      },
+      'hud',
+    );
+  };
+
   draw();
   setInterval(() => {
     tail.catchUp();
+    crumb();
     draw();
   }, POLL_MS);
 
@@ -175,6 +200,15 @@ function render(state, meta) {
           ? sage('●')
           : grey('●');
 
+  // the health chip: real tokens from the transcript, not a guess
+  let chip = '';
+  if (state.contextTokens > 0) {
+    const { pct, level } = classifyContext(state.contextTokens);
+    const paintChip = level === 'critical' ? red : level === 'fresh' ? sage : amber;
+    chip = '  ' + paintChip(`▮ ${pct}% full`);
+    if (level === 'critical') chip += red('  praxis switch = fresh start');
+  }
+
   const lines = [];
   lines.push('');
   lines.push(
@@ -186,7 +220,8 @@ function render(state, meta) {
       dot +
       ' ' +
       (now.kind === 'ask' ? bold(red(now.text)) : now.text) +
-      (state.lastTs ? grey('  ·  ' + agoFromIso(state.lastTs)) : ''),
+      (state.lastTs ? grey('  ·  ' + agoFromIso(state.lastTs)) : '') +
+      chip,
   );
   lines.push('');
 

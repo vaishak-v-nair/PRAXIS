@@ -9,6 +9,7 @@ import { feedback } from './commands/feedback.js';
 import { tray } from './commands/tray.js';
 import { hud } from './commands/hud.js';
 import { switchTool } from './commands/switch.js';
+import { health } from './commands/health.js';
 import { projectPaths } from './lib/paths.js';
 import { bigBanner, bold, grey } from './lib/ui.js';
 
@@ -29,6 +30,7 @@ function help() {
   ${bold('npx praxis-memory')}     set up PRAXIS here ${grey('(or show status if already set up)')}
   ${bold('praxis init')}           set up PRAXIS in the current project
   ${bold('praxis status')}         what PRAXIS remembers, and session health
+  ${bold('praxis health')}         how full is this Claude session, really — and where to go next
   ${bold('praxis hud')}            live view of your Claude session, in plain English ${grey('(second terminal)')}
   ${bold('praxis switch <tool>')}  pack a handoff brief and move to gemini · codex · claude · cursor
   ${bold('praxis tray')}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
@@ -62,6 +64,9 @@ switch (cmd) {
     break;
   case 'switch':
     await switchTool(process.argv.slice(3));
+    break;
+  case 'health':
+    await health(process.argv.slice(3));
     break;
   case '-v':
   case '--version':

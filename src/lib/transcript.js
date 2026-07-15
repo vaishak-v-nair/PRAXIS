@@ -44,6 +44,8 @@ export function freshHudState() {
     toolsThisTurn: 0,
     lastTs: null, // ISO timestamp of the newest event seen
     lastEvent: null, // 'user' | 'assistant' | 'tool'
+    contextTokens: 0, // REAL context size: last assistant usage (input + cache)
+    compactions: 0, // times this session has been squeezed
   };
 }
 
@@ -81,7 +83,15 @@ export function applyLine(state, raw) {
       }
     }
     if (sawResult) state.lastEvent = 'tool';
+  } else if (e.type === 'system' && e.subtype === 'compact_boundary') {
+    state.compactions++;
   } else if (e.type === 'assistant' && e.message && Array.isArray(e.message.content)) {
+    const u = e.message.usage;
+    if (u) {
+      const total =
+        (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
+      if (total > 0) state.contextTokens = total;
+    }
     for (const item of e.message.content) {
       if (item.type === 'text' && item.text && item.text.trim()) {
         state.responding = item.text.trim();

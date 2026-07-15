@@ -10,44 +10,11 @@ import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
 import { buildCapsule } from '../lib/handoff.js';
 import { writeState } from '../lib/state.js';
-import { rose, sage, amber, bold, grey, dim } from '../lib/ui.js';
+import { TOOLS, ALIASES, CAPSULE, onPath } from '../lib/tools.js';
+import { healthReport } from '../lib/health.js';
+import { rose, sage, amber, red, bold, grey, dim } from '../lib/ui.js';
 
-// forward slashes on purpose: every target tool understands them, on every OS
-const CAPSULE = '.praxis/handoff.md';
 const ASK = `Read ${CAPSULE} first, then continue the work it describes.`;
-
-export const TOOLS = {
-  claude: {
-    name: 'Claude Code',
-    bin: 'claude',
-    run: `claude "${ASK}"`,
-    install: 'npm install -g @anthropic-ai/claude-code',
-  },
-  gemini: {
-    name: 'Gemini CLI',
-    bin: 'gemini',
-    run: `gemini -i "${ASK}"`,
-    install: 'npm install -g @google/gemini-cli',
-  },
-  codex: {
-    name: 'Codex CLI',
-    bin: 'codex',
-    run: `codex "${ASK}"`,
-    install: 'npm install -g @openai/codex',
-  },
-  cursor: {
-    name: 'Cursor',
-    bin: 'cursor',
-    paste: true,
-  },
-  antigravity: {
-    name: 'Antigravity',
-    bin: 'antigravity',
-    paste: true,
-  },
-};
-
-const ALIASES = { 'gemini-cli': 'gemini', 'codex-cli': 'codex', 'claude-code': 'claude' };
 
 export async function switchTool(args = []) {
   const target = ALIASES[args[0]] || args[0];
@@ -116,9 +83,23 @@ export async function switchTool(args = []) {
 
 function listTools() {
   console.log(`
-  ${bold('praxis switch <tool>')} — pack your project memory and move to another AI tool.
+  ${bold('praxis switch <tool>')} — pack your project memory and move to another AI tool.`);
 
-  ${bold('Tools it can hand off to')}`);
+  // why switch now? show the real session number when we have one
+  const r = healthReport();
+  if (r && r.contextTokens > 0) {
+    const c = r.level === 'critical' ? red : r.level === 'fresh' ? sage : amber;
+    console.log(
+      '\n  ' +
+        bold('Right now') +
+        '  ' +
+        c('●') +
+        ` your Claude session is ${bold(r.pct + '% full')} ` +
+        grey(`(${r.level}${r.compactions ? ', squeezed ' + r.compactions + 'x' : ''})`),
+    );
+  }
+
+  console.log(`\n  ${bold('Tools it can hand off to')}`);
   for (const [key, t] of Object.entries(TOOLS)) {
     const here = t.bin && onPath(t.bin);
     const mark = here ? sage('● installed') : grey('○ not found');
@@ -130,15 +111,6 @@ function listTools() {
   2. Tells you the exact command that opens the next tool ${bold('already knowing')}
      your project — so you never re-explain it.
 `);
-}
-
-function onPath(bin) {
-  try {
-    const probe = process.platform === 'win32' ? 'where' : 'which';
-    return spawnSync(probe, [bin], { stdio: 'ignore', shell: false }).status === 0;
-  } catch {
-    return false;
-  }
 }
 
 /** Best-effort, zero-dependency clipboard. Failure is fine — text is on screen. */
