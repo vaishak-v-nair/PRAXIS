@@ -7,6 +7,8 @@ import { status } from './commands/status.js';
 import { capture } from './commands/capture.js';
 import { feedback } from './commands/feedback.js';
 import { tray } from './commands/tray.js';
+import { hud } from './commands/hud.js';
+import { switchTool } from './commands/switch.js';
 import { projectPaths } from './lib/paths.js';
 import { bigBanner, bold, grey } from './lib/ui.js';
 
@@ -24,12 +26,14 @@ function version() {
 function help() {
   console.log('\n' + bigBanner(version()) + '\n');
   console.log(`  ${bold('Usage')}
-  ${bold('npx praxis-memory')}   set up PRAXIS here ${grey('(or show status if already set up)')}
-  ${bold('praxis init')}         set up PRAXIS in the current project
-  ${bold('praxis status')}       what PRAXIS remembers, and session health
-  ${bold('praxis tray')}         the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
-  ${bold('praxis feedback')}     the two questions that shape what gets built next
-  ${grey('praxis capture      (internal) called by the Claude Code Stop hook')}
+  ${bold('npx praxis-memory')}     set up PRAXIS here ${grey('(or show status if already set up)')}
+  ${bold('praxis init')}           set up PRAXIS in the current project
+  ${bold('praxis status')}         what PRAXIS remembers, and session health
+  ${bold('praxis hud')}            live view of your Claude session, in plain English ${grey('(second terminal)')}
+  ${bold('praxis switch <tool>')}  pack a handoff brief and move to gemini · codex · claude · cursor
+  ${bold('praxis tray')}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
+  ${bold('praxis feedback')}       the two questions that shape what gets built next
+  ${grey('praxis capture        (internal) called by the Claude Code Stop hook')}
 
   ${grey('Local-first. No server. No account. Nothing leaves your machine.')}
 `);
@@ -52,6 +56,12 @@ switch (cmd) {
     break;
   case 'tray':
     await tray(process.argv.slice(3));
+    break;
+  case 'hud':
+    await hud(process.argv.slice(3));
+    break;
+  case 'switch':
+    await switchTool(process.argv.slice(3));
     break;
   case '-v':
   case '--version':

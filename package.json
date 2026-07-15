@@ -1,6 +1,6 @@
 {
   "name": "praxis-memory",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Give Claude Code a memory. Never re-explain your project again. Local-first — no server, no account, nothing leaves your machine.",
   "type": "module",
   "bin": {

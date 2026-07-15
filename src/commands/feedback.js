@@ -1,5 +1,5 @@
 export function feedback() {
-  const url = 'https://github.com/YOUR_HANDLE/praxis/issues/new?title=feedback';
+  const url = 'https://github.com/vaishak-v-nair/PRAXIS/issues/new?title=feedback';
   console.log(`
 PRAXIS is free and local. Two questions decide whether it becomes more:
 

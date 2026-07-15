@@ -79,11 +79,13 @@ On Windows it starts with the very first install and lives in your system tray: 
 ## Commands
 
 ```bash
-npx praxis-memory    # set up here (or show status, if already set up)
-praxis init          # explicit setup
-praxis status        # what Praxis remembers, and session health
-praxis tray          # the axolotl in your system tray (Windows; --stop to quit)
-praxis feedback      # the two questions that shape what gets built next
+npx praxis-memory     # set up here (or show status, if already set up)
+praxis init           # explicit setup
+praxis status         # what Praxis remembers, and session health
+praxis hud            # live view of your Claude session, in plain English (second terminal)
+praxis switch <tool>  # pack a handoff brief and move to gemini / codex / claude / cursor
+praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
+praxis feedback       # the two questions that shape what gets built next
 ```
 
 Inside Claude Code, type `/` and the Praxis commands appear:
@@ -109,6 +111,36 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 
 > `/` menu looks empty? Restart the open Claude Code session — it loads commands at start.
 
+## The HUD
+
+Terminals full of scrolling text are hard to read. `praxis hud` (in a second
+terminal) shows only three things, updating in place, in plain English:
+
+```
+ ✦ PRAXIS HUD  ·  E:\PRAXIS  ● Running a command  ·  just now
+
+ YOU ASKED
+   fix the login bug
+
+ CLAUDE SAYS
+   The token expiry check uses < instead of <=. Fixing it now.
+
+ RUNNING
+   now   Running a command — npm test   (3 steps this turn)
+```
+
+It reads the session transcript file Claude Code already writes — it never
+touches Claude's terminal, so it can't break anything. When Claude asks *you*
+a question, the header turns red so you don't miss it.
+
+## Switching tools
+
+Session filling up? Want a different model on the problem? `praxis switch gemini`
+(or `codex`, `claude`, `cursor`, `antigravity`) packs your project brief and the
+latest session notes into `.praxis/handoff.md` and puts the exact launch command
+on your clipboard. The next tool starts already knowing your project — you never
+re-explain it.
+
 ## Safety
 
 - **Redaction** — before writing, Praxis strips common secrets (API keys, tokens,
@@ -122,8 +154,9 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 
 - **v0.1 (now)** — local memory for Claude Code: capture loop, `/praxis-save`, `praxis status`.
 - **v0.2 (now)** — the tray companion on Windows: `praxis tray`.
-- **v0.3** — tray for macOS/Linux, and an MCP server (queryable memory).
-- **Later** — cross-tool support, richer summarization.
+- **v0.3 (now)** — `praxis hud` (live plain-English session view) and `praxis switch` (handoff brief for gemini/codex/claude/cursor).
+- **v0.4** — tray for macOS/Linux, and an MCP server (queryable memory).
+- **Later** — deeper cross-tool health, richer summarization.
 
 ## Develop
 

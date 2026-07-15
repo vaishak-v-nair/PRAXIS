@@ -102,6 +102,7 @@ export async function init() {
   ${grey('1.')} Open this project in Claude Code — your memory loads automatically.
   ${grey('2.')} End a session and PRAXIS logs it. Type ${rose('/praxis-save')} for a rich summary.
   ${grey('3.')} ${bold('praxis status')} — see what it remembers, any time.
+  ${grey('4.')} ${bold('praxis hud')} in a second terminal — watch the session live, in plain English.
 
   ${dim('If a Claude Code session is already open, restart it (or start a new')}
   ${dim('session) so the / menu picks up the new commands.')}

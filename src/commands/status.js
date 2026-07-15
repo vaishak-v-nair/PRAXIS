@@ -40,6 +40,12 @@ export function status() {
       : fill < 0.9
         ? amber('●') + ' filling up'
         : red('●') + ' near the cap';
+  const healthPlain =
+    fill < 0.6
+      ? 'Plenty of room. Nothing to do.'
+      : fill < 0.9
+        ? 'Getting full — the oldest session notes will be trimmed automatically. Nothing to do.'
+        : 'At the cap — oldest notes are trimmed as new ones arrive. Put anything precious in the Project section; it is never trimmed.';
 
   console.log('\n' + bigBanner(pkgVersion(), [grey((bytes / 1024).toFixed(1) + ' KB · ' + health)]) + '\n');
   console.log('  ' + grey('memory   ') + path.relative(p.root, p.memoryFile));
@@ -49,8 +55,9 @@ export function status() {
       `${(bytes / 1024).toFixed(1)} KB · ${entries} session entr${entries === 1 ? 'y' : 'ies'}`,
   );
   console.log('  ' + grey('updated  ') + timeAgo(stat.mtime));
-  console.log('  ' + grey('state    ') + health);
+  console.log('  ' + grey('state    ') + health + grey(' — ' + healthPlain));
   console.log('\n  ' + dim('Loaded into Claude Code automatically via the PRAXIS block in CLAUDE.md.'));
   console.log('  ' + dim('Inside a session, type ') + rose('/praxis-status') + dim(' or ') + rose('/praxis-save') + dim('.'));
+  console.log('  ' + dim('Watching a live session? ') + rose('praxis hud') + dim(' in a second terminal shows it in plain English.'));
   console.log('\n  ' + dim('“' + dailyQuote() + '”') + '\n');
 }
