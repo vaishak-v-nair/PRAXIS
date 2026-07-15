@@ -262,6 +262,212 @@ if ($env:PRAXIS_TRAY_TEST -ne 'panel') {
   $panel.add_Deactivate({ $panel.Hide() })
 }
 
+# ---------- floating mascot overlay ----------
+# No popup box, no window chrome: a layered per-pixel-alpha window that is
+# click-through and never takes focus. The mascot IS the message - it rises,
+# says one plain-English line, breathes for a few seconds, and fades away.
+$overlayEnabled = $true
+try {
+  $cfgOv = Get-Content -Raw $configFile | ConvertFrom-Json
+  if ($cfgOv.overlay -eq $false) { $overlayEnabled = $false }
+} catch {}
+
+$script:overlay = $null
+if ($overlayEnabled) {
+  try {
+    Add-Type -ReferencedAssemblies System.Windows.Forms, System.Drawing -TypeDefinition @'
+using System;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using System.Windows.Forms;
+
+// A borderless window whose shape and translucency come entirely from the
+// ARGB bitmap pushed through UpdateLayeredWindow. Click-through + no-activate:
+// it can never get in the user's way.
+public class PraxisOverlayWindow : Form {
+    public PraxisOverlayWindow() {
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        FormBorderStyle = FormBorderStyle.None;
+        TopMost = true;
+    }
+    protected override CreateParams CreateParams {
+        get {
+            CreateParams cp = base.CreateParams;
+            cp.ExStyle |= 0x00080000; // WS_EX_LAYERED
+            cp.ExStyle |= 0x00000020; // WS_EX_TRANSPARENT (clicks pass through)
+            cp.ExStyle |= 0x00000080; // WS_EX_TOOLWINDOW  (no alt-tab entry)
+            cp.ExStyle |= 0x08000000; // WS_EX_NOACTIVATE  (never steals focus)
+            return cp;
+        }
+    }
+    protected override bool ShowWithoutActivation { get { return true; } }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    struct BLENDFUNCTION { public byte BlendOp, BlendFlags, SourceConstantAlpha, AlphaFormat; }
+    [DllImport("user32.dll", SetLastError = true)]
+    static extern bool UpdateLayeredWindow(IntPtr hwnd, IntPtr hdcDst, ref Point pptDst, ref Size psize,
+        IntPtr hdcSrc, ref Point pprSrc, int crKey, ref BLENDFUNCTION pblend, int dwFlags);
+    [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr hWnd);
+    [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+    [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr hDC);
+    [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr hdc);
+    [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr hDC, IntPtr hObject);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr hObject);
+
+    public void SetBitmap(Bitmap bitmap, byte opacity, int x, int y) {
+        IntPtr screenDc = GetDC(IntPtr.Zero);
+        IntPtr memDc = CreateCompatibleDC(screenDc);
+        IntPtr hBitmap = IntPtr.Zero, oldBitmap = IntPtr.Zero;
+        try {
+            hBitmap = bitmap.GetHbitmap(Color.FromArgb(0));
+            oldBitmap = SelectObject(memDc, hBitmap);
+            Size size = new Size(bitmap.Width, bitmap.Height);
+            Point src = new Point(0, 0);
+            Point top = new Point(x, y);
+            BLENDFUNCTION blend = new BLENDFUNCTION();
+            blend.BlendOp = 0;              // AC_SRC_OVER
+            blend.SourceConstantAlpha = opacity;
+            blend.AlphaFormat = 1;          // AC_SRC_ALPHA (per-pixel)
+            UpdateLayeredWindow(Handle, screenDc, ref top, ref size, memDc, ref src, 0, ref blend, 2 /*ULW_ALPHA*/);
+        } finally {
+            ReleaseDC(IntPtr.Zero, screenDc);
+            if (hBitmap != IntPtr.Zero) { SelectObject(memDc, oldBitmap); DeleteObject(hBitmap); }
+            DeleteDC(memDc);
+        }
+    }
+}
+'@
+    $script:overlay = New-Object PraxisOverlayWindow
+    [void]$script:overlay.Handle   # force handle creation; stays invisible until SetBitmap
+  } catch { $script:overlay = $null }
+}
+
+# what the mascot says, per state - plain English, one action, no jargon
+$OVERLAY_MSG = @{
+  warning   = 'Your notes are getting full. I trim the oldest ones myself - nothing to do.'
+  limit     = 'Notes hit the cap. Type /praxis-save in Claude to keep what matters.'
+  switching = 'Saving this session...'
+  restored  = 'Saved. Your next session starts already briefed.'
+  happy     = 'I live down here now. I pop up when your project memory needs you.'
+}
+
+$OV_W = 380; $OV_MASCOT_W = 285; $OV_MASCOT_H = 160; $OV_TEXT_H = 76
+$OV_H = $OV_TEXT_H + $OV_MASCOT_H
+$fMsg  = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
+$bHalo = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(190, 22, 13, 9))
+$bInk  = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 240, 232, 218))
+$bStar = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 239, 111, 149))
+$HALO_OFFSETS = @(@(-1,-1),@(1,-1),@(-1,1),@(1,1),@(0,-2),@(0,2),@(-2,0),@(2,0))
+
+$script:ovGif = $null; $script:ovFrameDim = $null; $script:ovFrames = 0; $script:ovFrame = 0
+$script:ovLines = @(); $script:ovPhase = 'off'; $script:ovTick = 0; $script:ovTick0 = 0
+$script:ovPinned = $false
+$ovTimer = New-Object System.Windows.Forms.Timer
+$ovTimer.Interval = 40
+
+function Wrap-OvText([string]$text) {
+  $max = $OV_W - 40
+  $scratch = New-Object System.Drawing.Bitmap(1, 1)
+  $g = [System.Drawing.Graphics]::FromImage($scratch)
+  $lines = @(); $cur = ''
+  foreach ($w in ($text -split ' ')) {
+    $cand = $w
+    if ($cur) { $cand = $cur + ' ' + $w }
+    if ($cur -and $g.MeasureString($cand, $fMsg).Width -gt $max) { $lines += $cur; $cur = $w }
+    else { $cur = $cand }
+  }
+  if ($cur) { $lines += $cur }
+  $g.Dispose(); $scratch.Dispose()
+  return @($lines | Select-Object -First 3)
+}
+
+function Draw-Overlay {
+  $bmp = New-Object System.Drawing.Bitmap($OV_W, $OV_H, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+  if ($script:ovGif) {
+    try {
+      [void]$script:ovGif.SelectActiveFrame($script:ovFrameDim, $script:ovFrame)
+      $g.DrawImage($script:ovGif, ($OV_W - $OV_MASCOT_W), $OV_TEXT_H, $OV_MASCOT_W, $OV_MASCOT_H)
+    } catch {}
+  }
+  # message text: dark halo + warm ink, readable on any wallpaper, no box
+  $ty = [single]6
+  $first = $true
+  foreach ($line in $script:ovLines) {
+    $sz = $g.MeasureString($line, $fMsg)
+    $tx = [single]($OV_W - $sz.Width - 10)
+    foreach ($o in $HALO_OFFSETS) { $g.DrawString($line, $fMsg, $bHalo, ($tx + $o[0]), ($ty + $o[1])) }
+    $g.DrawString($line, $fMsg, $bInk, $tx, $ty)
+    if ($first) {
+      $star = [string][char]0x2726
+      foreach ($o in $HALO_OFFSETS) { $g.DrawString($star, $fMsg, $bHalo, ($tx - 20 + $o[0]), ($ty + $o[1])) }
+      $g.DrawString($star, $fMsg, $bStar, ($tx - 20), $ty)
+      $first = $false
+    }
+    $ty += 22
+  }
+  $g.Dispose()
+  return $bmp
+}
+
+function Hide-Overlay {
+  $ovTimer.Stop()
+  $script:ovPhase = 'off'
+  try { $script:overlay.Hide() } catch {}
+  if ($script:ovGif) { $script:ovGif.Dispose(); $script:ovGif = $null }
+}
+
+function Show-Overlay([string]$state, [string]$message, [bool]$pinned) {
+  if (-not $script:overlay) { return $false }
+  try {
+    $gif = Join-Path $AnimDir ($state + '.gif')
+    if (-not (Test-Path $gif)) { return $false }
+    if ($script:ovGif) { $script:ovGif.Dispose() }
+    $script:ovGif = [System.Drawing.Image]::FromFile($gif)
+    $script:ovFrameDim = New-Object System.Drawing.Imaging.FrameDimension($script:ovGif.FrameDimensionsList[0])
+    $script:ovFrames = $script:ovGif.GetFrameCount($script:ovFrameDim)
+    $script:ovFrame = 0
+    $script:ovLines = Wrap-OvText $message
+    $script:ovPinned = $pinned
+    $script:ovPhase = 'in'; $script:ovTick = 0; $script:ovTick0 = 0
+    $script:overlay.Show()
+    $ovTimer.Start()
+    return $true
+  } catch { return $false }
+}
+
+$ovTimer.add_Tick({
+  $script:ovTick++
+  if ($script:ovFrames -gt 0 -and ($script:ovTick % 3) -eq 0) {
+    $script:ovFrame = ($script:ovFrame + 1) % $script:ovFrames
+  }
+  $alpha = 255; $dy = 0
+  if ($script:ovPhase -eq 'in') {
+    $t = $script:ovTick / 8.0                      # ~320ms rise + fade in
+    if ($t -ge 1) { $t = 1; $script:ovPhase = 'hold'; $script:ovTick0 = $script:ovTick }
+    $e = 1 - (1 - $t) * (1 - $t)                   # ease-out
+    $alpha = [int](255 * $e); $dy = [int](24 * (1 - $e))
+  } elseif ($script:ovPhase -eq 'hold') {
+    if (-not $script:ovPinned -and ($script:ovTick - $script:ovTick0) -ge 150) {  # ~6s
+      $script:ovPhase = 'out'; $script:ovTick0 = $script:ovTick
+    }
+  } elseif ($script:ovPhase -eq 'out') {
+    $t = ($script:ovTick - $script:ovTick0) / 12.0 # ~480ms sink + fade out
+    if ($t -ge 1) { Hide-Overlay; return }
+    $alpha = [int](255 * (1 - $t)); $dy = [int](12 * $t)
+  } else { return }
+  $bmp = Draw-Overlay
+  $wa = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+  $x = $wa.Right - $bmp.Width - 16
+  $y = $wa.Bottom - $bmp.Height - 10 + $dy
+  try { $script:overlay.SetBitmap($bmp, [byte]$alpha, [int]$x, [int]$y) } catch {}
+  $bmp.Dispose()
+})
+
 # ---------- tray icon ----------
 $ni = New-Object System.Windows.Forms.NotifyIcon
 $ni.Icon = $icons['happy'][1]
@@ -313,11 +519,16 @@ $timer.add_Tick({
   $s = $null
   if ($panel.Visible) { $s = Refresh-Panel } else { $s = Get-PraxisState }
   if ($s.name -ne $script:lastName) {
-    # push a toast only when ENTERING a state that matters
+    # speak only when ENTERING a state that matters: the floating mascot
+    # says it; a balloon toast is the fallback if the overlay is unavailable
     if ($script:lastName -ne '' -and $TOAST.ContainsKey($s.name)) {
-      $ni.BalloonTipTitle = 'PRAXIS'
-      $ni.BalloonTipText = $TOAST[$s.name]
-      $ni.ShowBalloonTip(4000)
+      $popped = $false
+      if ($OVERLAY_MSG.ContainsKey($s.name)) { $popped = Show-Overlay $s.name $OVERLAY_MSG[$s.name] $false }
+      if (-not $popped) {
+        $ni.BalloonTipTitle = 'PRAXIS'
+        $ni.BalloonTipText = $TOAST[$s.name]
+        $ni.ShowBalloonTip(4000)
+      }
     }
     $script:lastName = $s.name
   }
@@ -332,6 +543,22 @@ $timer.add_Tick({
 $timer.Start()
 
 if ($env:PRAXIS_TRAY_TEST -eq 'panel') { Show-Panel }
+
+# QA pin: PRAXIS_TRAY_TEST=overlay-<state> shows the mascot and keeps it up
+if ($env:PRAXIS_TRAY_TEST -like 'overlay*') {
+  $ovState = 'warning'
+  if ($env:PRAXIS_TRAY_TEST -match 'overlay-(\w+)') { $ovState = $Matches[1] }
+  $ovMsg = 'Hello from the overlay test.'
+  if ($OVERLAY_MSG.ContainsKey($ovState)) { $ovMsg = $OVERLAY_MSG[$ovState] }
+  [void](Show-Overlay $ovState $ovMsg $true)
+} elseif ($script:overlay -and $PidFile) {
+  # first run ever in this project: the mascot introduces itself, once
+  $helloFlag = Join-Path (Split-Path $PidFile) 'hello.done'
+  if (-not (Test-Path $helloFlag)) {
+    Set-Content -Path $helloFlag -Value '1'
+    [void](Show-Overlay 'happy' $OVERLAY_MSG['happy'] $false)
+  }
+}
 
 [System.Windows.Forms.Application]::Run()
 $timer.Stop()

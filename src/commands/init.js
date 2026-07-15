@@ -32,7 +32,7 @@ export async function init() {
   if (!fs.existsSync(p.configFile)) {
     fs.writeFileSync(
       p.configFile,
-      JSON.stringify({ capture: true, maxLogBytes: 16384, redact: true, tray: true }, null, 2) + '\n',
+      JSON.stringify({ capture: true, maxLogBytes: 16384, redact: true, tray: true, overlay: true }, null, 2) + '\n',
     );
   }
   done.push('.praxis/memory.md + config.json');

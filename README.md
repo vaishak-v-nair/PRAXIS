@@ -74,7 +74,14 @@ bar — its state *is* your session's state:
 |:--:|:--:|:--:|:--:|:--:|
 | context fresh | filling up | limit reached | moving context | context recovered |
 
-On Windows it starts with the very first install and lives in your system tray: the axolotl breathes slowly, and only its glow changes with your session state — green healthy, amber filling, red at the limit, blue switching, gold restored. It pushes a toast at the moments that matter and stays silent otherwise. Left-click opens a popover: the animated mascot, live memory stats, your recent session entries and a suggestion. macOS and Linux are next; `praxis status` covers every platform meanwhile.
+On Windows it starts with the very first install and lives in your system tray: the axolotl breathes slowly, and only its glow changes with your session state — green healthy, amber filling, red at the limit, blue switching, gold restored. Left-click opens a popover: the animated mascot, live memory stats, your recent session entries and a suggestion. macOS and Linux are next; `praxis status` covers every platform meanwhile.
+
+At the moments that matter, the mascot itself floats up from the corner of your
+screen — no popup box, no window, just the axolotl and one plain-English line
+("Saved. Your next session starts already briefed."). It never takes focus,
+clicks pass straight through it, and it fades away on its own after a few
+seconds. Turn it off any time with `"overlay": false` in `.praxis/config.json`
+(balloon toasts return as the fallback).
 
 ## Commands
 
@@ -155,7 +162,8 @@ re-explain it.
 - **v0.1 (now)** — local memory for Claude Code: capture loop, `/praxis-save`, `praxis status`.
 - **v0.2 (now)** — the tray companion on Windows: `praxis tray`.
 - **v0.3 (now)** — `praxis hud` (live plain-English session view) and `praxis switch` (handoff brief for gemini/codex/claude/cursor).
-- **v0.4** — tray for macOS/Linux, and an MCP server (queryable memory).
+- **v0.4 (now)** — the floating mascot: state changes announced by the axolotl itself, no popup box.
+- **v0.5** — tray for macOS/Linux, and an MCP server (queryable memory).
 - **Later** — deeper cross-tool health, richer summarization.
 
 ## Develop
