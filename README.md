@@ -16,12 +16,12 @@ and hands it back to Claude automatically the next time you open the project.
 [![local-first](https://img.shields.io/badge/data-never%20leaves%20your%20machine-dfa03a)](#safety)
 
 ```bash
-npx praxis-memory
+npm install -g praxis-memory && praxis
 ```
 
-*One command — same on **Windows, macOS and Linux** (Node 18+). It sets up the hooks, the memory file, everything — then every session after remembers.*
+*One command — same on **Windows, macOS and Linux** (Node 18+). It sets up the hooks, the memory file, the tray companion, everything — then every session after remembers. The global install matters: the hooks (auto-capture, pre-compact snapshots, tray auto-start) call `praxis` by name, so it needs to be on your PATH. Just trying it out? `npx praxis-memory` works for a look around.*
 
-**Two doors:** before Claude, it's the terminal — `npx praxis-memory`. Inside Claude Code, it's the slash — type `/` and the `/praxis-*` commands are right there.
+**Two doors:** before Claude, it's the terminal — `praxis`. Inside Claude Code, it's the slash — type `/` and the `/praxis-*` commands are right there.
 
 </div>
 
@@ -58,7 +58,13 @@ Praxis closes the loop: the context survives the session.
   memory. Claude reads `CLAUDE.md` automatically, so memory loads every session with
   zero manual steps.
 - **Auto-capture** — `init` installs a `Stop` hook. When a session ends,
-  `praxis capture` appends a lightweight summary.
+  `praxis capture` appends a lightweight summary: what you were working on,
+  which files were touched.
+- **Snapshots** — a `PreCompact` hook fires right before Claude squeezes a full
+  session. That is the moment detail is about to be lost — Praxis saves the
+  context size, your recent asks and the files touched, first.
+- **Always on** — a `SessionStart` hook brings the tray companion up the moment
+  a Claude session opens. Health is ambient, not a command you remember to run.
 - **Rich capture** — `/praxis-save` asks Claude to write a real decision-level summary.
 
 ## The companion
@@ -113,7 +119,7 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `.praxis/memory.md` | Your living project memory — the thing Claude reads |
 | `.praxis/config.json` | Local settings: capture on/off, size cap, redaction |
 | `CLAUDE.md` | A managed `PRAXIS:START/END` block. **Your own content is never touched.** |
-| `.claude/settings.json` | A `Stop` hook, merged in without disturbing existing hooks |
+| `.claude/settings.json` | `Stop` + `PreCompact` + `SessionStart` hooks, merged in without disturbing existing hooks |
 | `.claude/commands/` | The five `/praxis-*` slash commands, project-scoped |
 | `~/.claude/commands/` | The same five, user-wide — so `/` shows them in **every** project |
 
@@ -157,10 +163,15 @@ exactly what to do about it:
  and your project memory comes along.
 ```
 
+You never have to run it: the tray companion computes the same number itself
+every few seconds, straight from the transcript. The icon's glow turns amber
+when the session gets heavy and red when it's critical, the tooltip and panel
+show "session 82% full", and the mascot floats up once per level with the way
+out. `praxis health` is just the detailed view of what the tray already knows.
+
 Claude is measured deeply; other tools (Gemini CLI, Codex CLI, Cursor,
 Antigravity) are checked shallowly — installed or not — so every suggestion is
-one you can actually take. The HUD shows the same number live in its header,
-and the tray mascot floats up once per session when it turns critical.
+one you can actually take. The HUD shows the same number live in its header.
 
 `praxis switch gemini` (or `codex`, `claude`, `cursor`, `antigravity`) packs
 your project brief and the latest session notes into `.praxis/handoff.md` and
@@ -183,7 +194,8 @@ knowing your project — you never re-explain it.
 - **v0.3 (now)** — `praxis hud` (live plain-English session view) and `praxis switch` (handoff brief for gemini/codex/claude/cursor).
 - **v0.4 (now)** — the floating mascot: state changes announced by the axolotl itself, no popup box.
 - **v0.5 (now)** — `praxis health`: real context fill from the transcript, directional switch suggestions, tray nudge at critical.
-- **v0.6** — tray for macOS/Linux, and an MCP server (queryable memory).
+- **v0.6 (now)** — health goes ambient: the tray measures the session itself and auto-starts with Claude; pre-compact snapshots; panel typography.
+- **v0.7** — tray for macOS/Linux, and an MCP server (queryable memory).
 - **Later** — deeper health for the other tools, richer summarization.
 
 ## Develop

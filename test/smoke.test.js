@@ -41,7 +41,7 @@ test('patchClaudeMd preserves user content and is idempotent', () => {
   assert.equal((out.match(/PRAXIS:START/g) || []).length, 1);
 });
 
-test('patchSettings adds a Stop hook without clobbering existing hooks', () => {
+test('patchSettings adds all hooks without clobbering existing ones', () => {
   const dir = tmp();
   const file = path.join(dir, 'settings.json');
   fs.writeFileSync(file, JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ type: 'command', command: 'echo hi' }] }] } }));
@@ -51,6 +51,10 @@ test('patchSettings adds a Stop hook without clobbering existing hooks', () => {
   assert.ok(s.hooks.PreToolUse, 'existing hooks preserved');
   assert.equal(s.hooks.Stop.length, 1, 'no duplicate Stop hook');
   assert.match(JSON.stringify(s.hooks.Stop), /praxis capture/);
+  assert.equal(s.hooks.PreCompact.length, 1, 'snapshot hook present once');
+  assert.match(JSON.stringify(s.hooks.PreCompact), /praxis capture/);
+  assert.equal(s.hooks.SessionStart.length, 1, 'tray auto-start hook present once');
+  assert.match(JSON.stringify(s.hooks.SessionStart), /praxis tray --ensure/);
 });
 
 test('addSessionEntry prepends, redacts, and caps size', () => {

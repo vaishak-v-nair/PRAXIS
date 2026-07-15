@@ -45,6 +45,57 @@ $healthFile = Join-Path $ProjectRoot '.praxis\health.json'
 $startTime  = Get-Date
 $projName   = Split-Path $ProjectRoot -Leaf
 
+# ---------- ambient session health ----------
+# Health is not a command someone remembers to type: the host itself tails the
+# newest Claude transcript (last 256 KB) and reads the REAL token usage Claude
+# records on every assistant turn. Throttled; breadcrumb health.json = fallback.
+$transDir = Join-Path $env:USERPROFILE ('.claude\projects\' + ($ProjectRoot -replace '[^a-zA-Z0-9]', '-'))
+$script:sessCache = $null
+$script:sessCacheAt = (Get-Date).AddDays(-1)
+
+function Get-SessionHealth {
+  try {
+    $f = Get-ChildItem -Path $transDir -Filter *.jsonl -ErrorAction Stop |
+      Where-Object { $_.Name -notlike 'agent-*' } |
+      Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $f) { return $null }
+    if (((Get-Date) - $f.LastWriteTime).TotalMinutes -gt 30) { return $null } # idle session = not current work
+
+    $stream = [System.IO.File]::Open($f.FullName, 'Open', 'Read', 'ReadWrite')
+    try {
+      $take = [Math]::Min($stream.Length, 262144)
+      [void]$stream.Seek(-$take, 'End')
+      $buf = New-Object byte[] $take
+      [void]$stream.Read($buf, 0, $take)
+    } finally { $stream.Close() }
+    $text = [System.Text.Encoding]::UTF8.GetString($buf)
+
+    $tok = -1
+    $lines = $text -split "`n"
+    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
+      $l = $lines[$i]
+      if ($l -like '*"usage":{*' -and $l -like '*"type":"assistant"*' -and $l -notlike '*"isSidechain":true*') {
+        $m = [regex]::Match($l, '"usage":\{"input_tokens":(\d+),"cache_creation_input_tokens":(\d+),"cache_read_input_tokens":(\d+)')
+        if ($m.Success) {
+          $tok = [long]$m.Groups[1].Value + [long]$m.Groups[2].Value + [long]$m.Groups[3].Value
+          break
+        }
+      }
+    }
+    if ($tok -lt 0) { return $null }
+
+    $limit = 200000
+    try {
+      $cfgH = Get-Content -Raw $configFile | ConvertFrom-Json
+      if ($cfgH.contextLimit) { $limit = [long]$cfgH.contextLimit }
+    } catch {}
+    $pct = [int][Math]::Min(100, [Math]::Round(($tok / $limit) * 100))
+    $level = 'fresh'
+    if ($pct -ge 88) { $level = 'critical' } elseif ($pct -ge 75) { $level = 'heavy' } elseif ($pct -ge 50) { $level = 'warming' }
+    return @{ pct = $pct; level = $level; id = $f.BaseName }
+  } catch { return $null }
+}
+
 function Get-PraxisState {
   $cap = 16384
   try {
@@ -72,29 +123,39 @@ function Get-PraxisState {
     $phaseAge = ((Get-Date) - [datetime]$st.ts).TotalSeconds
   } catch {}
 
+  # live session health, computed here (throttled to every 12s); the
+  # health.json breadcrumb from hud/capture/health is the fallback
+  if (((Get-Date) - $script:sessCacheAt).TotalSeconds -ge 12) {
+    $script:sessCacheAt = Get-Date
+    $script:sessCache = Get-SessionHealth
+    if (-not $script:sessCache) {
+      try {
+        $hj = Get-Content -Raw $healthFile | ConvertFrom-Json
+        $hAge = ((Get-Date) - [datetime]$hj.updated).TotalSeconds
+        if ($hAge -lt 900 -and $hj.pct -ge 0) {
+          $script:sessCache = @{ pct = [int]$hj.pct; level = [string]$hj.level; id = [string]$hj.sessionId }
+        }
+      } catch {}
+    }
+  }
+  $sess = $script:sessCache
+
   $name = 'idle'; $label = 'healthy'
   $ratio = 0.0
   if ($cap -gt 0) { $ratio = $bytes / $cap }
 
+  # what the glow means, in order of urgency: an active carry-over beats
+  # everything; then the LIVE session fill; then the memory file fill
   if ($phase -eq 'switching' -and $phaseAge -lt 90) { $name = 'switching'; $label = 'carrying context over' }
   elseif ($phase -eq 'restored' -and $phaseAge -lt 120) { $name = 'restored'; $label = 'context restored' }
+  elseif ($sess -and $sess.level -eq 'critical') { $name = 'limit'; $label = ('session ' + $sess.pct + '% full - switch soon') }
+  elseif ($sess -and $sess.level -eq 'heavy') { $name = 'warning'; $label = ('session ' + $sess.pct + '% full') }
   elseif ($ratio -ge 0.9) { $name = 'limit'; $label = 'memory near the cap' }
   elseif ($ratio -ge 0.6) { $name = 'warning'; $label = 'memory filling up' }
   else {
     $name = 'idle'; $label = 'healthy'
     if (((Get-Date) - $startTime).TotalSeconds -lt 8) { $name = 'happy'; $label = 'hello!' }
   }
-
-  # session health breadcrumb (written by praxis hud / capture / health):
-  # REAL context fill of the Claude session, if something measured it recently
-  $sess = $null
-  try {
-    $hj = Get-Content -Raw $healthFile | ConvertFrom-Json
-    $hAge = ((Get-Date) - [datetime]$hj.updated).TotalSeconds
-    if ($hAge -lt 900 -and $hj.pct -ge 0) {
-      $sess = @{ pct = [int]$hj.pct; level = [string]$hj.level; id = [string]$hj.sessionId }
-    }
-  } catch {}
 
   $entries = 0
   $recent = @()
@@ -104,6 +165,11 @@ function Get-PraxisState {
     $entries = $heads.Count
     $recent = @($heads | Select-Object -First 3 | ForEach-Object {
       $t = $_.Substring(4).Trim()
+      # raw ISO stamps read like machine noise - show local '15 Jul 19:02'
+      $mIso = [regex]::Match($t, '^(\S+Z)\s*-\s*(.*)$')
+      if ($mIso.Success) {
+        try { $t = ([datetime]$mIso.Groups[1].Value).ToString('dd MMM HH:mm') + ' - ' + $mIso.Groups[2].Value } catch {}
+      }
       if ($t.Length -gt 42) { $t = $t.Substring(0, 42) + [char]0x2026 }
       $t
     })
@@ -142,7 +208,9 @@ foreach ($n in @('idle', 'warning', 'limit', 'switching', 'restored', 'happy')) 
 
 if ($Once) {
   $s = Get-PraxisState
-  Write-Output ("state=" + $s.name + " label=" + $s.label + " kb=" + $s.kb + " entries=" + $s.entries + " icons=" + $icons.Count)
+  $sessTxt = 'none'
+  if ($s.sess) { $sessTxt = ('' + $s.sess.pct + '% (' + $s.sess.level + ')') }
+  Write-Output ("state=" + $s.name + " label=" + $s.label + " kb=" + $s.kb + " entries=" + $s.entries + " session=" + $sessTxt + " icons=" + $icons.Count)
   exit 0
 }
 
@@ -170,20 +238,21 @@ function L([int]$x, [int]$y, [int]$w, [int]$h, [string]$text, [single]$size, [bo
   $l.Location = New-Object System.Drawing.Point($x, $y)
   $l.Size = New-Object System.Drawing.Size($w, $h)
   $l.Text = $text
-  $style = [System.Drawing.FontStyle]::Regular
-  if ($boldFont) { $style = [System.Drawing.FontStyle]::Bold }
-  $l.Font = New-Object System.Drawing.Font('Segoe UI', $size, $style)
+  # Semibold family instead of GDI-bolded regular: crisper at small sizes
+  $family = 'Segoe UI'
+  if ($boldFont) { $family = 'Segoe UI Semibold' }
+  $l.Font = New-Object System.Drawing.Font($family, $size)
   $l.ForeColor = $color
   if ($align) { $l.TextAlign = $align }
   $inner.Controls.Add($l)
   return $l
 }
 
-$hdr      = L 14 12 200 24 ('PRAXIS') 11 $true $colInk ''
+$hdr      = L 14 12 200 26 ('PRAXIS') 11.5 $true $colInk ''
 $hdrMark  = L 0 0 0 0 '' 9 $false $colRose ''   # placeholder, star drawn in header text below
 $hdr.Text = [char]0x2726 + '  PRAXIS'
 $hdr.ForeColor = $colInk
-$proj     = L 200 15 122 20 $projName 8.5 $false $colDim 'TopRight'
+$proj     = L 200 16 122 20 $projName 9 $false $colDim 'TopRight'
 
 $pic = New-Object System.Windows.Forms.PictureBox
 $pic.Location = New-Object System.Drawing.Point(83, 44)
@@ -192,8 +261,8 @@ $pic.SizeMode = 'Zoom'
 $pic.BackColor = $colCard
 $inner.Controls.Add($pic)
 
-$stateLbl = L 14 158 308 22 '...' 10 $true $colInk 'TopCenter'
-$statsLbl = L 14 182 308 18 '' 8.25 $false $colDim 'TopCenter'
+$stateLbl = L 14 158 308 24 '...' 10.5 $true $colInk 'TopCenter'
+$statsLbl = L 14 184 308 18 '' 8.75 $false $colDim 'TopCenter'
 
 $div1 = New-Object System.Windows.Forms.Panel
 $div1.Location = New-Object System.Drawing.Point(14, 208)
@@ -201,18 +270,18 @@ $div1.Size = New-Object System.Drawing.Size(306, 1)
 $div1.BackColor = $colEdge
 $inner.Controls.Add($div1)
 
-$recHead = L 14 218 308 16 'RECENT MEMORY' 7.5 $true $colDim ''
-$rec1 = L 14 238 308 17 '' 8.75 $false $colInk ''
-$rec2 = L 14 256 308 17 '' 8.75 $false $colInk ''
-$rec3 = L 14 274 308 17 '' 8.75 $false $colInk ''
+$recHead = L 14 220 308 16 'R E C E N T   M E M O R Y' 8 $true $colDim ''
+$rec1 = L 14 240 308 18 '' 9.25 $false $colInk ''
+$rec2 = L 14 260 308 18 '' 9.25 $false $colInk ''
+$rec3 = L 14 280 308 18 '' 9.25 $false $colInk ''
 
 $div2 = New-Object System.Windows.Forms.Panel
-$div2.Location = New-Object System.Drawing.Point(14, 300)
+$div2.Location = New-Object System.Drawing.Point(14, 306)
 $div2.Size = New-Object System.Drawing.Size(306, 1)
 $div2.BackColor = $colEdge
 $inner.Controls.Add($div2)
 
-$sugLbl = L 14 310 308 56 '' 8.75 $false (C '#d9b9a8') ''
+$sugLbl = L 14 316 308 60 '' 9.25 $false (C '#d9b9a8') ''
 
 function Btn([int]$x, [string]$text, [int]$w) {
   $b = New-Object System.Windows.Forms.Button
@@ -223,7 +292,7 @@ function Btn([int]$x, [string]$text, [int]$w) {
   $b.FlatAppearance.BorderColor = $colEdge
   $b.BackColor = $colBtn
   $b.ForeColor = $colInk
-  $b.Font = New-Object System.Drawing.Font('Segoe UI', 8.5)
+  $b.Font = New-Object System.Drawing.Font('Segoe UI', 9)
   $inner.Controls.Add($b)
   return $b
 }
@@ -557,14 +626,20 @@ $timer.add_Tick({
     }
     $script:lastName = $s.name
   }
-  # the directional nudge: a Claude session measured nearly full pops the
-  # mascot ONCE per session with the exact way out
-  if ($s.sess -and $s.sess.level -eq 'critical') {
-    $popKey = $s.sess.id + ':critical'
+  # the directional nudge: the mascot speaks ONCE per session per level —
+  # a gentle heads-up at heavy, the exact way out at critical
+  if ($s.sess -and ($s.sess.level -eq 'critical' -or $s.sess.level -eq 'heavy')) {
+    $popKey = $s.sess.id + ':' + $s.sess.level
     if ($script:healthPopped -ne $popKey) {
       $script:healthPopped = $popKey
-      $msg = 'Your Claude session is ' + $s.sess.pct + '% full. praxis switch starts a fresh one - your memory comes along.'
-      $popped = Show-Overlay 'limit' $msg $false
+      if ($s.sess.level -eq 'critical') {
+        $emotion = 'limit'
+        $msg = 'Your Claude session is ' + $s.sess.pct + '% full. praxis switch starts a fresh one - your memory comes along.'
+      } else {
+        $emotion = 'warning'
+        $msg = 'Your Claude session is ' + $s.sess.pct + '% full. Good moment to finish the thought.'
+      }
+      $popped = Show-Overlay $emotion $msg $false
       if (-not $popped) {
         $ni.BalloonTipTitle = 'PRAXIS'
         $ni.BalloonTipText = $msg

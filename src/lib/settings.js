@@ -1,13 +1,21 @@
 import fs from 'node:fs';
 
-// Command the Stop hook runs. Requires `praxis` on PATH (global install or
-// `npm link`). If it is not, auto-capture is skipped silently and the user can
-// still run `/praxis-save` in-session. See README "Auto-capture".
-const HOOK_COMMAND = 'praxis capture';
+// Hook commands require `praxis` on PATH (npm install -g praxis-memory).
+// Without it the hooks fail silently and /praxis-save still covers capture.
+//
+// - Stop:         capture the session into memory when it ends
+// - PreCompact:   snapshot BEFORE Claude squeezes the session (detail rescue)
+// - SessionStart: make sure the tray companion is up the moment Claude starts
+//                 (health must be ambient, not a command you remember to run)
+const HOOKS = {
+  Stop: 'praxis capture',
+  PreCompact: 'praxis capture',
+  SessionStart: 'praxis tray --ensure',
+};
 
 /**
- * Add PRAXIS's Stop hook to .claude/settings.json without disturbing any hooks
- * the user (or another tool) already configured. Idempotent.
+ * Add PRAXIS's hooks to .claude/settings.json without disturbing any hooks
+ * the user (or another tool) already configured. Idempotent per event.
  */
 export function patchSettings(settingsFile) {
   let settings = {};
@@ -19,15 +27,16 @@ export function patchSettings(settingsFile) {
   if (typeof settings !== 'object' || settings === null) settings = {};
 
   settings.hooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};
-  settings.hooks.Stop = Array.isArray(settings.hooks.Stop) ? settings.hooks.Stop : [];
 
-  const already = JSON.stringify(settings.hooks.Stop).includes(HOOK_COMMAND);
-  if (!already) {
-    settings.hooks.Stop.push({
-      hooks: [{ type: 'command', command: HOOK_COMMAND }],
-    });
+  let added = 0;
+  for (const [event, command] of Object.entries(HOOKS)) {
+    settings.hooks[event] = Array.isArray(settings.hooks[event]) ? settings.hooks[event] : [];
+    if (!JSON.stringify(settings.hooks[event]).includes(command)) {
+      settings.hooks[event].push({ hooks: [{ type: 'command', command }] });
+      added++;
+    }
   }
 
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
-  return { already };
+  return { already: added === 0 };
 }

@@ -46,8 +46,8 @@ export async function init() {
   const set = patchSettings(p.settingsFile);
   done.push(
     set.already
-      ? '.claude/settings.json (Stop hook already present)'
-      : '.claude/settings.json (Stop hook installed)',
+      ? '.claude/settings.json (hooks already present)'
+      : '.claude/settings.json — capture on Stop · snapshot before compact · tray on SessionStart',
   );
 
   // slash commands
@@ -107,8 +107,9 @@ export async function init() {
   ${dim('If a Claude Code session is already open, restart it (or start a new')}
   ${dim('session) so the / menu picks up the new commands.')}
 
-  ${dim('tip: auto-capture needs `praxis` on your PATH (npm i -g praxis-memory);')}
-  ${dim('     without it, /praxis-save covers you.')}
+  ${dim('important: the hooks (auto-capture, snapshots, tray auto-start) call')}
+  ${dim('`praxis` by name — install it for real: ')}${bold('npm install -g praxis-memory')}
+  ${dim('Without that, /praxis-save still covers you.')}
 
   ${dim('“' + dailyQuote() + '”')}
 `);

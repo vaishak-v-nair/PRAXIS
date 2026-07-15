@@ -4,6 +4,7 @@ import { projectPaths } from '../lib/paths.js';
 import { ensureMemory, addSessionEntry } from '../lib/memory.js';
 import { writeState } from '../lib/state.js';
 import { analyzeTranscript, classifyContext, writeHealthFile, DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
+import { cleanUserText } from '../lib/transcript.js';
 
 // Called by the Claude Code Stop hook. Reads the hook's JSON from stdin,
 // derives a lightweight deterministic summary of the session, and appends it to
@@ -53,6 +54,25 @@ function summarizeTranscriptText(text) {
   return { files: [...files], turns };
 }
 
+/** The last few things the human actually asked for — the soul of a snapshot. */
+function recentAsks(text, max = 3) {
+  const asks = [];
+  for (const line of text.split('\n')) {
+    if (!line.includes('"type":"user"')) continue;
+    try {
+      const e = JSON.parse(line);
+      if (e.isSidechain || e.type !== 'user' || !e.message) continue;
+      const c = e.message.content;
+      if (typeof c !== 'string') continue;
+      const t = cleanUserText(c);
+      if (t && !t.startsWith('/') && !asks.includes(t)) asks.push(t.slice(0, 80));
+    } catch {
+      /* skip */
+    }
+  }
+  return asks.slice(-max);
+}
+
 function shorten(file, cwd) {
   try {
     const rel = file.startsWith(cwd) ? file.slice(cwd.length).replace(/^[\\/]/, '') : file;
@@ -77,11 +97,16 @@ export async function capture() {
     if (!fs.existsSync(p.praxisDir)) {
       process.exit(0); // not a PRAXIS project — nothing to do
     }
+    // PreCompact = snapshot BEFORE Claude squeezes the session and detail is
+    // lost forever. Stop = the regular end-of-session capture.
+    const snapshot = data.hook_event_name === 'PreCompact';
     writeState(p.praxisDir, 'switching'); // tray: context is being carried over
     ensureMemory(p.memoryFile);
 
     let files = [];
     let turns = 0;
+    let asks = [];
+    let analysis = null;
     if (typeof data.transcript_path === 'string') {
       let text = '';
       try {
@@ -90,19 +115,19 @@ export async function capture() {
         /* transcript unreadable — degrade gracefully */
       }
       ({ files, turns } = summarizeTranscriptText(text));
-      // session-end health breadcrumb for the tray and `praxis health`
-      const a = analyzeTranscript(text);
-      if (a.contextTokens > 0) {
-        const { pct, level } = classifyContext(a.contextTokens);
+      asks = recentAsks(text);
+      analysis = analyzeTranscript(text);
+      if (analysis.contextTokens > 0) {
+        const { pct, level } = classifyContext(analysis.contextTokens);
         writeHealthFile(
           p.praxisDir,
           {
             sessionId: path.basename(data.transcript_path, '.jsonl'),
-            contextTokens: a.contextTokens,
+            contextTokens: analysis.contextTokens,
             contextLimit: DEFAULT_CONTEXT_LIMIT,
             pct,
             level,
-            compactions: a.compactions,
+            compactions: analysis.compactions,
           },
           'capture',
         );
@@ -110,12 +135,17 @@ export async function capture() {
     }
 
     const rel = files.map((f) => shorten(f, cwd));
+    const k = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(n));
     const body = [
+      snapshot && analysis && analysis.contextTokens > 0
+        ? `- Context at snapshot: ${k(analysis.contextTokens)} tokens, squeeze #${analysis.compactions + 1} imminent`
+        : null,
+      asks.length ? `- Working on: ${asks.map((a) => `"${a}"`).join(' · ')}` : null,
       rel.length
         ? `- Files touched: ${rel.slice(0, 20).join(', ')}${rel.length > 20 ? ` (+${rel.length - 20} more)` : ''}`
         : '- (no file changes detected)',
       turns ? `- Transcript lines: ${turns}` : null,
-      '- Run `/praxis-save` for a richer, decision-level summary.',
+      snapshot ? null : '- Run `/praxis-save` for a richer, decision-level summary.',
     ]
       .filter(Boolean)
       .join('\n');
@@ -131,10 +161,12 @@ export async function capture() {
       /* use defaults */
     }
 
-    addSessionEntry(p.memoryFile, `${new Date().toISOString()} - session`, body, {
-      maxBytes,
-      redact: redactOn,
-    });
+    addSessionEntry(
+      p.memoryFile,
+      `${new Date().toISOString()} - ${snapshot ? 'pre-compact snapshot' : 'session'}`,
+      body,
+      { maxBytes, redact: redactOn },
+    );
     writeState(p.praxisDir, 'restored'); // tray: context safely written back
   } catch {
     // Swallow everything — a hook must never break the session.
