@@ -1,0 +1,26 @@
+name: Feedback
+description: The two questions that decide what gets built next
+title: "feedback: "
+labels: [feedback]
+body:
+  - type: textarea
+    id: pay-what
+    attributes:
+      label: What would make you pay for PRAXIS?
+      description: Missing feature, team need, anything. Brutal honesty welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: pay-much
+    attributes:
+      label: Would you pay for it? How much per month?
+      description: '"No" is as useful as "yes".'
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Version and OS
+      placeholder: praxis v0.6.0 · Windows 11
+    validations:
+      required: false

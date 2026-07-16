@@ -8,6 +8,7 @@ import { redact } from '../src/lib/redact.js';
 import { patchClaudeMd } from '../src/lib/claudemd.js';
 import { patchSettings } from '../src/lib/settings.js';
 import { addSessionEntry, defaultMemory } from '../src/lib/memory.js';
+import { buildFeedbackUrl } from '../src/commands/feedback.js';
 
 function tmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-test-'));
@@ -55,6 +56,15 @@ test('patchSettings adds all hooks without clobbering existing ones', () => {
   assert.match(JSON.stringify(s.hooks.PreCompact), /praxis capture/);
   assert.equal(s.hooks.SessionStart.length, 1, 'tray auto-start hook present once');
   assert.match(JSON.stringify(s.hooks.SessionStart), /praxis tray --ensure/);
+});
+
+test('buildFeedbackUrl pre-fills a labeled GitHub issue', () => {
+  const url = buildFeedbackUrl();
+  assert.match(url, /^https:\/\/github\.com\/vaishak-v-nair\/PRAXIS\/issues\/new\?/);
+  assert.match(url, /labels=feedback/);
+  assert.match(url, new RegExp(encodeURIComponent('What would make you pay for PRAXIS?').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(url, new RegExp(encodeURIComponent(`praxis v`)));
+  assert.doesNotMatch(url, /[^%](&body|&labels)=.*\s/, 'no raw whitespace in query');
 });
 
 test('addSessionEntry prepends, redacts, and caps size', () => {

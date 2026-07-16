@@ -1,0 +1,25 @@
+name: Bug report
+description: Something broke
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Paste the exact error if there is one.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: false
+  - type: input
+    id: env
+    attributes:
+      label: Version and OS
+      placeholder: praxis v0.6.0 · Windows 11
+    validations:
+      required: false
