@@ -119,6 +119,7 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `/praxis-switch` | hand this work off to gemini · codex · cursor · antigravity |
 | `/praxis-feedback` | the two questions that shape what gets built |
 | `/praxis-hud` | how to watch this session live, in plain English |
+| `/praxis-explain` | re-explain Claude's last answer with zero jargon — for people who don't read code |
 
 ## What Praxis writes, and where
 
@@ -160,6 +161,11 @@ touches or overrides Claude's terminal, so it can't break anything. Repeated
 steps collapse into one line (`×3`), a squeeze (compaction) shows up as a ⚠
 note, and when Claude asks *you* a question a red banner appears so you never
 miss it.
+
+Don't read code? The HUD glosses jargon inline — *"refactor (rewriting code
+without changing what it does)"* — and inside Claude, `/praxis-explain` makes
+it re-explain its last answer with zero jargon: what was asked, what actually
+changed, why it's better, what you should do now.
 
 ## Session health, and switching tools
 

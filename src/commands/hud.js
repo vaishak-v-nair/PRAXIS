@@ -14,6 +14,7 @@ import {
   whatIsHappening,
 } from '../lib/transcript.js';
 import { classifyContext, DEFAULT_CONTEXT_LIMIT, writeHealthFile } from '../lib/health.js';
+import { plainify } from '../lib/plain.js';
 import { projectPaths } from '../lib/paths.js';
 import { rose, sage, amber, blue, red, bold, grey, dim, stripAnsi } from '../lib/ui.js';
 
@@ -273,8 +274,12 @@ function storyLines(timeline, cols) {
       tag = grey('  ·   ');
       paint = dim;
     }
-    // plain English means no raw markdown noise in the story
-    const text = t.text.replace(/\*\*|__|`/g, '') + (t.count > 1 ? ` ×${t.count}` : '');
+    // plain English means no raw markdown noise — and no unexplained jargon:
+    // Claude's replies get inline glosses ("refactor (rewriting code without
+    // changing what it does)") so non-programmers can follow the story too
+    let raw = t.text.replace(/\*\*|__|`/g, '');
+    if (t.who === 'claude') raw = plainify(raw);
+    const text = raw + (t.count > 1 ? ` ×${t.count}` : '');
     const wrapped = wrap(text, width, t.who === 'claude' ? 3 : 2);
     if (t.who === 'you' && out.length) out.push(''); // breathing room between turns
     out.push(' ' + time + ' ' + tag + '  ' + paint(wrapped[0]));

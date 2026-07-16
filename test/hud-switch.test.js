@@ -11,6 +11,7 @@ import {
   transcriptDir,
 } from '../src/lib/transcript.js';
 import { buildCapsule } from '../src/lib/handoff.js';
+import { plainify } from '../src/lib/plain.js';
 import { wrap } from '../src/commands/hud.js';
 
 const j = (o) => JSON.stringify(o);
@@ -149,6 +150,20 @@ test('toolDetail picks the human-relevant field', () => {
 test('toolInPlainEnglish translates jargon', () => {
   assert.match(toolInPlainEnglish('Bash', 'git status'), /Running a command — git status/);
   assert.match(toolInPlainEnglish('mcp__github__create_issue', ''), /connected app \(github\)/);
+});
+
+test('plainify glosses jargon once, skips already-explained terms', () => {
+  const out = plainify('I will refactor the API layer.');
+  assert.match(out, /refactor \(rewriting code without changing what it does\)/);
+  assert.match(out, /API \(a way for programs to talk to each other\)/);
+  // longest match wins: "context window" glossed as one term
+  assert.match(plainify('the context window is full'), /context window \(the AI's working memory/);
+  // author already explained it — leave it alone
+  const explained = plainify('refactor (cleanup) done');
+  assert.equal(explained, 'refactor (cleanup) done');
+  // gloss only the first occurrence
+  const twice = plainify('deploy now, deploy later');
+  assert.equal((twice.match(/put it live/g) || []).length, 1);
 });
 
 test('wrap: bounds lines and hard-slices long words', () => {
