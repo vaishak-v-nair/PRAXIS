@@ -10,6 +10,8 @@ import { tray } from './commands/tray.js';
 import { hud } from './commands/hud.js';
 import { switchTool } from './commands/switch.js';
 import { health } from './commands/health.js';
+import { telemetry } from './commands/telemetry.js';
+import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
 import { miniHeader, bold, grey } from './lib/ui.js';
 
@@ -35,6 +37,7 @@ function help() {
   ${bold('praxis switch <tool>')}  pack a handoff brief and move to gemini · codex · claude · cursor
   ${bold('praxis tray')}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
   ${bold('praxis feedback')}       the two questions that shape what gets built next
+  ${bold('praxis telemetry')}      what leaves your machine (spoiler: counts, never content) ${grey('· show / on / off')}
   ${grey('praxis capture        (internal) called by the Claude Code Stop hook')}
 
   ${grey('Local-first. No server. No account. Nothing leaves your machine.')}
@@ -42,6 +45,9 @@ function help() {
 }
 
 const cmd = process.argv[2];
+
+// tier-2 telemetry: one counter per command, opt-in only, counts-and-enums only
+record('cmd_' + (cmd || 'default'));
 
 switch (cmd) {
   case 'init':
@@ -68,6 +74,9 @@ switch (cmd) {
   case 'health':
     await health(process.argv.slice(3));
     break;
+  case 'telemetry':
+    telemetry(process.argv.slice(3));
+    break;
   case '-v':
   case '--version':
     console.log(version());
@@ -91,3 +100,6 @@ switch (cmd) {
     help();
     process.exitCode = 1;
 }
+
+// fire-and-forget; inert until an endpoint exists and the user has opted in
+void flush(version());

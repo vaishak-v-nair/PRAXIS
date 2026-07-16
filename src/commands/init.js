@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { TELEMETRY_ENDPOINT, telemetryState, setTelemetry } from '../lib/telemetry.js';
 import { projectPaths } from '../lib/paths.js';
 import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
@@ -108,6 +110,21 @@ export async function init() {
       /* the tray is a bonus, never a blocker */
     }
   }
+  // tier-2 consent: one honest question, once, and only when a receiver
+  // actually exists — asking consent for a send that can't happen is noise
+  if (TELEMETRY_ENDPOINT && process.stdin.isTTY && process.stdout.isTTY && !telemetryState().decided) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ans = await new Promise((resolve) =>
+      rl.question(
+        '\n  Share anonymous usage counts to improve PRAXIS? Never your code,\n' +
+          '  never your words — see exactly what with: praxis telemetry show  [y/N] ',
+        resolve,
+      ),
+    );
+    rl.close();
+    setTelemetry(/^y(es)?$/i.test(String(ans).trim()));
+  }
+
   if (!firstRun) {
     console.log('\n  ' + dim('All commands: ') + rose('praxis help') + '\n');
     return;
