@@ -9,7 +9,10 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-export const TELEMETRY_ENDPOINT = ''; // set when the receiver exists; empty = inert
+// Receiver: a Supabase REST insert (RLS insert-only — the public key can
+// write one row, never read any). Both empty = telemetry fully inert.
+export const TELEMETRY_ENDPOINT = ''; // e.g. https://xyz.supabase.co/rest/v1/praxis_telemetry
+export const TELEMETRY_KEY = ''; // the anon PUBLIC key (public by design; RLS is the gate)
 
 const FILE =
   process.env.PRAXIS_TELEMETRY_FILE ||
@@ -86,10 +89,15 @@ export async function flush(version = '') {
     const s = telemetryState();
     if (!s.enabled || !Object.keys(s.counts).length) return false;
     if (Date.now() - (s.lastSent || 0) < SEND_EVERY_MS) return false;
+    const headers = { 'content-type': 'application/json' };
+    if (TELEMETRY_KEY) {
+      headers.apikey = TELEMETRY_KEY;
+      headers.authorization = 'Bearer ' + TELEMETRY_KEY;
+    }
     await fetch(TELEMETRY_ENDPOINT, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload(version)),
+      headers,
+      body: JSON.stringify({ payload: payload(version) }),
       signal: AbortSignal.timeout(3000),
     });
     s.lastSent = Date.now();
