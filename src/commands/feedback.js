@@ -54,5 +54,6 @@ PRAXIS is free and local. Two questions decide whether it becomes more:
 ${opened
     ? '\nYour browser just opened a pre-filled GitHub issue — type your answers, hit Submit.'
     : `\n  ${url}`}
+No GitHub account? Email vaishak.v.nair.dev@gmail.com — same two questions.
 `);
 }

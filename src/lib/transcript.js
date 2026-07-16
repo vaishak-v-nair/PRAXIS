@@ -46,7 +46,15 @@ export function freshHudState() {
     lastEvent: null, // 'user' | 'assistant' | 'tool'
     contextTokens: 0, // REAL context size: last assistant usage (input + cache)
     compactions: 0, // times this session has been squeezed
+    timeline: [], // the session as a story: { ts, who: 'you'|'claude'|'action'|'note', text, count? }
   };
+}
+
+const TIMELINE_CAP = 200;
+
+function pushTimeline(state, entry) {
+  state.timeline.push(entry);
+  if (state.timeline.length > TIMELINE_CAP) state.timeline.splice(0, state.timeline.length - TIMELINE_CAP);
 }
 
 /**
@@ -79,12 +87,14 @@ export function applyLine(state, raw) {
           state.responding = '';
           state.toolsThisTurn = 0;
           state.lastEvent = 'user';
+          pushTimeline(state, { ts: state.lastTs, who: 'you', text });
         }
       }
     }
     if (sawResult) state.lastEvent = 'tool';
   } else if (e.type === 'system' && e.subtype === 'compact_boundary') {
     state.compactions++;
+    pushTimeline(state, { ts: state.lastTs, who: 'note', text: 'Claude squeezed the session to keep going — older detail was compressed' });
   } else if (e.type === 'assistant' && e.message && Array.isArray(e.message.content)) {
     const u = e.message.usage;
     if (u) {
@@ -92,10 +102,18 @@ export function applyLine(state, raw) {
         (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
       if (total > 0) state.contextTokens = total;
     }
+    const msgId = e.message.id;
     for (const item of e.message.content) {
       if (item.type === 'text' && item.text && item.text.trim()) {
         state.responding = item.text.trim();
         state.lastEvent = 'assistant';
+        // streamed repeats of one message carry the same id + text: skip them
+        const dup = msgId && state._lastClaudeMsgId === msgId && state._lastClaudeText === state.responding;
+        if (!dup) {
+          pushTimeline(state, { ts: state.lastTs, who: 'claude', text: state.responding, msgId });
+          state._lastClaudeMsgId = msgId;
+          state._lastClaudeText = state.responding;
+        }
       } else if (item.type === 'tool_use') {
         state.toolsThisTurn++;
         if (item.name === 'AskUserQuestion') {
@@ -110,6 +128,16 @@ export function applyLine(state, raw) {
           startTs: typeof e.timestamp === 'string' ? e.timestamp : null,
         };
         state.lastEvent = 'tool';
+        const label = toolInPlainEnglish(item.name, toolDetail(item.name, item.input).slice(0, 60));
+        const last = state.timeline[state.timeline.length - 1];
+        // a burst of the same tool reads as one line: "Reading a file … ×4"
+        if (last && last.who === 'action' && last.name === item.name) {
+          last.count = (last.count || 1) + 1;
+          last.text = label;
+          last.ts = state.lastTs;
+        } else {
+          pushTimeline(state, { ts: state.lastTs, who: 'action', name: item.name, text: label });
+        }
       }
     }
   }

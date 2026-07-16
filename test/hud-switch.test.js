@@ -86,6 +86,54 @@ test('hud reducer ignores noise: sidechains, bad JSON, hook stdout', () => {
   assert.equal(s.asking, '');
 });
 
+test('hud reducer: timeline retells the session and merges tool bursts', () => {
+  const s = freshHudState();
+  applyLine(s, j({ type: 'user', timestamp: '2026-07-16T10:00:00Z', message: { content: 'fix the login bug' } }));
+  applyLine(
+    s,
+    j({
+      type: 'assistant',
+      timestamp: '2026-07-16T10:00:05Z',
+      message: {
+        id: 'm1',
+        content: [
+          { type: 'tool_use', id: 't1', name: 'Read', input: { file_path: 'src/a.js' } },
+          { type: 'tool_use', id: 't2', name: 'Read', input: { file_path: 'src/b.js' } },
+        ],
+      },
+    }),
+  );
+  applyLine(
+    s,
+    j({
+      type: 'assistant',
+      timestamp: '2026-07-16T10:00:09Z',
+      message: { id: 'm1', content: [{ type: 'text', text: 'Found it. Fixing.' }] },
+    }),
+  );
+  applyLine(s, j({ type: 'system', subtype: 'compact_boundary', timestamp: '2026-07-16T10:01:00Z' }));
+
+  assert.equal(s.timeline.length, 4);
+  assert.deepEqual(
+    s.timeline.map((t) => t.who),
+    ['you', 'action', 'claude', 'note'],
+  );
+  assert.equal(s.timeline[1].count, 2, 'two Reads merged into one story line');
+  assert.match(s.timeline[1].text, /Reading a file — src\/b\.js/);
+  assert.match(s.timeline[3].text, /squeezed/);
+
+  // streamed duplicate of the same assistant text does not double the story
+  applyLine(
+    s,
+    j({
+      type: 'assistant',
+      timestamp: '2026-07-16T10:01:05Z',
+      message: { id: 'm1', content: [{ type: 'text', text: 'Found it. Fixing.' }] },
+    }),
+  );
+  assert.equal(s.timeline.length, 4);
+});
+
 test('cleanUserText: slash commands and reminders', () => {
   assert.equal(cleanUserText('<command-name>/compact</command-name> <command-message>x</command-message>'), '/compact');
   assert.equal(cleanUserText('<system-reminder>secret context</system-reminder>do the thing'), 'do the thing');

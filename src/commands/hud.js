@@ -1,6 +1,7 @@
 // praxis hud — a live, readable view of your Claude Code session.
-// Terminals full of scrolling text are hard to read. The HUD shows only three
-// things, updating in place: what you asked, what Claude says, what is running.
+// Terminals full of scrolling text are hard to read. The HUD retells the whole
+// session as a story: you said / claude said / what it did, one aligned line
+// each, with a real context-health bar in the header.
 // It tails the session transcript file — it never touches Claude's terminal.
 
 import fs from 'node:fs';
@@ -10,7 +11,6 @@ import {
   newestTranscript,
   freshHudState,
   applyLine,
-  toolInPlainEnglish,
   whatIsHappening,
 } from '../lib/transcript.js';
 import { classifyContext, DEFAULT_CONTEXT_LIMIT, writeHealthFile } from '../lib/health.js';
@@ -188,8 +188,8 @@ function makeTail(initialFile) {
 }
 
 function render(state, meta) {
-  const cols = Math.max(40, process.stdout.columns || 80);
-  const width = Math.min(cols - 4, 100);
+  const cols = Math.max(48, process.stdout.columns || 80);
+  const rows = Math.max(14, process.stdout.rows || 30);
   const now = whatIsHappening(state);
   const dot =
     now.kind === 'ask'
@@ -200,57 +200,93 @@ function render(state, meta) {
           ? sage('●')
           : grey('●');
 
-  // the health chip: real tokens from the transcript, not a guess
-  let chip = '';
+  // real tokens from the transcript, drawn as a bar — not a guess
+  let bar = grey('▯▯▯▯▯▯▯▯▯▯  warming up');
+  let critical = false;
   if (state.contextTokens > 0) {
     const { pct, level } = classifyContext(state.contextTokens);
-    const paintChip = level === 'critical' ? red : level === 'fresh' ? sage : amber;
-    chip = '  ' + paintChip(`▮ ${pct}% full`);
-    if (level === 'critical') chip += red('  praxis switch = fresh start');
+    critical = level === 'critical';
+    const paint = critical ? red : level === 'fresh' ? sage : amber;
+    const filled = Math.max(0, Math.min(10, Math.round(pct / 10)));
+    bar = paint('▮'.repeat(filled) + '▯'.repeat(10 - filled) + `  ${pct}% full`);
   }
 
+  const title =
+    ' ' + rose('✦ ') + bold('PRAXIS HUD') + grey('  ·  ' + shortPath(process.cwd()));
+  const titlePad = Math.max(2, cols - 1 - stripAnsi(title).length - stripAnsi(bar).length);
   const lines = [];
   lines.push('');
+  lines.push(title + ' '.repeat(titlePad) + bar);
   lines.push(
     ' ' +
-      rose('✦ ') +
-      bold('PRAXIS HUD') +
-      grey('  ·  ' + shortPath(process.cwd())) +
-      '  ' +
       dot +
       ' ' +
       (now.kind === 'ask' ? bold(red(now.text)) : now.text) +
       (state.lastTs ? grey('  ·  ' + agoFromIso(state.lastTs)) : '') +
-      chip,
+      (critical ? red('  ·  praxis switch = fresh start') : ''),
   );
-  lines.push('');
+  lines.push(' ' + grey('─'.repeat(cols - 2)));
 
-  section(lines, rose, state.needsYou ? 'CLAUDE ASKS YOU' : 'YOU ASKED', state.asking || dim('(nothing yet)'), width);
-  section(lines, blue, 'CLAUDE SAYS', state.responding || dim('(nothing yet this turn)'), width);
-
-  let runText = dim('(nothing running)');
-  if (state.running) {
-    const verb = state.running.done ? sage('done  ') : amber('now   ');
-    runText = verb + toolInPlainEnglish(state.running.name, state.running.detail);
-    if (state.toolsThisTurn > 1) runText += grey(`   (${state.toolsThisTurn} steps this turn)`);
+  // the session as a story — newest at the bottom, like a chat
+  const bannerRows = state.needsYou ? 3 : 0;
+  const budget = Math.max(4, rows - 7 - bannerRows);
+  const story = storyLines(state.timeline, cols).slice(-budget);
+  if (story.length === 0) {
+    lines.push('');
+    lines.push('   ' + dim('Nothing yet. Start claude in this folder — the session appears here,'));
+    lines.push('   ' + dim('in plain English, as it happens.'));
   }
-  section(lines, amber, 'RUNNING', runText, width);
+  for (const l of story) lines.push(l);
 
+  lines.push(' ' + grey('─'.repeat(cols - 2)));
+  if (state.needsYou) {
+    lines.push(' ' + red(bold('▌ CLAUDE IS WAITING FOR YOUR ANSWER')));
+    for (const l of wrap(state.asking, cols - 6, 2)) lines.push(' ' + red('▌ ') + l);
+  }
   lines.push(
     ' ' +
       dim('q to quit  ·  watching ') +
       dim(path.basename(meta.file)) +
       dim('  ·  ' + fmtSize(meta.bytes) + ' of session so far'),
   );
-  lines.push('');
   // pad every line to full width so in-place redraw leaves no ghosts
   return lines.map((l) => l + ' '.repeat(Math.max(0, cols - 1 - stripAnsi(l).length))).join('\n');
 }
 
-function section(lines, color, title, text, width) {
-  lines.push(' ' + color(bold(title)));
-  for (const l of wrap(text, width, 4)) lines.push('   ' + l);
-  lines.push('');
+/** Timeline entries → aligned rows: time column, speaker column, wrapped text. */
+function storyLines(timeline, cols) {
+  const indent = 17; // " 19:02  claude  "
+  const width = Math.max(20, Math.min(cols - indent - 2, 96));
+  const out = [];
+  for (const t of timeline) {
+    const time = dim(hhmm(t.ts).padEnd(5));
+    let tag;
+    let paint = (x) => x;
+    if (t.who === 'you') {
+      tag = rose(bold('you   '));
+    } else if (t.who === 'claude') {
+      tag = blue('claude');
+    } else if (t.who === 'note') {
+      tag = amber('  ⚠   ');
+      paint = amber;
+    } else {
+      tag = grey('  ·   ');
+      paint = dim;
+    }
+    // plain English means no raw markdown noise in the story
+    const text = t.text.replace(/\*\*|__|`/g, '') + (t.count > 1 ? ` ×${t.count}` : '');
+    const wrapped = wrap(text, width, t.who === 'claude' ? 3 : 2);
+    if (t.who === 'you' && out.length) out.push(''); // breathing room between turns
+    out.push(' ' + time + ' ' + tag + '  ' + paint(wrapped[0]));
+    for (const cont of wrapped.slice(1)) out.push(' '.repeat(indent) + paint(cont));
+  }
+  return out;
+}
+
+function hhmm(iso) {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return '     ';
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
 /** Simple word wrap; words longer than the width are hard-sliced. */

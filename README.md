@@ -21,6 +21,8 @@ npm install -g praxis-memory && praxis
 
 *One command — same on **Windows, macOS and Linux** (Node 18+). It sets up the hooks, the memory file, the tray companion, everything — then every session after remembers. The global install matters: the hooks (auto-capture, pre-compact snapshots, tray auto-start) call `praxis` by name, so it needs to be on your PATH. Just trying it out? `npx praxis-memory` works for a look around.*
 
+*Never used a terminal? **[Start here](docs/START-HERE.md)** — five minutes, no prior knowledge, works the same in VS Code, Cursor, or a plain terminal window.*
+
 **Two doors:** before Claude, it's the terminal — `praxis`. Inside Claude Code, it's the slash — type `/` and the `/praxis-*` commands are right there.
 
 </div>
@@ -69,16 +71,18 @@ Praxis closes the loop: the context survives the session.
 
 ## The companion
 
-<div align="center">
-<img src="docs/flow.gif" width="380" alt="The Praxis axolotl cycling through session states: idle, warning, limit, switching, restored">
-</div>
-
 An axolotl regrows lost limbs; Praxis regrows lost context. The mascot is the status
 bar — its state *is* your session's state:
 
-| 🟢 idle | 🟠 warning | 🔴 limit | 🔵 switching | 🟡 restored |
-|:--:|:--:|:--:|:--:|:--:|
-| context fresh | filling up | limit reached | moving context | context recovered |
+<table align="center">
+<tr>
+<td align="center"><img src="assets/tray/idle.webp" width="104" alt="idle"><br><sub>🟢 <b>idle</b><br>context fresh</sub></td>
+<td align="center"><img src="assets/tray/warning.webp" width="104" alt="warning"><br><sub>🟠 <b>warning</b><br>filling up</sub></td>
+<td align="center"><img src="assets/tray/limit.webp" width="104" alt="limit"><br><sub>🔴 <b>limit</b><br>limit reached</sub></td>
+<td align="center"><img src="assets/tray/switching.webp" width="104" alt="switching"><br><sub>🔵 <b>switching</b><br>moving context</sub></td>
+<td align="center"><img src="assets/tray/restored.webp" width="104" alt="restored"><br><sub>🟡 <b>restored</b><br>context recovered</sub></td>
+</tr>
+</table>
 
 On Windows it starts with the very first install and lives in your system tray: the axolotl breathes slowly, and only its glow changes with your session state — green healthy, amber filling, red at the limit, blue switching, gold restored. Left-click opens a popover: the animated mascot, live memory stats, your recent session entries and a suggestion. macOS and Linux are next; `praxis status` covers every platform meanwhile.
 
@@ -127,25 +131,29 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 
 ## The HUD
 
-Terminals full of scrolling text are hard to read. `praxis hud` (in a second
-terminal) shows only three things, updating in place, in plain English:
+A working Claude session is a wall of scrolling text — file dumps, tool calls,
+JSON. `praxis hud` (in a second terminal) retells the **whole session as a
+story**: what you said, what Claude said back, what it actually did — one
+aligned, plain-English line each, with a real context-health bar on top:
 
 ```
- ✦ PRAXIS HUD  ·  E:\PRAXIS  ● Running a command  ·  just now
-
- YOU ASKED
-   fix the login bug
-
- CLAUDE SAYS
-   The token expiry check uses < instead of <=. Fixing it now.
-
- RUNNING
-   now   Running a command — npm test   (3 steps this turn)
+ ✦ PRAXIS HUD  ·  E:\PRAXIS                        ▮▮▮▮▮▯▯▯▯▯  52% full
+ ● Running a command  ·  just now
+ ──────────────────────────────────────────────────────────────────────
+  19:02  you     fix the login bug
+  19:02   ·      Reading a file — src/auth.js ×3
+  19:03  claude  The token expiry check uses < instead of <=. Fixing it.
+  19:03   ·      Editing a file — src/auth.js
+  19:04   ·      Running a command — npm test
+ ──────────────────────────────────────────────────────────────────────
+  q to quit  ·  watching your session live
 ```
 
 It reads the session transcript file Claude Code already writes — it never
-touches Claude's terminal, so it can't break anything. When Claude asks *you*
-a question, the header turns red so you don't miss it.
+touches or overrides Claude's terminal, so it can't break anything. Repeated
+steps collapse into one line (`×3`), a squeeze (compaction) shows up as a ⚠
+note, and when Claude asks *you* a question a red banner appears so you never
+miss it.
 
 ## Session health, and switching tools
 
@@ -189,14 +197,26 @@ knowing your project — you never re-explain it.
 
 ## Roadmap
 
-- **v0.1 (now)** — local memory for Claude Code: capture loop, `/praxis-save`, `praxis status`.
-- **v0.2 (now)** — the tray companion on Windows: `praxis tray`.
-- **v0.3 (now)** — `praxis hud` (live plain-English session view) and `praxis switch` (handoff brief for gemini/codex/claude/cursor).
-- **v0.4 (now)** — the floating mascot: state changes announced by the axolotl itself, no popup box.
-- **v0.5 (now)** — `praxis health`: real context fill from the transcript, directional switch suggestions, tray nudge at critical.
-- **v0.6 (now)** — health goes ambient: the tray measures the session itself and auto-starts with Claude; pre-compact snapshots; panel typography.
-- **v0.7** — tray for macOS/Linux, and an MCP server (queryable memory).
-- **Later** — deeper health for the other tools, richer summarization.
+PRAXIS is **v0** — one product, built from scratch, in the open. The npm
+version (0.x.y) just counts releases inside v0; the milestone that matters is v1.
+
+**Already in v0**
+- The memory loop: auto-capture, auto-load, `/praxis-*` slash commands, redaction, size cap.
+- The tray companion (Windows): breathing axolotl, glow = session state, live panel.
+- `praxis hud` — the session retold in plain English · `praxis switch` — handoff brief for gemini/codex/claude/cursor.
+- Real session health, measured from the transcript — ambient in the tray, detailed in `praxis health`.
+- The floating mascot: state changes announced by the axolotl itself, no popup box.
+- Pre-compact snapshots: what you were working on, saved the moment before Claude squeezes the session.
+
+**Still inside v0**
+- Tray companion for macOS and Linux.
+- MCP server — memory Claude can query, beyond the size cap.
+- The HUD as the *primary* way to watch a session, not a sidecar.
+- Deep health for the other tools (Gemini CLI, Codex), richer summarization.
+
+**v1.0 — the line**
+v1.0 is not a feature list. It ships when real users say PRAXIS is something
+they wouldn't work without. Until then, everything is v0.
 
 ## Develop
 
