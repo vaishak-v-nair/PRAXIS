@@ -137,6 +137,8 @@ story**: what you said, what Claude said back, what it actually did — one
 aligned, plain-English line each, with a real context-health bar on top:
 
 ```
+ $ praxis hud
+
  ✦ PRAXIS HUD  ·  E:\PRAXIS                        ▮▮▮▮▮▯▯▯▯▯  52% full
  ● Running a command  ·  just now
  ──────────────────────────────────────────────────────────────────────

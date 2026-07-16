@@ -6,7 +6,7 @@ import { projectPaths } from '../lib/paths.js';
 import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchSettings } from '../lib/settings.js';
-import { bigBanner, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
+import { bigBanner, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
 import { tray } from './tray.js';
 import { readFileSync } from 'node:fs';
 
@@ -24,6 +24,7 @@ const TEMPLATES = path.join(__dirname, '..', 'templates');
 
 export async function init() {
   const p = projectPaths();
+  const firstRun = !fs.existsSync(p.memoryFile); // the big welcome is a one-time thing
   const done = [];
 
   // .praxis/ memory + config
@@ -78,8 +79,13 @@ export async function init() {
 
   ensureGitignore(p.root);
 
-  console.log('\n' + bigBanner(pkgVersion()) + '\n');
-  console.log('  ' + bold('Memory is set up.') + '\n');
+  if (firstRun) {
+    console.log('\n' + bigBanner(pkgVersion()) + '\n');
+    console.log('  ' + bold('Memory is set up.') + '\n');
+  } else {
+    console.log('\n  ' + miniHeader(pkgVersion(), 'init') + '\n');
+    console.log('  ' + bold('Already set up — refreshed everything.') + '\n');
+  }
   for (const d of done) console.log('  ' + sage('✓') + ' ' + d);
 
   // the tray companion starts with the very first install — no second command
@@ -96,6 +102,10 @@ export async function init() {
     } catch {
       /* the tray is a bonus, never a blocker */
     }
+  }
+  if (!firstRun) {
+    console.log('\n  ' + dim('All commands: ') + rose('praxis help') + '\n');
+    return;
   }
   console.log(`
   ${bold('Next steps')}

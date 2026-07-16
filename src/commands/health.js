@@ -19,28 +19,18 @@ export async function health(args = []) {
   console.log('\n  ' + rose('✦') + ' ' + bold('Session health') + grey('  ·  ' + process.cwd()) + '\n');
 
   if (!report) {
-    console.log(`  No Claude Code session found for this folder yet.
-  Start ${bold('claude')} here, work a bit, then run ${bold('praxis health')} again.\n`);
+    console.log(
+      '  ' +
+        bold('Claude Code'.padEnd(14)) +
+        grey('○ not connected — no session in this folder yet') +
+        `\n\n  Start ${bold('claude')} here and I measure it live. Everything else already works:` +
+        `\n  ${bold('praxis status')} · ${bold('praxis switch')} · ${bold('praxis feedback')}\n`,
+    );
+    printTools(installed);
     return;
   }
 
-  const dot =
-    report.level === 'fresh'
-      ? sage('●')
-      : report.level === 'warming'
-        ? amber('●')
-        : report.level === 'heavy'
-          ? amber('●')
-          : red('●');
   const k = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(n));
-
-  console.log(
-    '  ' +
-      bold('Claude Code'.padEnd(14)) +
-      dot +
-      ` ${report.pct}% full ` +
-      grey(`(${k(report.contextTokens)} of ${k(report.contextLimit)} tokens) — ${report.level}`),
-  );
   const facts = [];
   if (report.compactions > 0) {
     facts.push(
@@ -49,12 +39,49 @@ export async function health(args = []) {
   }
   if (report.toolErrors > 2) facts.push(`${report.toolErrors} tool errors this session`);
   if (report.lastTs) facts.push('last active ' + agoFromIso(report.lastTs));
-  if (facts.length) console.log('  ' + ' '.repeat(14) + grey(facts.join(' · ')));
 
-  const s = suggestNext(report.level, installed);
-  console.log('\n  ' + bold('What to do') + '\n  ' + (s.urgent ? red(s.text) : s.text));
-  if (s.command) console.log('  ' + dim('exact command: ') + rose(s.command));
+  if (!report.live) {
+    // that session is over — its number is history, not a warning
+    console.log(
+      '  ' +
+        bold('Claude Code'.padEnd(14)) +
+        grey('◌ not open right now') +
+        grey(` — last session ended at ${report.pct}% full (${k(report.contextTokens)} tokens)`),
+    );
+    if (facts.length) console.log('  ' + ' '.repeat(14) + grey(facts.join(' · ')));
+    console.log(
+      '\n  ' +
+        bold('What to do') +
+        '\n  Nothing. A new session always starts fresh at 0%, and your project memory loads into it automatically.',
+    );
+  } else {
+    const dot =
+      report.level === 'fresh'
+        ? sage('●')
+        : report.level === 'critical'
+          ? red('●')
+          : amber('●');
+    console.log(
+      '  ' +
+        bold('Claude Code'.padEnd(14)) +
+        dot +
+        ` ${report.pct}% full ` +
+        grey(`(${k(report.contextTokens)} of ${k(report.contextLimit)} tokens) — ${report.level}`),
+    );
+    if (facts.length) console.log('  ' + ' '.repeat(14) + grey(facts.join(' · ')));
 
+    const s = suggestNext(report.level, installed);
+    console.log('\n  ' + bold('What to do') + '\n  ' + (s.urgent ? red(s.text) : s.text));
+    if (s.command) console.log('  ' + dim('exact command: ') + rose(s.command));
+  }
+
+  printTools(installed);
+
+  // leave the breadcrumb so the tray companion can see what we saw
+  writeHealthFile(projectPaths().praxisDir, report, 'health');
+}
+
+function printTools(installed) {
   console.log('\n  ' + bold('Other tools on this machine'));
   for (const [key, t] of Object.entries(TOOLS)) {
     if (key === 'claude') continue;
@@ -62,11 +89,12 @@ export async function health(args = []) {
     console.log('  ' + t.name.padEnd(14) + mark + grey('   praxis switch ' + key));
   }
   console.log(
-    '\n  ' + dim('Numbers come from the session transcript Claude Code itself writes — real usage, not a guess.') + '\n',
+    '\n  ' +
+      dim('"full" = that session\'s context window (Claude\'s working memory) filling up —') +
+      '\n  ' +
+      dim('NOT your plan usage or quota. Numbers come from the transcript Claude itself writes.') +
+      '\n',
   );
-
-  // leave the breadcrumb so the tray companion can see what we saw
-  writeHealthFile(projectPaths().praxisDir, report, 'health');
 }
 
 function agoFromIso(iso) {

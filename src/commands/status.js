@@ -3,7 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
-import { banner, bigBanner, sage, amber, red, rose, bold, grey, dim, timeAgo, dailyQuote } from '../lib/ui.js';
+import { miniHeader, sage, amber, red, rose, bold, grey, dim, timeAgo } from '../lib/ui.js';
+import { healthReport } from '../lib/health.js';
 
 function pkgVersion() {
   try {
@@ -17,7 +18,7 @@ function pkgVersion() {
 export function status() {
   const p = projectPaths();
   if (!fs.existsSync(p.memoryFile)) {
-    console.log('\n' + banner(pkgVersion()) + '\n');
+    console.log('\n  ' + miniHeader(pkgVersion()) + '\n');
     console.log('  PRAXIS is not set up in this directory yet.');
     console.log('  Run ' + bold('npx praxis-memory') + ' to set it up.\n');
     return;
@@ -47,7 +48,7 @@ export function status() {
         ? 'Getting full — the oldest session notes will be trimmed automatically. Nothing to do.'
         : 'At the cap — oldest notes are trimmed as new ones arrive. Put anything precious in the Project section; it is never trimmed.';
 
-  console.log('\n' + bigBanner(pkgVersion(), [grey((bytes / 1024).toFixed(1) + ' KB · ' + health)]) + '\n');
+  console.log('\n  ' + miniHeader(pkgVersion(), 'status') + '\n');
   console.log('  ' + grey('memory   ') + path.relative(p.root, p.memoryFile));
   console.log(
     '  ' +
@@ -56,8 +57,20 @@ export function status() {
   );
   console.log('  ' + grey('updated  ') + timeAgo(stat.mtime));
   console.log('  ' + grey('state    ') + health + grey(' — ' + healthPlain));
+
+  // is Claude actually here right now? say so in one honest line
+  const hr = healthReport();
+  if (!hr) {
+    console.log('  ' + grey('claude   ') + grey('○ not connected — start ') + bold('claude') + grey(' here and PRAXIS comes alive'));
+  } else if (hr.live) {
+    const dot = hr.level === 'critical' ? red('●') : hr.level === 'fresh' ? sage('●') : amber('●');
+    console.log('  ' + grey('claude   ') + dot + ` live session ${hr.pct}% full` + grey(' — praxis health for detail'));
+  } else {
+    console.log('  ' + grey('claude   ') + grey(`◌ not open — last session ended at ${hr.pct}% full`));
+  }
+
   console.log('\n  ' + dim('Loaded into Claude Code automatically via the PRAXIS block in CLAUDE.md.'));
   console.log('  ' + dim('Inside a session, type ') + rose('/praxis-status') + dim(' or ') + rose('/praxis-save') + dim('.'));
   console.log('  ' + dim('Watching a live session? ') + rose('praxis hud') + dim(' in a second terminal shows it in plain English.'));
-  console.log('\n  ' + dim('“' + dailyQuote() + '”') + '\n');
+  console.log('  ' + dim('All commands: ') + rose('praxis help') + '\n');
 }

@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { transcriptDir, newestTranscript } from './transcript.js';
-import { TOOLS, ALTERNATES_FOR_CLAUDE, onPath } from './tools.js';
+import { TOOLS, ALTERNATES_FOR_CLAUDE, isInstalled } from './tools.js';
 
 export const DEFAULT_CONTEXT_LIMIT = 200000;
 
@@ -116,10 +116,10 @@ export function suggestNext(level, installed = {}) {
   };
 }
 
-/** Shallow check: which tools exist on this machine. */
+/** Which tools exist on this machine: PATH, install dirs, registry, /Applications. */
 export function detectTools() {
   const installed = {};
-  for (const [key, t] of Object.entries(TOOLS)) installed[key] = t.bin ? onPath(t.bin) : false;
+  for (const [key, t] of Object.entries(TOOLS)) installed[key] = isInstalled(t);
   return installed;
 }
 
@@ -145,6 +145,12 @@ export function healthReport(cwd = process.cwd()) {
   }
   const a = analyzeTranscript(text);
   const { pct, level } = classifyContext(a.contextTokens, limit);
+  // a session that stopped writing minutes ago is history, not "right now"
+  let idleMinutes = null;
+  if (a.lastTs) {
+    const ms = Date.now() - Date.parse(a.lastTs);
+    if (Number.isFinite(ms)) idleMinutes = Math.max(0, Math.floor(ms / 60000));
+  }
   return {
     sessionId: path.basename(file, '.jsonl'),
     file,
@@ -152,6 +158,8 @@ export function healthReport(cwd = process.cwd()) {
     contextLimit: limit,
     pct,
     level,
+    idleMinutes,
+    live: idleMinutes !== null && idleMinutes < 10,
   };
 }
 

@@ -16,9 +16,15 @@ export const sage = paint('38;5;114');
 export const amber = paint('38;5;179');
 export const blue = paint('38;5;110');
 export const red = paint('38;5;174');
+export const gold = paint('38;5;220');
 export const bold = paint('1');
 export const dim = paint('2');
 export const grey = paint('38;5;245');
+
+/** One clean line for everyday commands — the big welcome is init-only. */
+export function miniHeader(version, note = '') {
+  return rose('✦ ') + bold('PRAXIS') + grey(' v' + version) + (note ? grey('  ·  ' + note) : '');
+}
 
 export function stripAnsi(s) {
   // eslint-disable-next-line no-control-regex

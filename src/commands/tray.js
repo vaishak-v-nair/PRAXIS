@@ -3,7 +3,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
-import { sage, amber, rose, bold, grey, dim } from '../lib/ui.js';
+import { sage, amber, red, blue, gold, rose, bold, grey, dim } from '../lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TRAY_SRC = path.join(__dirname, '..', 'tray');
@@ -170,6 +170,14 @@ export async function tray(args = []) {
   }
 
   console.log('\n  ' + rose('✦') + ' ' + bold('tray companion is live') + ' — look for the axolotl by the clock.');
-  console.log('    ' + grey('its emotion = your session: ') + sage('idle') + grey(' · ') + amber('warning') + grey(' · limit · switching · restored'));
-  console.log('    ' + dim('praxis tray --stop  when you want it gone.') + '\n');
+  console.log(
+    '    ' +
+      grey('its emotion = your session: ') +
+      sage('idle') + grey(' · ') +
+      amber('warning') + grey(' · ') +
+      red('limit') + grey(' · ') +
+      blue('switching') + grey(' · ') +
+      gold('restored'),
+  );
+  console.log('    ' + rose('praxis tray --stop') + dim('  when you want it gone.') + '\n');
 }

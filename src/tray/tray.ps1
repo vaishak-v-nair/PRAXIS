@@ -92,7 +92,8 @@ function Get-SessionHealth {
     $pct = [int][Math]::Min(100, [Math]::Round(($tok / $limit) * 100))
     $level = 'fresh'
     if ($pct -ge 88) { $level = 'critical' } elseif ($pct -ge 75) { $level = 'heavy' } elseif ($pct -ge 50) { $level = 'warming' }
-    return @{ pct = $pct; level = $level; id = $f.BaseName }
+    $ageMin = [int]((Get-Date) - $f.LastWriteTime).TotalMinutes
+    return @{ pct = $pct; level = $level; id = $f.BaseName; ageMin = $ageMin }
   } catch { return $null }
 }
 
@@ -133,7 +134,7 @@ function Get-PraxisState {
         $hj = Get-Content -Raw $healthFile | ConvertFrom-Json
         $hAge = ((Get-Date) - [datetime]$hj.updated).TotalSeconds
         if ($hAge -lt 900 -and $hj.pct -ge 0) {
-          $script:sessCache = @{ pct = [int]$hj.pct; level = [string]$hj.level; id = [string]$hj.sessionId }
+          $script:sessCache = @{ pct = [int]$hj.pct; level = [string]$hj.level; id = [string]$hj.sessionId; ageMin = [int]($hAge / 60) }
         }
       } catch {}
     }
@@ -146,10 +147,13 @@ function Get-PraxisState {
 
   # what the glow means, in order of urgency: an active carry-over beats
   # everything; then the LIVE session fill; then the memory file fill
+  # only a session writing RIGHT NOW (last 5 min) earns a warning glow or a
+  # nudge — a full session from 20 minutes ago is history; the next one is 0%
+  $sessLive = ($sess -and $sess.ageMin -ne $null -and $sess.ageMin -le 5)
   if ($phase -eq 'switching' -and $phaseAge -lt 90) { $name = 'switching'; $label = 'carrying context over' }
   elseif ($phase -eq 'restored' -and $phaseAge -lt 120) { $name = 'restored'; $label = 'context restored' }
-  elseif ($sess -and $sess.level -eq 'critical') { $name = 'limit'; $label = ('session ' + $sess.pct + '% full - switch soon') }
-  elseif ($sess -and $sess.level -eq 'heavy') { $name = 'warning'; $label = ('session ' + $sess.pct + '% full') }
+  elseif ($sessLive -and $sess.level -eq 'critical') { $name = 'limit'; $label = ('session ' + $sess.pct + '% full - switch soon') }
+  elseif ($sessLive -and $sess.level -eq 'heavy') { $name = 'warning'; $label = ('session ' + $sess.pct + '% full') }
   elseif ($ratio -ge 0.9) { $name = 'limit'; $label = 'memory near the cap' }
   elseif ($ratio -ge 0.6) { $name = 'warning'; $label = 'memory filling up' }
   else {
@@ -627,8 +631,9 @@ $timer.add_Tick({
     $script:lastName = $s.name
   }
   # the directional nudge: the mascot speaks ONCE per session per level —
-  # a gentle heads-up at heavy, the exact way out at critical
-  if ($s.sess -and ($s.sess.level -eq 'critical' -or $s.sess.level -eq 'heavy')) {
+  # a gentle heads-up at heavy, the exact way out at critical. Live sessions
+  # only: a stale transcript is history, not something to interrupt anyone for.
+  if ($s.sess -and $s.sess.ageMin -ne $null -and $s.sess.ageMin -le 5 -and ($s.sess.level -eq 'critical' -or $s.sess.level -eq 'heavy')) {
     $popKey = $s.sess.id + ':' + $s.sess.level
     if ($script:healthPopped -ne $popKey) {
       $script:healthPopped = $popKey

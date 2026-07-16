@@ -11,7 +11,7 @@ import { hud } from './commands/hud.js';
 import { switchTool } from './commands/switch.js';
 import { health } from './commands/health.js';
 import { projectPaths } from './lib/paths.js';
-import { bigBanner, bold, grey } from './lib/ui.js';
+import { miniHeader, bold, grey } from './lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,7 +25,7 @@ function version() {
 }
 
 function help() {
-  console.log('\n' + bigBanner(version()) + '\n');
+  console.log('\n  ' + miniHeader(version()) + '\n');
   console.log(`  ${bold('Usage')}
   ${bold('npx praxis-memory')}     set up PRAXIS here ${grey('(or show status if already set up)')}
   ${bold('praxis init')}           set up PRAXIS in the current project
