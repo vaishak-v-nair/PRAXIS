@@ -73,9 +73,9 @@ switch (cmd) {
     console.log(version());
     break;
   case undefined:
-    // Smart default: first run sets up, later runs report.
+    // Smart default: first run sets up, later runs give the full welcome.
     if (existsSync(projectPaths().praxisDir)) {
-      status();
+      status({ welcome: true });
       await tray(['--ensure']); // the companion comes back with every run
     } else {
       await init();

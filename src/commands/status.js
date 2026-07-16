@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
-import { miniHeader, sage, amber, red, rose, bold, grey, dim, timeAgo } from '../lib/ui.js';
+import { miniHeader, bigBanner, sage, amber, red, rose, bold, grey, dim, timeAgo, dailyQuote } from '../lib/ui.js';
 import { healthReport } from '../lib/health.js';
 
 function pkgVersion() {
@@ -15,7 +15,7 @@ function pkgVersion() {
   }
 }
 
-export function status() {
+export function status(opts = {}) {
   const p = projectPaths();
   if (!fs.existsSync(p.memoryFile)) {
     console.log('\n  ' + miniHeader(pkgVersion()) + '\n');
@@ -48,7 +48,13 @@ export function status() {
         ? 'Getting full — the oldest session notes will be trimmed automatically. Nothing to do.'
         : 'At the cap — oldest notes are trimmed as new ones arrive. Put anything precious in the Project section; it is never trimmed.';
 
-  console.log('\n  ' + miniHeader(pkgVersion(), 'status') + '\n');
+  // the front door (`npx praxis-memory`, bare `praxis`) keeps the full
+  // welcome — mascot, box, slash menu. Plain `praxis status` stays clean.
+  if (opts.welcome) {
+    console.log('\n' + bigBanner(pkgVersion(), [grey((bytes / 1024).toFixed(1) + ' KB · ' + health)]) + '\n');
+  } else {
+    console.log('\n  ' + miniHeader(pkgVersion(), 'status') + '\n');
+  }
   console.log('  ' + grey('memory   ') + path.relative(p.root, p.memoryFile));
   console.log(
     '  ' +
@@ -73,4 +79,5 @@ export function status() {
   console.log('  ' + dim('Inside a session, type ') + rose('/praxis-status') + dim(' or ') + rose('/praxis-save') + dim('.'));
   console.log('  ' + dim('Watching a live session? ') + rose('praxis hud') + dim(' in a second terminal shows it in plain English.'));
   console.log('  ' + dim('All commands: ') + rose('praxis help') + '\n');
+  if (opts.welcome) console.log('  ' + dim('“' + dailyQuote() + '”') + '\n');
 }

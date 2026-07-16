@@ -81,6 +81,7 @@ export function bigBanner(version, leftExtras = []) {
     bold('Inside Claude Code, type /'),
     '',
     ...menu.map(([n, d]) => rose(n.padEnd(nameW + 2)) + grey(d)),
+    grey('+ ') + rose('/praxis-') + grey('health · switch · feedback · hud'),
     '',
     grey('praxis help — everything else'),
   ];

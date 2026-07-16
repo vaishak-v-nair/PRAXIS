@@ -549,7 +549,9 @@ $ovTimer.add_Tick({
     $e = 1 - (1 - $t) * (1 - $t)                   # ease-out
     $alpha = [int](255 * $e); $dy = [int](24 * (1 - $e))
   } elseif ($script:ovPhase -eq 'hold') {
-    if (-not $script:ovPinned -and ($script:ovTick - $script:ovTick0) -ge 150) {  # ~6s
+    # playful float: a slow bob while it's up, like treading water
+    $dy = [int](4 * [Math]::Sin(($script:ovTick - $script:ovTick0) * 0.1))
+    if (-not $script:ovPinned -and ($script:ovTick - $script:ovTick0) -ge 250) {  # ~10s
       $script:ovPhase = 'out'; $script:ovTick0 = $script:ovTick
     }
   } elseif ($script:ovPhase -eq 'out') {

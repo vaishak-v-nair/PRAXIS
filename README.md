@@ -115,6 +115,10 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `/praxis-remember` | save a fact or decision right now |
 | `/praxis-forget` | remove outdated info from memory |
 | `/praxis-status` | memory at a glance |
+| `/praxis-health` | how full is this session, and the best next step |
+| `/praxis-switch` | hand this work off to gemini · codex · cursor · antigravity |
+| `/praxis-feedback` | the two questions that shape what gets built |
+| `/praxis-hud` | how to watch this session live, in plain English |
 
 ## What Praxis writes, and where
 
