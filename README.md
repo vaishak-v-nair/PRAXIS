@@ -102,6 +102,7 @@ praxis status         # what Praxis remembers, and session health
 praxis health         # how full is this Claude session, really — and where to go next
 praxis hud            # live view of your Claude session, in plain English (second terminal)
 praxis switch <tool>  # pack a handoff brief and move to gemini / codex / claude / cursor
+praxis checkpoint     # save the whole session to md files, then /compact and keep going
 praxis trace          # the AI context behind a commit (on · off · log · <hash>)
 praxis cost           # what did that just cost? API-equivalent dollars (--all)
 praxis gate [ref]     # slop-risk score for a commit — triage before you review
@@ -121,6 +122,7 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `/praxis-status` | memory at a glance |
 | `/praxis-health` | how full is this session, and the best next step |
 | `/praxis-switch` | hand this work off to gemini · codex · cursor · antigravity |
+| `/praxis-checkpoint` | save everything, `/compact`, continue in this same session |
 | `/praxis-feedback` | the two questions that shape what gets built |
 | `/praxis-hud` | how to watch this session live, in plain English |
 | `/praxis-explain` | re-explain Claude's last answer with zero jargon — for people who don't read code |
@@ -131,10 +133,11 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 |------|------|
 | `.praxis/memory.md` | Your living project memory — the thing Claude reads |
 | `.praxis/config.json` | Local settings: capture on/off, size cap, redaction |
+| `.praxis/checkpoints/` | `praxis checkpoint` — the RESUME brief + full session archives |
 | `CLAUDE.md` | A managed `PRAXIS:START/END` block. **Your own content is never touched.** |
 | `.claude/settings.json` | `Stop` + `PreCompact` + `SessionStart` hooks, merged in without disturbing existing hooks |
-| `.claude/commands/` | The five `/praxis-*` slash commands, project-scoped |
-| `~/.claude/commands/` | The same five, user-wide — so `/` shows them in **every** project |
+| `.claude/commands/` | The eleven `/praxis-*` slash commands, project-scoped |
+| `~/.claude/commands/` | The same eleven, user-wide — so `/` shows them in **every** project |
 
 > `/` menu looks empty? Restart the open Claude Code session — it loads commands at start.
 
@@ -302,6 +305,7 @@ version (0.x.y) just counts releases inside v0; the milestone that matters is v1
 - The floating mascot: state changes announced by the axolotl itself, no popup box.
 - Pre-compact snapshots: what you were working on, saved the moment before Claude squeezes the session.
 - Trace v0: the AI's decision trail on every commit, in plain git notes — `praxis trace`.
+- Checkpoint: save the whole session to markdown (+ Obsidian), `/compact`, continue in the same session — `praxis checkpoint`.
 
 **Still inside v0**
 - Tray companion for macOS and Linux.

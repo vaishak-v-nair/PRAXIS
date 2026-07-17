@@ -4,6 +4,33 @@
 
 const LOG_MARKER = '## Session Log';
 
+/** The durable project brief from a memory.md string — shared by switch + checkpoint. */
+export function extractBrief(memoryContent) {
+  const content = String(memoryContent || '');
+  const idx = content.indexOf(LOG_MARKER);
+  const project = (idx >= 0 ? content.slice(0, idx) : content)
+    .replace(/^# PRAXIS Memory[^\n]*\n?/, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/^## Project\s*/m, '')
+    .trim();
+  if (!project || project.startsWith('_(No project summary yet')) return '';
+  return project;
+}
+
+/** The newest N Session Log entries from a memory.md string. */
+export function extractRecentEntries(memoryContent, maxEntries = 3) {
+  const content = String(memoryContent || '');
+  const idx = content.indexOf(LOG_MARKER);
+  if (idx < 0) return [];
+  return content
+    .slice(idx + LOG_MARKER.length)
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .split(/\n(?=### )/)
+    .map((s) => s.trim())
+    .filter((s) => s.startsWith('### '))
+    .slice(0, maxEntries);
+}
+
 /**
  * Build the capsule text from a memory.md string.
  * Pure function — no filesystem, fully testable.
@@ -12,28 +39,12 @@ export function buildCapsule(memoryContent, opts = {}) {
   const toolName = opts.toolName || 'a new AI tool';
   const maxEntries = Number.isFinite(opts.maxEntries) ? opts.maxEntries : 3;
   const now = opts.now || new Date().toISOString();
-  const content = String(memoryContent || '');
 
-  const idx = content.indexOf(LOG_MARKER);
-  let project = (idx >= 0 ? content.slice(0, idx) : content)
-    .replace(/^# PRAXIS Memory[^\n]*\n?/, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/^## Project\s*/m, '')
-    .trim();
-  if (!project || project.startsWith('_(No project summary yet')) {
-    project = '_(No project brief saved yet — read the session notes below and the code itself.)_';
-  }
+  const project =
+    extractBrief(memoryContent) ||
+    '_(No project brief saved yet — read the session notes below and the code itself.)_';
 
-  let entries = [];
-  if (idx >= 0) {
-    entries = content
-      .slice(idx + LOG_MARKER.length)
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .split(/\n(?=### )/)
-      .map((s) => s.trim())
-      .filter((s) => s.startsWith('### '))
-      .slice(0, maxEntries);
-  }
+  const entries = extractRecentEntries(memoryContent, maxEntries);
   const sessions = entries.length
     ? entries.join('\n\n')
     : '_(No sessions logged yet.)_';

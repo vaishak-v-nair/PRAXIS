@@ -14,6 +14,7 @@ import { telemetry } from './commands/telemetry.js';
 import { trace } from './commands/trace.js';
 import { vault } from './commands/vault.js';
 import { cost } from './commands/cost.js';
+import { checkpoint } from './commands/checkpoint.js';
 import { gate } from './commands/gate.js';
 import { roi } from './commands/roi.js';
 import { record, flush } from './lib/telemetry.js';
@@ -40,6 +41,7 @@ function help() {
   ${bold('praxis health')}         how full is this Claude session, really — and where to go next
   ${bold('praxis hud')}            live view of your Claude session, in plain English ${grey('(second terminal)')}
   ${bold('praxis switch <tool>')}  pack a handoff brief and move to gemini · codex · claude · cursor
+  ${bold('praxis checkpoint')}     save the whole session to md files, then /compact and keep going ${grey('· [folder]')}
   ${bold('praxis trace')}          the AI context behind a commit ${grey('· on / off / log / <hash>')}
   ${bold('praxis vault <path>')}   write sessions, commits & memory into your Obsidian vault
   ${bold('praxis cost')}           what did that just cost? API-equivalent dollars ${grey('· --all')}
@@ -109,6 +111,9 @@ switch (cmd) {
     break;
   case 'cost':
     cost(process.argv.slice(3));
+    break;
+  case 'checkpoint':
+    await checkpoint(process.argv.slice(3));
     break;
   case 'gate':
     gate(process.argv.slice(3));
