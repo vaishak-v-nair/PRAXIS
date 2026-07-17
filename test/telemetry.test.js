@@ -9,9 +9,8 @@ process.env.PRAXIS_TELEMETRY_FILE = path.join(
   fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-tel-')),
   'telemetry.json',
 );
-const { telemetryState, setTelemetry, record, payload, TELEMETRY_ENDPOINT } = await import(
-  '../src/lib/telemetry.js'
-);
+const { telemetryState, setTelemetry, record, payload, TELEMETRY_ENDPOINT, TELEMETRY_KEY } =
+  await import('../src/lib/telemetry.js');
 
 test('telemetry is opt-in: nothing recorded before consent', () => {
   record('cmd_status');
@@ -62,6 +61,8 @@ test('SCHEMA GUARD: payload is structurally incapable of carrying content', () =
   walk(p, 'payload');
 });
 
-test('no endpoint configured ships in this build — nothing can be sent', () => {
-  assert.equal(TELEMETRY_ENDPOINT, '', 'endpoint stays empty until the receiver exists');
+test('the package ships a URL and zero credentials', () => {
+  assert.match(TELEMETRY_ENDPOINT, /^$|^https:\/\//, 'endpoint is empty or https');
+  assert.ok(!TELEMETRY_ENDPOINT.includes('supabase.co'), 'never talks to storage directly');
+  assert.equal(TELEMETRY_KEY, '', 'no key of any kind ships in the public client');
 });

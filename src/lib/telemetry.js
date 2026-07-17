@@ -9,10 +9,11 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-// Receiver: a Supabase REST insert (RLS insert-only — the public key can
-// write one row, never read any). Both empty = telemetry fully inert.
-export const TELEMETRY_ENDPOINT = ''; // e.g. https://xyz.supabase.co/rest/v1/praxis_telemetry
-export const TELEMETRY_KEY = ''; // the anon PUBLIC key (public by design; RLS is the gate)
+// Receiver: a Cloudflare Worker that validates the schema server-side and
+// forwards to storage the client has no credentials for. The client ships a
+// URL and NOTHING else — no key of any kind.
+export const TELEMETRY_ENDPOINT = 'https://praxis-pvt.vaishak-v-nair-dev.workers.dev';
+export const TELEMETRY_KEY = ''; // deliberately empty: no key ever ships in this package
 
 const FILE =
   process.env.PRAXIS_TELEMETRY_FILE ||
