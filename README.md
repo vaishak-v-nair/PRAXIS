@@ -102,6 +102,7 @@ praxis status         # what Praxis remembers, and session health
 praxis health         # how full is this Claude session, really — and where to go next
 praxis hud            # live view of your Claude session, in plain English (second terminal)
 praxis switch <tool>  # pack a handoff brief and move to gemini / codex / claude / cursor
+praxis trace          # the AI context behind a commit (on · off · log · <hash>)
 praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
 praxis feedback       # the two questions that shape what gets built next
 ```
@@ -198,6 +199,37 @@ your project brief and the latest session notes into `.praxis/handoff.md` and
 puts the exact launch command on your clipboard. The next tool starts already
 knowing your project — you never re-explain it.
 
+## Trace — the *why* behind every commit
+
+Git records *what* changed. `praxis trace` records **why the AI changed it** —
+straight from the session, attached to the commit, in plain git:
+
+```
+ $ praxis trace
+
+ 7efb103  feat(telemetry): go live behind the Cloudflare worker
+
+ praxis trace — the AI context behind this commit
+
+ Asked:
+   · make telemetry live end-to-end
+ Touched: src/lib/telemetry.js · test/telemetry.test.js
+ Ran: 11 commands
+ In its words:
+   "Endpoint flipped to the deployed worker. The package ships a URL and
+    zero credentials — a test enforces that."
+
+ — session 100% full at commit · praxis v0.6.0
+```
+
+`praxis trace on` adds one line to your post-commit hook (existing hooks are
+never touched). Every commit after that carries its AI context in
+`refs/notes/praxis` — no server, no vendor, works on any git host. Review a
+teammate's AI-written PR with the *reasoning*, not just the diff:
+`praxis trace <hash>` · `praxis trace log` · share notes with
+`git push origin refs/notes/praxis`. Secrets are redacted; files outside the
+repo are counted, never named.
+
 ## Safety
 
 - **Redaction** — before writing, Praxis strips common secrets (API keys, tokens,
@@ -219,6 +251,7 @@ version (0.x.y) just counts releases inside v0; the milestone that matters is v1
 - Real session health, measured from the transcript — ambient in the tray, detailed in `praxis health`.
 - The floating mascot: state changes announced by the axolotl itself, no popup box.
 - Pre-compact snapshots: what you were working on, saved the moment before Claude squeezes the session.
+- Trace v0: the AI's decision trail on every commit, in plain git notes — `praxis trace`.
 
 **Still inside v0**
 - Tray companion for macOS and Linux.
