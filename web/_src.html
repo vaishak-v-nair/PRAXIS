@@ -7,7 +7,7 @@
   --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
   --rose:#d93a67; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
   --ok:#4fa376; --warn:#dfa03a; --xfer:#4e8fd0; --limit:#d94f3d; --restored:#c79a3e;
-  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.5); --hair:rgba(43,32,25,.15);
+  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.62); --hair:rgba(43,32,25,.15);
   --pool:rgba(78,143,208,.16);
   --card:#1c1310; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
@@ -18,7 +18,7 @@
     --paper:#171009; --paper2:#231a10; --ink:#f0e7d6;
     --rose:#ef6f95; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
     --ok:#6fbd8c; --warn:#edb54f; --xfer:#6aa5e0; --limit:#e0604d; --restored:#d9ad55;
-    --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.5); --hair:rgba(240,231,214,.16);
+    --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.6); --hair:rgba(240,231,214,.16);
     --pool:rgba(106,165,224,.14);
     --card:#0f0a06; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
   }
@@ -27,7 +27,7 @@
   --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
   --rose:#d93a67; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
   --ok:#4fa376; --warn:#dfa03a; --xfer:#4e8fd0; --limit:#d94f3d; --restored:#c79a3e;
-  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.5); --hair:rgba(43,32,25,.15);
+  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.62); --hair:rgba(43,32,25,.15);
   --pool:rgba(78,143,208,.16);
   --card:#1c1310; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
 }
@@ -35,7 +35,7 @@
   --paper:#171009; --paper2:#231a10; --ink:#f0e7d6;
   --rose:#ef6f95; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
   --ok:#6fbd8c; --warn:#edb54f; --xfer:#6aa5e0; --limit:#e0604d; --restored:#d9ad55;
-  --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.5); --hair:rgba(240,231,214,.16);
+  --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.6); --hair:rgba(240,231,214,.16);
   --pool:rgba(106,165,224,.14);
   --card:#0f0a06; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
 }
@@ -158,7 +158,8 @@ nav .cmd{padding:9px 17px;font-size:12px}
 .term .bar i{width:9px;height:9px;border-radius:50%}
 .term .bar .t{margin-left:9px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--card-dim)}
 .term pre{padding:20px 22px 24px;font-family:var(--mono);font-size:12.8px;line-height:1.75;white-space:pre-wrap}
-.term .ln{display:block;opacity:0;transition:opacity .35s}
+.js .term .ln{opacity:0}
+.term .ln{display:block;transition:opacity .35s}
 .term .ln.on{opacity:1}
 .term .h{color:var(--rose)}
 .term .c{color:var(--card-dim);font-style:italic}
@@ -254,7 +255,7 @@ footer .fcol a:hover{color:var(--rose)}
 
 @media (prefers-reduced-motion: reduce){
   .js .rv{opacity:1;transform:none;transition:none}
-  .stage .glow,.stage .pet{animation:none}
+  .stage .glow,.stage .pet,.term .caret{animation:none}
   html{scroll-behavior:auto}
 }
 </style>

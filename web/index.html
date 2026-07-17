@@ -1,3 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f8f3e7">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#171009">
+<link rel="icon" href="data:image/png;base64,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">
+<link rel="canonical" href="https://praxis-six-xi.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="PRAXIS — your AI never forgets your project">
+<meta property="og:description" content="Open-source local memory, session health, a decision trail, and a cost meter for Claude Code and every AI coding agent. Nothing leaves your machine.">
+<meta property="og:url" content="https://praxis-six-xi.vercel.app/">
+<meta property="og:image" content="https://raw.githubusercontent.com/vaishak-v-nair/PRAXIS/main/docs/mascot.gif">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PRAXIS — your AI never forgets your project">
+<meta name="twitter:description" content="Local memory, session health, decision trail and cost meter for Claude Code. Nothing leaves your machine.">
 <title>PRAXIS — Local memory for Claude Code. Your AI never forgets your project.</title>
 <meta name="description" content="Praxis is an open-source local memory for Claude Code. It captures your project's decisions, architecture and reasoning into one markdown file — read back automatically every session. No server, no account, $0 added cost.">
 <meta name="keywords" content="Claude Code memory, AI coding assistant, local-first, persistent context, developer tools, open source, CLI, markdown memory">
@@ -7,7 +24,7 @@
   --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
   --rose:#d93a67; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
   --ok:#4fa376; --warn:#dfa03a; --xfer:#4e8fd0; --limit:#d94f3d; --restored:#c79a3e;
-  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.5); --hair:rgba(43,32,25,.15);
+  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.62); --hair:rgba(43,32,25,.15);
   --pool:rgba(78,143,208,.16);
   --card:#1c1310; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
@@ -18,7 +35,7 @@
     --paper:#171009; --paper2:#231a10; --ink:#f0e7d6;
     --rose:#ef6f95; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
     --ok:#6fbd8c; --warn:#edb54f; --xfer:#6aa5e0; --limit:#e0604d; --restored:#d9ad55;
-    --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.5); --hair:rgba(240,231,214,.16);
+    --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.6); --hair:rgba(240,231,214,.16);
     --pool:rgba(106,165,224,.14);
     --card:#0f0a06; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
   }
@@ -27,7 +44,7 @@
   --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
   --rose:#d93a67; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
   --ok:#4fa376; --warn:#dfa03a; --xfer:#4e8fd0; --limit:#d94f3d; --restored:#c79a3e;
-  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.5); --hair:rgba(43,32,25,.15);
+  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.62); --hair:rgba(43,32,25,.15);
   --pool:rgba(78,143,208,.16);
   --card:#1c1310; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
 }
@@ -35,7 +52,7 @@
   --paper:#171009; --paper2:#231a10; --ink:#f0e7d6;
   --rose:#ef6f95; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
   --ok:#6fbd8c; --warn:#edb54f; --xfer:#6aa5e0; --limit:#e0604d; --restored:#d9ad55;
-  --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.5); --hair:rgba(240,231,214,.16);
+  --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.6); --hair:rgba(240,231,214,.16);
   --pool:rgba(106,165,224,.14);
   --card:#0f0a06; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
 }
@@ -158,7 +175,8 @@ nav .cmd{padding:9px 17px;font-size:12px}
 .term .bar i{width:9px;height:9px;border-radius:50%}
 .term .bar .t{margin-left:9px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--card-dim)}
 .term pre{padding:20px 22px 24px;font-family:var(--mono);font-size:12.8px;line-height:1.75;white-space:pre-wrap}
-.term .ln{display:block;opacity:0;transition:opacity .35s}
+.js .term .ln{opacity:0}
+.term .ln{display:block;transition:opacity .35s}
 .term .ln.on{opacity:1}
 .term .h{color:var(--rose)}
 .term .c{color:var(--card-dim);font-style:italic}
@@ -254,7 +272,7 @@ footer .fcol a:hover{color:var(--rose)}
 
 @media (prefers-reduced-motion: reduce){
   .js .rv{opacity:1;transform:none;transition:none}
-  .stage .glow,.stage .pet{animation:none}
+  .stage .glow,.stage .pet,.term .caret{animation:none}
   html{scroll-behavior:auto}
 }
 </style>
