@@ -5,7 +5,7 @@
 <style>
 :root{
   --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
-  --rose:#e0517d; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
+  --rose:#d93a67; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
   --ok:#4fa376; --warn:#dfa03a; --xfer:#4e8fd0; --limit:#d94f3d; --restored:#c79a3e;
   --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.5); --hair:rgba(43,32,25,.15);
   --pool:rgba(78,143,208,.16);
@@ -25,7 +25,7 @@
 }
 :root[data-theme="light"]{
   --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
-  --rose:#e0517d; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
+  --rose:#d93a67; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
   --ok:#4fa376; --warn:#dfa03a; --xfer:#4e8fd0; --limit:#d94f3d; --restored:#c79a3e;
   --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.5); --hair:rgba(43,32,25,.15);
   --pool:rgba(78,143,208,.16);
@@ -94,6 +94,7 @@ nav .cmd{padding:9px 17px;font-size:12px}
 .hero h1{font-size:clamp(2.9rem,6.6vw,5.3rem);line-height:1;letter-spacing:-.022em;font-weight:600}
 .hero h1 em{font-style:italic;font-weight:500;background:linear-gradient(100deg,var(--rose),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
 .hero .sub{font-style:italic;font-size:clamp(1.06rem,1.6vw,1.26rem);line-height:1.55;color:var(--body);max-width:46ch;margin-top:20px}
+@media(max-width:520px){.hero h1{font-size:min(2.45rem,10.6vw)}.hero .sub{font-size:1.02rem}.h2{font-size:1.7rem}}
 .hero-cta{display:flex;align-items:center;gap:22px;margin-top:26px;flex-wrap:wrap}
 .hero .facts{font-family:var(--mono);font-size:11.5px;letter-spacing:.07em;color:var(--dim);margin-top:20px}
 .hero .facts b{color:var(--rose);font-weight:400;padding:0 6px}
@@ -268,6 +269,7 @@ footer .fcol a:hover{color:var(--rose)}
       <a href="#benefits">Benefits</a>
       <a href="#loop">How it works</a>
       <a href="#tray">Tray app</a>
+      <a href="#trace">Trace</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/vaishak-v-nair/PRAXIS">GitHub</a>
     </div>
@@ -388,7 +390,7 @@ footer .fcol a:hover{color:var(--rose)}
     <span class="kick rv">Design principles</span>
     <h2 class="h2 rv d1">Memory that stays on <em>your</em> machine.</h2>
     <div class="rows">
-      <div class="wrow rv"><span class="n">i.</span><h3>Local by design</h3><p>The entire capture loop runs beside your code. No server, no telemetry, no account — nothing is uploaded, ever.</p></div>
+      <div class="wrow rv"><span class="n">i.</span><h3>Local by design</h3><p>The entire capture loop runs beside your code. No server, no account — your code and conversations never leave. The one thing that ever can: anonymous usage counts, strictly opt-in, and <code>praxis telemetry show</code> prints the exact payload first.</p></div>
       <div class="wrow rv"><span class="n">ii.</span><h3>Zero added cost</h3><p>Praxis rides the Claude Code subscription you already run. It makes no API calls of its own and adds nothing to your bill.</p></div>
       <div class="wrow rv"><span class="n">iii.</span><h3>Owned by the repo</h3><p>Memory lives in your project, gitignored by default. Commit it to share context with your team, or keep it private.</p></div>
       <div class="wrow rv"><span class="n">iv.</span><h3>Self-loading</h3><p><code>CLAUDE.md</code> includes the memory file, so every new session reads it without being asked. No paste, no prompt engineering.</p></div>
@@ -436,6 +438,36 @@ footer .fcol a:hover{color:var(--rose)}
   </div>
 </section>
 
+<!-- TRACE -->
+<section class="tray" id="trace" data-label="the flight recorder">
+  <div class="wrap split">
+    <div>
+      <span class="kick rv">The flight recorder</span>
+      <h2 class="h2 rv d1">Git records <em>what</em> changed. Praxis records <em>why</em>.</h2>
+      <p class="lead rv d2">AI wrote the commit — <code style="font-family:var(--mono);font-size:.85em">praxis trace</code> keeps its reasoning. One line in your post-commit hook (existing hooks untouched), and every commit carries the session behind it: what was asked, what was touched, the AI's own words. Stored in plain git notes — no server, no vendor, any git host.</p>
+      <p class="lead rv d3">Reviewing an AI-written PR stops being archaeology: the testimony sits next to the diff. Share it with the whole team — <code style="font-family:var(--mono);font-size:.85em">git push origin refs/notes/praxis</code>.</p>
+    </div>
+    <div class="term rv d2">
+      <div class="bar"><i style="background:var(--limit)"></i><i style="background:var(--warn)"></i><i style="background:var(--ok)"></i><span class="t">praxis trace</span></div>
+      <pre><span class="ln"><span class="h">$ praxis trace</span></span>
+<span class="ln"></span>
+<span class="ln">7efb103  feat(telemetry): go live behind the worker</span>
+<span class="ln"></span>
+<span class="ln">praxis trace &mdash; the AI context behind this commit</span>
+<span class="ln"></span>
+<span class="ln">Asked:</span>
+<span class="ln">  &middot; make telemetry live end-to-end</span>
+<span class="ln">Touched: src/lib/telemetry.js &middot; test/telemetry.test.js</span>
+<span class="ln">Ran: 11 commands</span>
+<span class="ln">In its words:</span>
+<span class="ln">  "Endpoint flipped to the deployed worker. The package</span>
+<span class="ln">   ships a URL and zero credentials &mdash; a test enforces that."</span>
+<span class="ln"></span>
+<span class="ln"><span class="c">&mdash; session 100% full at commit &middot; praxis v0.6</span></span></pre>
+    </div>
+  </div>
+</section>
+
 <!-- PRACTICE -->
 <section class="practice" data-label="a day in practice">
   <div class="wrap">
@@ -459,7 +491,7 @@ footer .fcol a:hover{color:var(--rose)}
     <div class="list rv d1">
       <details>
         <summary>Does my code ever leave my machine?</summary>
-        <p>No. Praxis is local-first by construction: the capture hook, the memory file, and the tray app all run on your machine. There is no server to send anything to, no account to create, and no telemetry. The memory is a plain file in your repository.</p>
+        <p>No. The capture hook, the memory file, the tray app and trace notes all run on your machine; the memory is a plain file in your repository. The only network feature is strictly opt-in: anonymous usage counts — never code, never conversations. <code>praxis telemetry show</code> prints the exact payload, and <code>off</code> wipes even the anonymous install id.</p>
       </details>
       <details>
         <summary>What exactly does it remember?</summary>
@@ -479,7 +511,7 @@ footer .fcol a:hover{color:var(--rose)}
       </details>
       <details>
         <summary>Which tools does it work with?</summary>
-        <p>Claude Code today. Because the memory is one portable markdown file, it is readable by any editor, agent, or AI coding assistant — support for more tools is planned, and the format will stay plain markdown.</p>
+        <p>Claude Code is measured deeply today. <code>praxis switch</code> already packs your context and hands it to Gemini CLI, Codex, Cursor or Antigravity, and trace notes work on any git host. The memory stays one portable markdown file, readable by any editor or agent.</p>
       </details>
       <details>
         <summary>Does it work on Windows, macOS and Linux?</summary>
@@ -506,7 +538,7 @@ footer .fcol a:hover{color:var(--rose)}
     <p class="fineprint rv d2" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--card-dim);margin-top:12px">click to copy &middot; windows, macos &amp; linux &middot; node 18+</p>
     <div class="doors rv d3">
       <span><b>1</b>&nbsp; before Claude — run it once in your terminal</span>
-      <span><b>2</b>&nbsp; inside Claude — type <em>/</em> &nbsp;&rarr;&nbsp; /praxis-recap &middot; /praxis-save &middot; /praxis-remember &middot; /praxis-forget &middot; /praxis-status</span>
+      <span><b>2</b>&nbsp; inside Claude — type <em>/</em> &nbsp;&rarr;&nbsp; /praxis-recap &middot; /praxis-save &middot; /praxis-health &middot; /praxis-switch &middot; /praxis-explain &middot; five more</span>
     </div>
     <div class="links rv d3"><a class="tlink" href="https://github.com/vaishak-v-nair/PRAXIS">View the source on GitHub &rarr;</a></div>
   </div>
@@ -589,8 +621,8 @@ if('IntersectionObserver' in window){
   secs.forEach(function(s){secIO.observe(s);});
 }
 
-var term=document.getElementById('term');
-if(term&&io){
+document.querySelectorAll('.term').forEach(function(term){
+  if(!io){term.querySelectorAll('.ln').forEach(function(l){l.classList.add('on');});return;}
   var tio=new IntersectionObserver(function(es){
     es.forEach(function(e){
       if(!e.isIntersecting)return;tio.unobserve(term);
@@ -599,7 +631,7 @@ if(term&&io){
     });
   },{threshold:.3});
   tio.observe(term);
-}else if(term){term.querySelectorAll('.ln').forEach(function(l){l.classList.add('on');});}
+});
 
 /* tray flow sync: 70 frames x 125ms = 8750ms, 5 states x 1750ms */
 var flow=document.getElementById('flow');
