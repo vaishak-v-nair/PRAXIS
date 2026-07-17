@@ -16,6 +16,14 @@ CLAUDE.md
 .claude/
 npx
 
+# local agent tooling (maintainer-only, not part of the package)
+.agents/
+.mcp.json
+skills-lock.json
+
 # raw brand sources: private repo only (heavy)
 assets/source/
 TRAY-VISION.md
+
+# personal Obsidian vault content - never public
+Personal Intelligence/
