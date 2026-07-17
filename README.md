@@ -103,6 +103,9 @@ praxis health         # how full is this Claude session, really — and where to
 praxis hud            # live view of your Claude session, in plain English (second terminal)
 praxis switch <tool>  # pack a handoff brief and move to gemini / codex / claude / cursor
 praxis trace          # the AI context behind a commit (on · off · log · <hash>)
+praxis cost           # what did that just cost? API-equivalent dollars (--all)
+praxis gate [ref]     # slop-risk score for a commit — triage before you review
+praxis roi            # the receipt: sessions, commits, hours, dollars (--days N)
 praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
 praxis feedback       # the two questions that shape what gets built next
 ```
@@ -229,6 +232,35 @@ teammate's AI-written PR with the *reasoning*, not just the diff:
 `praxis trace <hash>` · `praxis trace log` · share notes with
 `git push origin refs/notes/praxis`. Secrets are redacted; files outside the
 repo are counted, never named.
+
+## What did the AI just cost, and can you trust it?
+
+Every session transcript carries the exact token usage of every model turn.
+Nobody turns that into a number you can budget with. Praxis does — three
+plain-English commands, no server, same local engine:
+
+```
+ $ praxis cost
+
+ $14.20  API-equivalent · this session
+   sonnet-5        $11.40   3.1M tokens · 60 responses
+   haiku-4-5        $2.80   1.4M tokens · 22 responses
+```
+
+- **`praxis cost`** — *what did that just cost?* API-equivalent dollars per
+  model, this session or the whole project (`--all`). On a subscription, read
+  it as the value you extracted; the rates are overridable in config.
+- **`praxis gate [ref]`** — a slop-risk score (0-100) for a commit from local
+  signals: churn, files touched, tests untouched, how full the session was at
+  commit time, whether it carries a trace note. A five-second triage before a
+  human spends 90 minutes reviewing. A signal, never a verdict.
+- **`praxis roi`** — the receipt: sessions, active AI hours, commits (and how
+  many carry a decision trail), total and per-commit cost over the last N days.
+  Real numbers from your transcripts and git — you decide if it was worth it.
+
+Together with memory, health and trace, praxis answers the three questions
+every AI-using developer ends up asking: what did it do, what did it cost, and
+can I trust it.
 
 ## Your Obsidian vault, auto-fed
 
