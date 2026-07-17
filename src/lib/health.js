@@ -151,6 +151,11 @@ export function healthReport(cwd = process.cwd()) {
     const ms = Date.now() - Date.parse(a.lastTs);
     if (Number.isFinite(ms)) idleMinutes = Math.max(0, Math.floor(ms / 60000));
   }
+  // praxis only knows when the transcript last changed, not whether the app is
+  // open — so the states describe activity honestly. A paused session (you
+  // stepped away, switched apps) is "idle", NOT "not open".
+  const LIVE_MINUTES = 15; // writing recently → active
+  const IDLE_MINUTES = 180; // paused but almost certainly still open
   return {
     sessionId: path.basename(file, '.jsonl'),
     file,
@@ -159,7 +164,8 @@ export function healthReport(cwd = process.cwd()) {
     pct,
     level,
     idleMinutes,
-    live: idleMinutes !== null && idleMinutes < 10,
+    live: idleMinutes !== null && idleMinutes < LIVE_MINUTES,
+    idle: idleMinutes !== null && idleMinutes >= LIVE_MINUTES && idleMinutes < IDLE_MINUTES,
   };
 }
 

@@ -41,18 +41,21 @@ export async function health(args = []) {
   if (report.lastTs) facts.push('last active ' + agoFromIso(report.lastTs));
 
   if (!report.live) {
-    // that session is over — its number is history, not a warning
+    // not writing right now — idle (open, paused) vs no recent session (history)
     console.log(
       '  ' +
         bold('Claude Code'.padEnd(14)) +
-        grey('◌ not open right now') +
-        grey(` — last session ended at ${report.pct}% full (${k(report.contextTokens)} tokens)`),
+        (report.idle
+          ? amber('◐ idle') + grey(` — open but paused, ${report.idleMinutes}m since the last message (${report.pct}% full)`)
+          : grey('○ no recent session') + grey(` — the last one reached ${report.pct}% full (${k(report.contextTokens)} tokens)`)),
     );
     if (facts.length) console.log('  ' + ' '.repeat(14) + grey(facts.join(' · ')));
     console.log(
       '\n  ' +
         bold('What to do') +
-        '\n  Nothing. A new session always starts fresh at 0%, and your project memory loads into it automatically.',
+        (report.idle
+          ? '\n  Pick the thread back up in Claude, or switch tools with your memory: praxis switch.'
+          : '\n  Nothing. A new session always starts fresh at 0%, and your project memory loads into it automatically.'),
     );
   } else {
     const dot =

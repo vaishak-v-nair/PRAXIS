@@ -70,9 +70,11 @@ export function status(opts = {}) {
     console.log('  ' + grey('claude   ') + grey('○ not connected — start ') + bold('claude') + grey(' here and PRAXIS comes alive'));
   } else if (hr.live) {
     const dot = hr.level === 'critical' ? red('●') : hr.level === 'fresh' ? sage('●') : amber('●');
-    console.log('  ' + grey('claude   ') + dot + ` live session ${hr.pct}% full` + grey(' — praxis health for detail'));
+    console.log('  ' + grey('claude   ') + dot + ` active now — ${hr.pct}% full` + grey(' · praxis health for detail'));
+  } else if (hr.idle) {
+    console.log('  ' + grey('claude   ') + amber('◐') + ` idle ${hr.pct}% full` + grey(` — open but paused, ${hr.idleMinutes}m since the last message`));
   } else {
-    console.log('  ' + grey('claude   ') + grey(`◌ not open — last session ended at ${hr.pct}% full`));
+    console.log('  ' + grey('claude   ') + grey(`○ no recent session — last one reached ${hr.pct}% full`));
   }
 
   console.log('\n  ' + dim('Loaded into Claude Code automatically via the PRAXIS block in CLAUDE.md.'));
