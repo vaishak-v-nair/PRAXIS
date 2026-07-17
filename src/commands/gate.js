@@ -16,7 +16,7 @@ const git = (a) => spawnSync('git', a, { encoding: 'utf8', windowsHide: true });
 
 export function gate(args = []) {
   const ref = args.filter((a) => !a.startsWith('--'))[0] || 'HEAD';
-  console.log('\n  ' + miniHeader('', 'gate').replace('  v', '') + '\n');
+  console.log('\n  ' + miniHeader('', 'gate') + '\n');
   if (git(['rev-parse', '--git-dir']).status !== 0) {
     console.log('  Not a git repository.\n');
     process.exitCode = 1;
@@ -32,9 +32,12 @@ export function gate(args = []) {
   // diff signals
   const stat = git(['show', '--stat', '--format=', ref]).stdout || '';
   const files = (git(['show', '--name-only', '--format=', ref]).stdout || '').trim().split('\n').filter(Boolean);
-  const m = stat.match(/(\d+) insertions?[^,]*(?:, (\d+) deletions?)?/);
-  const insertions = m ? parseInt(m[1], 10) : 0;
-  const deletions = m && m[2] ? parseInt(m[2], 10) : 0;
+  // parse the two counts independently — a delete-only commit has no
+  // "insertions" token, so a combined regex would score it as zero churn
+  const insM = stat.match(/(\d+) insertions?/);
+  const delM = stat.match(/(\d+) deletions?/);
+  const insertions = insM ? parseInt(insM[1], 10) : 0;
+  const deletions = delM ? parseInt(delM[1], 10) : 0;
   const testsTouched = files.some((f) => /test|spec|__tests__/i.test(f));
   const srcTouched = files.some((f) => /\.(js|ts|py|go|rs|java|rb|c|cpp|cs|jsx|tsx|mjs)$/i.test(f) && !/test|spec/i.test(f));
 

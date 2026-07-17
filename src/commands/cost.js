@@ -21,7 +21,7 @@ function pricingFromConfig() {
 export function cost(args = []) {
   const all = args.includes('--all');
   const dir = transcriptDir();
-  console.log('\n  ' + miniHeader('', 'cost').replace('  v', '') + '\n');
+  console.log('\n  ' + miniHeader('', 'cost') + '\n');
 
   let files = [];
   try {

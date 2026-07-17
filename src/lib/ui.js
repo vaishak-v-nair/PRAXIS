@@ -23,7 +23,7 @@ export const grey = paint('38;5;245');
 
 /** One clean line for everyday commands — the big welcome is init-only. */
 export function miniHeader(version, note = '') {
-  return rose('✦ ') + bold('PRAXIS') + grey(' v' + version) + (note ? grey('  ·  ' + note) : '');
+  return rose('✦ ') + bold('PRAXIS') + (version ? grey(' v' + version) : '') + (note ? grey('  ·  ' + note) : '');
 }
 
 export function stripAnsi(s) {

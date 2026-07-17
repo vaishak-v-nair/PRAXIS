@@ -173,7 +173,7 @@ export async function capture() {
     try {
       const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
       const project = path.basename(p.root);
-      const vd = vaultDirFor(cfg, project);
+      const vd = vaultDirFor(cfg, project, undefined, p.root);
       if (vd) {
         mirrorMemory(vd, project, fs.readFileSync(p.memoryFile, 'utf8'));
         writeSessionNote(vd, project, {

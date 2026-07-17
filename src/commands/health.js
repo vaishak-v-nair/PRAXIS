@@ -66,7 +66,11 @@ export async function health(args = []) {
         bold('Claude Code'.padEnd(14)) +
         dot +
         ` ${report.pct}% full ` +
-        grey(`(${k(report.contextTokens)} of ${k(report.contextLimit)} tokens) — ${report.level}`),
+        grey(
+          (report.contextTokens > report.contextLimit
+            ? `(${k(report.contextTokens)} tokens) — `
+            : `(${k(report.contextTokens)} of ${k(report.contextLimit)} tokens) — `) + report.level,
+        ),
     );
     if (facts.length) console.log('  ' + ' '.repeat(14) + grey(facts.join(' · ')));
 

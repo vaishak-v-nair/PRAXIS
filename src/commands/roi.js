@@ -16,7 +16,7 @@ export function roi(args = []) {
   const di = args.indexOf('--days');
   const days = di >= 0 ? Math.max(1, parseInt(args[di + 1], 10) || 7) : 7;
   const since = Date.now() - days * 86400000;
-  console.log('\n  ' + miniHeader('', 'receipt').replace('  v', '') + '\n');
+  console.log('\n  ' + miniHeader('', 'receipt') + '\n');
 
   const dir = transcriptDir();
   let files = [];
@@ -75,9 +75,15 @@ export function roi(args = []) {
   let commits = 0;
   let traced = 0;
   if (inRepo) {
-    commits = ((git(['log', '--oneline', `--since=${days} days ago`]).stdout || '').trim().split('\n').filter(Boolean)).length;
-    const noted = (git(['notes', '--ref=refs/notes/praxis', 'list']).stdout || '').trim().split('\n').filter(Boolean).length;
-    traced = Math.min(noted, commits);
+    const recent = (git(['log', `--since=${days} days ago`, '--format=%H']).stdout || '').trim().split('\n').filter(Boolean);
+    commits = recent.length;
+    // intersect recent commits with noted objects — "notes list" spans ALL
+    // history, so a min() would credit old traces to recent commits
+    const notedSet = new Set(
+      (git(['notes', '--ref=refs/notes/praxis', 'list']).stdout || '')
+        .trim().split('\n').map((l) => l.split(' ')[1]).filter(Boolean),
+    );
+    traced = recent.filter((h) => notedSet.has(h)).length;
   }
 
   const hours = activeMs / 3600000;

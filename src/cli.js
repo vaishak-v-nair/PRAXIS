@@ -59,6 +59,20 @@ const cmd = process.argv[2];
 // tier-2 telemetry: one counter per command, opt-in only, counts-and-enums only
 record('cmd_' + (cmd || 'default'));
 
+// Error boundary: a command must never dump a raw stack — especially the
+// SessionStart hook (`praxis tray --ensure`) and post-commit trace, where a
+// throw would surface as a hook error in the user's Claude session.
+try {
+  await dispatch(cmd);
+} catch (e) {
+  console.error('\n  ' + bold('praxis hit a problem') + grey(' — ' + (e && e.message ? e.message : String(e))) + '\n');
+  process.exitCode = 1;
+}
+
+// fire-and-forget; inert until an endpoint exists and the user has opted in
+void flush(version());
+
+async function dispatch(cmd) {
 switch (cmd) {
   case 'init':
     await init();
@@ -125,6 +139,4 @@ switch (cmd) {
     help();
     process.exitCode = 1;
 }
-
-// fire-and-forget; inert until an endpoint exists and the user has opted in
-void flush(version());
+}

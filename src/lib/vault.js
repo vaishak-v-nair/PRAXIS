@@ -84,7 +84,9 @@ export function writeSessionNote(dir, projectName, info = {}) {
   if (!dir) return false;
   ensureHub(dir, projectName);
   const now = new Date();
-  const stamp = now.toISOString().slice(0, 16).replace('T', ' ').replace(':', '.');
+  // second resolution so a pre-compact snapshot + Stop in the same minute
+  // don't clobber each other's note
+  const stamp = now.toISOString().slice(0, 19).replace('T', ' ').replaceAll(':', '.');
   const lines = [
     '---',
     `tags: [praxis, session${info.snapshot ? ', snapshot' : ''}]`,
