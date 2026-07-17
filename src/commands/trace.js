@@ -86,7 +86,7 @@ function capture(quiet) {
   try {
     const cfg = JSON.parse(fs.readFileSync(path.join(root, '.praxis', 'config.json'), 'utf8'));
     const project = path.basename(root);
-    const vd = vaultDirFor(cfg, project);
+    const vd = vaultDirFor(cfg, project, undefined, root);
     if (vd && r.status === 0) {
       const head = git(['log', '-1', '--format=%h%x09%s']);
       const [hash, subject] = (head.stdout || '').trim().split('\t');
@@ -126,7 +126,9 @@ function hookOn() {
   console.log('\n  ' + miniHeader(pkgVersion(), 'trace') + '\n');
   console.log('  ' + sage('✓') + (changed ? ' trace is on — every commit now carries its AI context.' : ' already on.'));
   console.log('  ' + dim('Existing hooks were kept; praxis added one line, nothing more.'));
-  console.log('  ' + dim('Read: ') + rose('praxis trace') + dim(' · share with the team: ') + rose('git push origin refs/notes/praxis') + '\n');
+  console.log('  ' + dim('Read: ') + rose('praxis trace') + dim(' · share with the team: ') + rose('git push origin refs/notes/praxis'));
+  console.log('  ' + amber('note') + dim('  notes distill your session — secrets are redacted best-effort,'));
+  console.log('        ' + dim('so glance at a note before pushing it to a public repo.') + '\n');
 }
 
 function hookOff() {

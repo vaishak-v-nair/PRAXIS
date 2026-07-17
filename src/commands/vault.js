@@ -4,8 +4,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { projectPaths } from '../lib/paths.js';
-import { vaultDirFor, mirrorMemory } from '../lib/vault.js';
+import { vaultDirFor, vaultPathAllowed, mirrorMemory } from '../lib/vault.js';
 import { miniHeader, sage, rose, bold, grey, dim } from '../lib/ui.js';
 
 export function vault(args = []) {
@@ -45,6 +46,13 @@ export function vault(args = []) {
   const target = path.resolve(sub);
   if (!fs.existsSync(target)) {
     console.log('  That folder does not exist: ' + target + '\n');
+    process.exitCode = 1;
+    return;
+  }
+  if (!vaultPathAllowed(target, os.homedir(), p.root)) {
+    console.log('  ' + bold('Vault must live under your home folder or this project.'));
+    console.log('  ' + dim(`home: ${os.homedir()}  ·  project: ${p.root}`));
+    console.log('  ' + dim('This keeps a cloned project from steering praxis writes elsewhere.') + '\n');
     process.exitCode = 1;
     return;
   }

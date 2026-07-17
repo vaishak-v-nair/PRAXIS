@@ -16,6 +16,15 @@ const PATTERNS = [
   [/AKIA[0-9A-Z]{16}/g, '[REDACTED_AWS_KEY]'],
   // Slack tokens
   [/xox[baprs]-[A-Za-z0-9-]{10,}/g, '[REDACTED_SLACK_TOKEN]'],
+  // Google API keys
+  [/AIza[A-Za-z0-9\-_]{35}/g, '[REDACTED_GOOGLE_KEY]'],
+  // Stripe keys (live + restricted)
+  [/[sr]k_live_[A-Za-z0-9]{20,}/g, '[REDACTED_STRIPE_KEY]'],
+  // Connection strings with inline credentials — postgres://user:pw@host,
+  // mongodb+srv://u:p@host, redis://... anything with user:password@ in a URL.
+  // This is the class most likely to slip past key-shaped patterns and land in
+  // a pushed trace note. Keep the scheme + host, drop the credentials.
+  [/\b([a-z][a-z0-9+.\-]*):\/\/([^\s:/@]+):([^\s:/@]+)@/gi, '$1://[REDACTED]:[REDACTED]@'],
   // JWTs
   [/\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\b/g, '[REDACTED_JWT]'],
   // KEY = VALUE where the key name looks secret

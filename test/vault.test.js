@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { vaultDirFor, mirrorMemory, writeSessionNote, writeCommitNote } from '../src/lib/vault.js';
+import { vaultDirFor, vaultPathAllowed, mirrorMemory, writeSessionNote, writeCommitNote } from '../src/lib/vault.js';
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-vault-'));
 
@@ -52,4 +52,21 @@ test('vault: no config = no-op, never throws', () => {
   assert.equal(mirrorMemory(null, 'X', 'y'), false);
   assert.equal(writeSessionNote(null, 'X', {}), false);
   assert.equal(writeCommitNote(null, 'X', {}), false);
+});
+
+test('vault path is confined to home OR repo tree (hostile-repo defense)', () => {
+  const home = path.join(os.tmpdir(), 'praxis-home');
+  const repo = path.join(os.tmpdir(), 'praxis-repo');
+  assert.ok(vaultPathAllowed(path.join(home, 'Obsidian', 'vault'), home, repo), 'inside home ok');
+  assert.ok(vaultPathAllowed(home, home, repo), 'home root ok');
+  assert.ok(vaultPathAllowed(path.join(repo, 'Personal Intelligence'), home, repo), 'inside repo ok (any drive)');
+  assert.ok(!vaultPathAllowed('/etc/cron.d', home, repo), 'system path rejected');
+  assert.ok(!vaultPathAllowed(path.join(home, '..', '..', 'etc'), home, repo), 'traversal rejected');
+  assert.ok(!vaultPathAllowed(path.join(os.tmpdir(), 'other-project'), home, repo), 'sibling project rejected');
+  // a hostile config pointing outside both yields no vault dir at all
+  assert.equal(vaultDirFor({ vault: '/etc' }, 'X', home, repo), null);
+  assert.equal(
+    vaultDirFor({ vault: path.join(repo, 'v') }, 'X', home, repo),
+    path.join(repo, 'v', 'Praxis', 'X'),
+  );
 });

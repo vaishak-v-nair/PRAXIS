@@ -6,6 +6,7 @@
 // hook, a commit, or a session.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { redact } from './redact.js';
 
@@ -13,9 +14,33 @@ export function vaultRoot(cfg) {
   return cfg && typeof cfg.vault === 'string' && cfg.vault.trim() ? cfg.vault.trim() : null;
 }
 
-export function vaultDirFor(cfg, projectName) {
+function under(base, target) {
+  if (!base) return false;
+  try {
+    const rel = path.relative(path.resolve(base), path.resolve(target));
+    return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A vault path is honored only if it sits under the user's home directory OR
+ * the current repo. A cloned repo can ship a hostile `.praxis/config.json`;
+ * without this, its `vault` value would steer where session notes get written
+ * on the victim's disk. Home-or-repo confinement blocks writes to system paths
+ * or sibling projects while still allowing a vault on any drive the user
+ * actually works in (e.g. E:\project\Personal Intelligence).
+ */
+export function vaultPathAllowed(root, home = os.homedir(), repoRoot = null) {
+  if (!root) return false;
+  return under(home, root) || (repoRoot && under(repoRoot, root));
+}
+
+export function vaultDirFor(cfg, projectName, home = os.homedir(), repoRoot = null) {
   const root = vaultRoot(cfg);
-  return root ? path.join(root, 'Praxis', projectName) : null;
+  if (!root || !vaultPathAllowed(root, home, repoRoot)) return null;
+  return path.join(root, 'Praxis', projectName);
 }
 
 function safeWrite(file, content) {

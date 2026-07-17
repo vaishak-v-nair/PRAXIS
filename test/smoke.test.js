@@ -20,6 +20,18 @@ test('redact strips common secrets', () => {
   assert.equal(redact('nothing secret here'), 'nothing secret here');
 });
 
+test('redact strips connection-string credentials (the pushed-trace class)', () => {
+  const out = redact('DB is postgres://admin:s3cr3tpw@db.example.com:5432/app');
+  assert.doesNotMatch(out, /s3cr3tpw/, 'inline password removed');
+  assert.match(out, /postgres:\/\/\[REDACTED\]:\[REDACTED\]@db\.example\.com/, 'scheme + host kept');
+  assert.match(redact('mongodb+srv://u:p@cluster0.abc.mongodb.net'), /\[REDACTED\]:\[REDACTED\]@/);
+  // fixtures assembled at runtime so no scannable key literal sits in source
+  assert.match(redact('AIza' + 'B'.repeat(35)), /REDACTED_GOOGLE_KEY/);
+  assert.match(redact('sk' + '_live_' + 'C'.repeat(24)), /REDACTED_STRIPE_KEY/);
+  // a plain https URL with no credentials is untouched
+  assert.equal(redact('see https://github.com/x/y'), 'see https://github.com/x/y');
+});
+
 test('patchClaudeMd creates the managed block', () => {
   const dir = tmp();
   const file = path.join(dir, 'CLAUDE.md');
