@@ -230,6 +230,24 @@ teammate's AI-written PR with the *reasoning*, not just the diff:
 `git push origin refs/notes/praxis`. Secrets are redacted; files outside the
 repo are counted, never named.
 
+## Your Obsidian vault, auto-fed
+
+Already keep a second brain in Obsidian? Point praxis at it once:
+
+```bash
+praxis vault "D:\path\to\your vault"
+```
+
+From then on, everything the AI does writes itself into your vault as plain,
+wiki-linked markdown — no typing, no pasting: a hub note per project, a live
+mirror of the project memory, **one note per session** (what you worked on,
+files touched, where the context ended), and **one note per traced commit**
+(the AI's reasoning). Your graph view becomes the visual history of your AI
+work. Obsidian is where you write what *you* think; praxis fills in what the
+*AI* did — from a live session stream no notes app can see. Notes are
+redacted like everything else, and `praxis vault off` disconnects any time
+(your notes stay).
+
 ## Safety
 
 - **Redaction** — before writing, Praxis strips common secrets (API keys, tokens,

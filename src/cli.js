@@ -12,6 +12,7 @@ import { switchTool } from './commands/switch.js';
 import { health } from './commands/health.js';
 import { telemetry } from './commands/telemetry.js';
 import { trace } from './commands/trace.js';
+import { vault } from './commands/vault.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
 import { miniHeader, bold, grey } from './lib/ui.js';
@@ -37,6 +38,7 @@ function help() {
   ${bold('praxis hud')}            live view of your Claude session, in plain English ${grey('(second terminal)')}
   ${bold('praxis switch <tool>')}  pack a handoff brief and move to gemini · codex · claude · cursor
   ${bold('praxis trace')}          the AI context behind a commit ${grey('· on / off / log / <hash>')}
+  ${bold('praxis vault <path>')}   write sessions, commits & memory into your Obsidian vault
   ${bold('praxis tray')}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
   ${bold('praxis feedback')}       the two questions that shape what gets built next
   ${bold('praxis telemetry')}      what leaves your machine (spoiler: counts, never content) ${grey('· show / on / off')}
@@ -81,6 +83,9 @@ switch (cmd) {
     break;
   case 'trace':
     await trace(process.argv.slice(3));
+    break;
+  case 'vault':
+    vault(process.argv.slice(3));
     break;
   case '-v':
   case '--version':

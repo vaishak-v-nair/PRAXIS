@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { transcriptDir, newestTranscript } from '../lib/transcript.js';
 import { DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
 import { scanWindow, buildTraceBlock, patchHookScript, unpatchHookScript } from '../lib/trace.js';
+import { vaultDirFor, writeCommitNote } from '../lib/vault.js';
 import { miniHeader, rose, sage, amber, bold, grey, dim } from '../lib/ui.js';
 
 const NOTES_REF = 'refs/notes/praxis';
@@ -80,6 +81,20 @@ function capture(quiet) {
 
   const block = buildTraceBlock(scan, { root, version: pkgVersion(), contextLimit: DEFAULT_CONTEXT_LIMIT });
   const r = git(['notes', '--ref=' + NOTES_REF, 'add', '-f', '-m', block, 'HEAD']);
+
+  // Obsidian bridge: the commit's AI context becomes a note in the vault too
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(root, '.praxis', 'config.json'), 'utf8'));
+    const project = path.basename(root);
+    const vd = vaultDirFor(cfg, project);
+    if (vd && r.status === 0) {
+      const head = git(['log', '-1', '--format=%h%x09%s']);
+      const [hash, subject] = (head.stdout || '').trim().split('\t');
+      writeCommitNote(vd, project, { hash, subject, block });
+    }
+  } catch {
+    /* the vault is a mirror, never a blocker */
+  }
   if (!quiet) {
     console.log(
       r.status === 0

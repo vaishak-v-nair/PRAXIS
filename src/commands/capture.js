@@ -5,6 +5,7 @@ import { ensureMemory, addSessionEntry } from '../lib/memory.js';
 import { writeState } from '../lib/state.js';
 import { analyzeTranscript, classifyContext, writeHealthFile, DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
 import { cleanUserText } from '../lib/transcript.js';
+import { vaultDirFor, mirrorMemory, writeSessionNote } from '../lib/vault.js';
 
 // Called by the Claude Code Stop hook. Reads the hook's JSON from stdin,
 // derives a lightweight deterministic summary of the session, and appends it to
@@ -167,6 +168,26 @@ export async function capture() {
       body,
       { maxBytes, redact: redactOn },
     );
+
+    // Obsidian bridge: the session becomes a linked note in the user's vault
+    try {
+      const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
+      const project = path.basename(p.root);
+      const vd = vaultDirFor(cfg, project);
+      if (vd) {
+        mirrorMemory(vd, project, fs.readFileSync(p.memoryFile, 'utf8'));
+        writeSessionNote(vd, project, {
+          snapshot,
+          asks,
+          files: rel.slice(0, 20),
+          turns,
+          tokens: analysis ? analysis.contextTokens : 0,
+        });
+      }
+    } catch {
+      /* the vault is a mirror, never a blocker */
+    }
+
     writeState(p.praxisDir, 'restored'); // tray: context safely written back
   } catch {
     // Swallow everything — a hook must never break the session.
