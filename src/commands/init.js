@@ -67,11 +67,18 @@ export async function init() {
     'praxis-hud.md',
     'praxis-explain.md',
     'praxis-checkpoint.md',
+    'praxis-trace.md',
+    'praxis-cost.md',
+    'praxis-gate.md',
+    'praxis-roi.md',
+    'praxis-vault.md',
+    'praxis-telemetry.md',
+    'praxis-tray.md',
   ];
   for (const name of slashCmds) {
     fs.copyFileSync(path.join(TEMPLATES, name), path.join(p.commandsDir, name));
   }
-  done.push('.claude/commands — eleven /praxis-* commands (save · status · remember · forget · recap · health · switch · checkpoint · feedback · hud · explain)');
+  done.push(`.claude/commands — ${slashCmds.length} /praxis-* commands, one per praxis command`);
 
   // user-scope commands: make /praxis-* visible in EVERY project, not just this one
   try {
@@ -80,7 +87,7 @@ export async function init() {
     for (const name of slashCmds) {
       fs.copyFileSync(path.join(TEMPLATES, name), path.join(userCmds, name));
     }
-    done.push('~/.claude/commands — the same eleven, available in every project');
+    done.push('~/.claude/commands — the same commands, available in every project');
   } catch {
     /* user scope is best-effort */
   }

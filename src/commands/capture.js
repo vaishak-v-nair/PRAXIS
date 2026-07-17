@@ -40,7 +40,7 @@ function collectFilePaths(obj, out, depth = 0) {
   for (const v of Object.values(obj)) collectFilePaths(v, out, depth + 1);
 }
 
-function summarizeTranscriptText(text) {
+export function summarizeTranscriptText(text) {
   const files = new Set();
   let turns = 0;
   const lines = text.split('\n').filter(Boolean);
@@ -56,7 +56,7 @@ function summarizeTranscriptText(text) {
 }
 
 /** The last few things the human actually asked for — the soul of a snapshot. */
-function recentAsks(text, max = 3) {
+export function recentAsks(text, max = 3) {
   const asks = [];
   for (const line of text.split('\n')) {
     if (!line.includes('"type":"user"')) continue;
@@ -74,7 +74,7 @@ function recentAsks(text, max = 3) {
   return asks.slice(-max);
 }
 
-function shorten(file, cwd) {
+export function shorten(file, cwd) {
   try {
     const rel = file.startsWith(cwd) ? file.slice(cwd.length).replace(/^[\\/]/, '') : file;
     return rel.replace(/\\/g, '/'); // OS-neutral in the memory file

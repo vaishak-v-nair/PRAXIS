@@ -99,6 +99,10 @@ seconds. Turn it off any time with `"overlay": false` in `.praxis/config.json`
 npx praxis-memory     # set up here (or show status, if already set up)
 praxis init           # explicit setup
 praxis status         # what Praxis remembers, and session health
+praxis recap          # catch me up on this project, right in the terminal
+praxis save           # log the current session into memory, mid-flight
+praxis remember "<f>" # save a fact or decision into project memory now
+praxis forget "<t>"   # remove matching lines from memory (asks first)
 praxis health         # how full is this Claude session, really — and where to go next
 praxis hud            # live view of your Claude session, in plain English (second terminal)
 praxis switch <tool>  # pack a handoff brief and move to gemini / codex / claude / cursor
@@ -126,6 +130,10 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `/praxis-feedback` | the two questions that shape what gets built |
 | `/praxis-hud` | how to watch this session live, in plain English |
 | `/praxis-explain` | re-explain Claude's last answer with zero jargon — for people who don't read code |
+| `/praxis-trace` · `/praxis-cost` · `/praxis-gate` · `/praxis-roi` · `/praxis-vault` · `/praxis-telemetry` · `/praxis-tray` | the same commands as the CLI, explained in plain English by Claude |
+
+Every `praxis` command has a slash twin, and every slash command has a terminal
+twin — use whichever is closer to your hands.
 
 ## What Praxis writes, and where
 
@@ -136,8 +144,8 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `.praxis/checkpoints/` | `praxis checkpoint` — the RESUME brief + full session archives |
 | `CLAUDE.md` | A managed `PRAXIS:START/END` block. **Your own content is never touched.** |
 | `.claude/settings.json` | `Stop` + `PreCompact` + `SessionStart` hooks, merged in without disturbing existing hooks |
-| `.claude/commands/` | The eleven `/praxis-*` slash commands, project-scoped |
-| `~/.claude/commands/` | The same eleven, user-wide — so `/` shows them in **every** project |
+| `.claude/commands/` | The `/praxis-*` slash commands — one per praxis command, project-scoped |
+| `~/.claude/commands/` | The same commands, user-wide — so `/` shows them in **every** project |
 
 > `/` menu looks empty? Restart the open Claude Code session — it loads commands at start.
 

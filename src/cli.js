@@ -15,6 +15,10 @@ import { trace } from './commands/trace.js';
 import { vault } from './commands/vault.js';
 import { cost } from './commands/cost.js';
 import { checkpoint } from './commands/checkpoint.js';
+import { remember } from './commands/remember.js';
+import { recap } from './commands/recap.js';
+import { forget } from './commands/forget.js';
+import { save } from './commands/save.js';
 import { gate } from './commands/gate.js';
 import { roi } from './commands/roi.js';
 import { record, flush } from './lib/telemetry.js';
@@ -38,6 +42,10 @@ function help() {
   ${bold('npx praxis-memory')}     set up PRAXIS here ${grey('(or show status if already set up)')}
   ${bold('praxis init')}           set up PRAXIS in the current project
   ${bold('praxis status')}         what PRAXIS remembers, and session health
+  ${bold('praxis recap')}          catch me up on this project, right in the terminal
+  ${bold('praxis save')}           log the current session into memory, mid-flight
+  ${bold('praxis remember "<f>"')} save a fact or decision into project memory now
+  ${bold('praxis forget "<t>"')}   remove matching lines from memory ${grey('(asks first)')}
   ${bold('praxis health')}         how full is this Claude session, really — and where to go next
   ${bold('praxis hud')}            live view of your Claude session, in plain English ${grey('(second terminal)')}
   ${bold('praxis switch <tool>')}  pack a handoff brief and move to gemini · codex · claude · cursor
@@ -114,6 +122,22 @@ switch (cmd) {
     break;
   case 'checkpoint':
     await checkpoint(process.argv.slice(3));
+    break;
+  case 'remember':
+    remember(process.argv.slice(3));
+    break;
+  case 'recap':
+    recap();
+    break;
+  case 'forget':
+    await forget(process.argv.slice(3));
+    break;
+  case 'save':
+    save();
+    break;
+  case 'explain':
+    // the one command that honestly needs the live conversation
+    console.log('\n  Explaining the last answer needs the conversation itself — only Claude has it.\n  Inside Claude Code, type: /praxis-explain\n');
     break;
   case 'gate':
     gate(process.argv.slice(3));

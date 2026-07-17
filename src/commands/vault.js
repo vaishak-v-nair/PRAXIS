@@ -20,7 +20,7 @@ export function vault(args = []) {
     return;
   }
   const sub = args[0];
-  console.log('\n  ' + miniHeader('', 'vault').replace(' v', '') + '\n');
+  console.log('\n  ' + miniHeader('', 'vault') + '\n');
 
   if (!sub) {
     if (cfg.vault) {

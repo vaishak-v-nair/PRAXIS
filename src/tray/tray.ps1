@@ -447,6 +447,18 @@ $OVERLAY_MSG = @{
 }
 
 $OV_W = 380; $OV_MASCOT_W = 285; $OV_MASCOT_H = 160; $OV_TEXT_H = 76
+
+# Transparent padding inside each source gif (190x107), measured from the
+# alpha channel. Cropped away at draw time so the mascot hugs the text with
+# no dead gap - without this, warning/restored float ~36-60px below the text.
+$OV_PAD = @{
+  happy     = @(3, 0)
+  idle      = @(0, 0)
+  warning   = @(24, 24)
+  limit     = @(6, 15)
+  switching = @(0, 0)
+  restored  = @(40, 17)
+}
 $OV_H = $OV_TEXT_H + $OV_MASCOT_H
 $fMsg  = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
 $bHalo = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(190, 22, 13, 9))
@@ -484,11 +496,28 @@ function Draw-Overlay {
   if ($script:ovGif) {
     try {
       [void]$script:ovGif.SelectActiveFrame($script:ovFrameDim, $script:ovFrame)
-      $g.DrawImage($script:ovGif, ($OV_W - $OV_MASCOT_W), $OV_TEXT_H, $OV_MASCOT_W, $OV_MASCOT_H)
+      # crop the gif's transparent padding and bottom-anchor what remains, so
+      # every state's mascot sits the same distance under the message
+      $pad = $OV_PAD[$script:ovState]; if (-not $pad) { $pad = @(0, 0) }
+      $srcW = $script:ovGif.Width; $srcH = $script:ovGif.Height - $pad[0] - $pad[1]
+      if ($srcH -lt 1) { $srcH = $script:ovGif.Height; $pad = @(0, 0) }
+      $scale = $OV_MASCOT_W / $srcW
+      $dstH = [int]($srcH * $scale); if ($dstH -gt $OV_MASCOT_H) { $dstH = $OV_MASCOT_H }
+      # keep the mascot grounded at the bottom edge (next to the taskbar)...
+      $mascotTop = $OV_TEXT_H + $OV_MASCOT_H - $dstH
+      $dst = New-Object System.Drawing.Rectangle(($OV_W - $OV_MASCOT_W), $mascotTop, $OV_MASCOT_W, $dstH)
+      $g.DrawImage($script:ovGif, $dst, 0, $pad[0], $srcW, $srcH, [System.Drawing.GraphicsUnit]::Pixel)
+      $script:ovMascotTop = $mascotTop
     } catch {}
   }
-  # message text: dark halo + warm ink, readable on any wallpaper, no box
-  $ty = [single]6
+  # message text: dark halo + warm ink, readable on any wallpaper, no box.
+  # ...and anchor the text right above the mascot's actual (cropped) top, so
+  # message and axolotl read as one unit - no dead gap, whatever the state
+  # and however many lines wrapped.
+  $mTop = $script:ovMascotTop; if (-not $mTop) { $mTop = $OV_TEXT_H }
+  $tyStart = $mTop - 6 - ($script:ovLines.Count * 22)
+  if ($tyStart -lt 4) { $tyStart = 4 }
+  $ty = [single]$tyStart
   $first = $true
   foreach ($line in $script:ovLines) {
     $sz = $g.MeasureString($line, $fMsg)
@@ -517,6 +546,8 @@ function Hide-Overlay {
 
 function Show-Overlay([string]$state, [string]$message, [bool]$pinned) {
   if (-not $script:overlay) { return $false }
+  # a pinned overlay (QA, first-run intro) is never replaced by a passing toast
+  if ($script:ovPinned -and $script:ovPhase -ne 'off' -and -not $pinned) { return $true }
   try {
     $gif = Join-Path $AnimDir ($state + '.gif')
     if (-not (Test-Path $gif)) { return $false }
@@ -528,6 +559,8 @@ function Show-Overlay([string]$state, [string]$message, [bool]$pinned) {
     $script:ovFrameDim = New-Object System.Drawing.Imaging.FrameDimension($script:ovGif.FrameDimensionsList[0])
     $script:ovFrames = $script:ovGif.GetFrameCount($script:ovFrameDim)
     $script:ovFrame = 0
+    $script:ovState = $state
+    $script:ovMascotTop = $null
     $script:ovLines = Wrap-OvText $message
     $script:ovPinned = $pinned
     $script:ovPhase = 'in'; $script:ovTick = 0; $script:ovTick0 = 0
