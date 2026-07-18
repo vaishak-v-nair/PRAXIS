@@ -448,16 +448,17 @@ $OVERLAY_MSG = @{
 
 $OV_W = 380; $OV_MASCOT_W = 285; $OV_MASCOT_H = 160; $OV_TEXT_H = 76
 
-# Transparent padding inside each source gif (190x107), measured from the
-# alpha channel. Cropped away at draw time so the mascot hugs the text with
-# no dead gap - without this, warning/restored float ~36-60px below the text.
+# Transparent padding inside each source gif (190x107): the UNION alpha
+# bounding box across every frame, not a single frame - the mascot bobs, so a
+# one-frame measurement crops heads off other frames. Cropped away at draw
+# time so the mascot hugs the text with no dead gap.
 $OV_PAD = @{
-  happy     = @(3, 0)
+  happy     = @(0, 0)
   idle      = @(0, 0)
-  warning   = @(24, 24)
-  limit     = @(6, 15)
+  warning   = @(19, 24)
+  limit     = @(0, 0)
   switching = @(0, 0)
-  restored  = @(40, 17)
+  restored  = @(3, 15)
 }
 $OV_H = $OV_TEXT_H + $OV_MASCOT_H
 $fMsg  = New-Object System.Drawing.Font('Segoe UI', 10, [System.Drawing.FontStyle]::Bold)
