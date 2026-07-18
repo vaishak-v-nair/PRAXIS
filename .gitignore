@@ -21,8 +21,9 @@ npx
 .mcp.json
 skills-lock.json
 
-# raw brand sources: private repo only (heavy)
-assets/source/
+# brand vault: masters and working files live in the private repo only.
+# public distribution renders are curated into docs/ instead.
+assets/
 TRAY-VISION.md
 
 # personal Obsidian vault content - never public

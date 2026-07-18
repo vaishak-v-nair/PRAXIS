@@ -81,11 +81,11 @@ bar — its state *is* your session's state:
 
 <table align="center">
 <tr>
-<td align="center"><img src="assets/tray/idle.webp" width="104" alt="idle"><br><sub>🟢 <b>idle</b><br>context fresh</sub></td>
-<td align="center"><img src="assets/tray/warning.webp" width="104" alt="warning"><br><sub>🟠 <b>warning</b><br>filling up</sub></td>
-<td align="center"><img src="assets/tray/limit.webp" width="104" alt="limit"><br><sub>🔴 <b>limit</b><br>limit reached</sub></td>
-<td align="center"><img src="assets/tray/switching.webp" width="104" alt="switching"><br><sub>🔵 <b>switching</b><br>moving context</sub></td>
-<td align="center"><img src="assets/tray/restored.webp" width="104" alt="restored"><br><sub>🟡 <b>restored</b><br>context recovered</sub></td>
+<td align="center"><img src="docs/tray/idle.webp" width="104" alt="idle"><br><sub>🟢 <b>idle</b><br>context fresh</sub></td>
+<td align="center"><img src="docs/tray/warning.webp" width="104" alt="warning"><br><sub>🟠 <b>warning</b><br>filling up</sub></td>
+<td align="center"><img src="docs/tray/limit.webp" width="104" alt="limit"><br><sub>🔴 <b>limit</b><br>limit reached</sub></td>
+<td align="center"><img src="docs/tray/switching.webp" width="104" alt="switching"><br><sub>🔵 <b>switching</b><br>moving context</sub></td>
+<td align="center"><img src="docs/tray/restored.webp" width="104" alt="restored"><br><sub>🟡 <b>restored</b><br>context recovered</sub></td>
 </tr>
 </table>
 
