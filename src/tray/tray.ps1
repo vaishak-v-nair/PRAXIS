@@ -124,9 +124,9 @@ function Get-PraxisState {
     $phaseAge = ((Get-Date) - [datetime]$st.ts).TotalSeconds
   } catch {}
 
-  # live session health, computed here (throttled to every 12s); the
-  # health.json breadcrumb from hud/capture/health is the fallback
-  if (((Get-Date) - $script:sessCacheAt).TotalSeconds -ge 12) {
+  # live session health, computed here (throttled to every 6s - a 256KB tail
+  # read); the health.json breadcrumb from hud/capture/health is the fallback
+  if (((Get-Date) - $script:sessCacheAt).TotalSeconds -ge 6) {
     $script:sessCacheAt = Get-Date
     $script:sessCache = Get-SessionHealth
     if (-not $script:sessCache) {
@@ -446,6 +446,24 @@ $OVERLAY_MSG = @{
   happy     = 'I live down here now. I pop up when your project memory needs you.'
 }
 
+# The mascot speaks the REAL numbers at the moment it pops - never a canned
+# line when live state is on hand. Falls back to the static map.
+function Get-LiveMsg([string]$state, $s) {
+  $msg = $OVERLAY_MSG[$state]
+  if (-not $s) { return $msg }
+  $sessionDriven = ($s.label -like 'session*')
+  if ($state -eq 'warning') {
+    if ($sessionDriven -and $s.sess) { $msg = 'This session is ' + $s.sess.pct + '% full. Good moment to finish the thought.' }
+    elseif ($s.kb) { $msg = 'Notes at ' + $s.kb + ' of ' + $s.capKb + ' KB. I move the oldest into the archive - nothing is lost.' }
+  } elseif ($state -eq 'limit') {
+    if ($sessionDriven -and $s.sess) { $msg = 'Session ' + $s.sess.pct + '% full. praxis switch carries your memory to a fresh one.' }
+    elseif ($s.kb) { $msg = 'Notes hit the ' + $s.capKb + ' KB cap. Older ones are safe in the archive.' }
+  } elseif ($state -eq 'restored' -and $s.entries) {
+    $msg = 'Saved - ' + $s.entries + ' entries in memory. Your next session starts already briefed.'
+  }
+  return $msg
+}
+
 $OV_W = 380; $OV_MASCOT_W = 285; $OV_MASCOT_H = 160; $OV_TEXT_H = 76
 
 # Transparent padding inside each source gif (190x107): the UNION alpha
@@ -657,10 +675,11 @@ $timer.add_Tick({
     # says it; a balloon toast is the fallback if the overlay is unavailable
     if ($script:lastName -ne '' -and $TOAST.ContainsKey($s.name)) {
       $popped = $false
-      if ($OVERLAY_MSG.ContainsKey($s.name)) { $popped = Show-Overlay $s.name $OVERLAY_MSG[$s.name] $false }
+      $liveMsg = Get-LiveMsg $s.name $s
+      if ($liveMsg) { $popped = Show-Overlay $s.name $liveMsg $false }
       if (-not $popped) {
         $ni.BalloonTipTitle = 'PRAXIS'
-        $ni.BalloonTipText = $TOAST[$s.name]
+        $ni.BalloonTipText = if ($liveMsg) { $liveMsg } else { $TOAST[$s.name] }
         $ni.ShowBalloonTip(4000)
       }
     }

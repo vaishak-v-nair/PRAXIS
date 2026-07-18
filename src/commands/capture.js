@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { projectPaths } from '../lib/paths.js';
+import { extractEssence } from '../lib/checkpoint.js';
 import { ensureMemory, addSessionEntry } from '../lib/memory.js';
 import { writeState } from '../lib/state.js';
 import { analyzeTranscript, classifyContext, writeHealthFile, DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
@@ -74,6 +76,32 @@ export function recentAsks(text, max = 3) {
   return asks.slice(-max);
 }
 
+/** Commits made while this session ran — the concrete output, straight from git. */
+export function sessionCommits(text, cwd, max = 3) {
+  try {
+    let since = '';
+    for (const line of text.split('\n')) {
+      if (!line) continue;
+      const m = line.match(/"timestamp":"([^"]+)"/);
+      if (m) {
+        since = m[1];
+        break;
+      }
+    }
+    if (!since) return [];
+    const out = execFileSync('git', ['log', `--since=${since}`, '--format=%h %s'], {
+      cwd,
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+    return out ? out.split('\n').slice(0, max) : [];
+  } catch {
+    return []; // no git, no repo, no problem
+  }
+}
+
 export function shorten(file, cwd) {
   try {
     const rel = file.startsWith(cwd) ? file.slice(cwd.length).replace(/^[\\/]/, '') : file;
@@ -107,6 +135,8 @@ export async function capture() {
     let files = [];
     let turns = 0;
     let asks = [];
+    let lastClaude = '';
+    let commits = [];
     let analysis = null;
     if (typeof data.transcript_path === 'string') {
       let text = '';
@@ -117,6 +147,8 @@ export async function capture() {
       }
       ({ files, turns } = summarizeTranscriptText(text));
       asks = recentAsks(text);
+      lastClaude = extractEssence(text, 1).lastClaude;
+      commits = sessionCommits(text, cwd);
       analysis = analyzeTranscript(text);
       if (analysis.contextTokens > 0) {
         const { pct, level } = classifyContext(analysis.contextTokens);
@@ -142,6 +174,10 @@ export async function capture() {
         ? `- Context at snapshot: ${k(analysis.contextTokens)} tokens, squeeze #${analysis.compactions + 1} imminent`
         : null,
       asks.length ? `- Working on: ${asks.map((a) => `"${a}"`).join(' · ')}` : null,
+      commits.length ? `- Commits: ${commits.join(' · ')}` : null,
+      lastClaude
+        ? `- In its words: "${lastClaude.replace(/\s+/g, ' ').replace(/\*\*|__|`/g, '').slice(0, 220)}"`
+        : null,
       rel.length
         ? `- Files touched: ${rel.slice(0, 20).join(', ')}${rel.length > 20 ? ` (+${rel.length - 20} more)` : ''}`
         : '- (no file changes detected)',

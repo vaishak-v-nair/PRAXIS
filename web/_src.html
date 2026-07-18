@@ -326,7 +326,7 @@ footer .fcol a:hover{color:var(--rose)}
     <p class="lead rv d2">Claude Code is brilliant for a session, then forgets everything when it closes. Praxis fixes that. It is a small open-source tool that distills each coding session into durable project memory — the decisions, constraints and reasons — and hands it back to Claude automatically the next time you open your project.</p>
     <div class="chips">
       <div class="chip rv d1"><div class="ct">$ the CLI</div><p>One command sets up the hooks. <b>npx praxis-memory</b> and the loop is running — nothing else to configure.</p></div>
-      <div class="chip rv d2"><div class="ct">&#9998; the memory file</div><p><b>.praxis/memory.md</b> — plain markdown in your repo. Redacted, size-capped, readable by any tool or teammate.</p></div>
+      <div class="chip rv d2"><div class="ct">&#9998; the memory file</div><p><b>.praxis/memory.md</b> — plain markdown in your repo. Redacted, size-capped, readable by any tool or teammate. Older entries rotate to a forever-archive — nothing is ever deleted.</p></div>
       <div class="chip rv d3"><div class="ct">&#9673; the companion</div><p><b>praxis tray</b> — the axolotl beside your clock, its emotion tracking session health live. Windows today; macOS &amp; Linux next.</p></div>
     </div>
   </div>
@@ -410,7 +410,7 @@ footer .fcol a:hover{color:var(--rose)}
       <div class="rail"><i id="railFill"></i></div>
       <div class="lstep"><span class="t">01</span><h4>Session ends</h4><p>You close Claude Code. Context would normally vanish here.</p></div>
       <div class="lstep"><span class="t">02</span><h4>Stop hook fires</h4><p>A Claude Code <code>Stop</code> hook runs — locally, on your machine.</p></div>
-      <div class="lstep"><span class="t">03</span><h4>Decisions written</h4><p>The session's durable decisions land in <code>.praxis/memory.md</code> — redacted and size-capped.</p></div>
+      <div class="lstep"><span class="t">03</span><h4>Decisions written</h4><p>What you asked, what was touched, the commits made and the AI's own summary land in <code>.praxis/memory.md</code> — redacted, capped, with older entries archived forever.</p></div>
       <div class="lstep"><span class="t">04</span><h4>CLAUDE.md links it</h4><p>The memory file is included from your project's context file.</p></div>
       <div class="lstep"><span class="t">05</span><h4>Next session recalls</h4><p>Claude reads it on open. No paste, no re-explaining, no lost week.</p></div>
     </div>
@@ -424,7 +424,7 @@ footer .fcol a:hover{color:var(--rose)}
     <div>
       <span class="kick rv">The companion</span>
       <h2 class="h2 rv d1">Session health, <em>at a glance.</em></h2>
-      <p class="lead rv d2">The axolotl is Praxis's status bar. Its glow encodes the state of your context window — healthy, filling up, at the limit, switching over, restored.</p>
+      <p class="lead rv d2">The axolotl is Praxis's status bar. Its glow encodes the state of your context window — healthy, filling up, at the limit, switching over, restored — and when it speaks, it speaks the real numbers, live: <i>"Your Claude session is 88% full."</i></p>
       <p class="lead rv d3">Shipped today on Windows — and it starts itself with your very first install. The axolotl breathes beside your clock, its glow tracking the session live; a toast appears only at the moments that matter, and a click opens the full panel: animated mascot, memory stats, recent entries, suggestions. macOS and Linux are next; <code style="font-family:var(--mono);font-size:.85em">praxis status</code> covers every platform meanwhile.</p>
     </div>
     <div class="panel rv d2">
@@ -511,7 +511,7 @@ footer .fcol a:hover{color:var(--rose)}
       </details>
       <details>
         <summary>What exactly does it remember?</summary>
-        <p>Durable decisions, not transcripts — the architecture you settled on, the constraints you discovered, the approaches you tried and reverted, and the reasons behind them. That is the context a fresh session loses and a transcript buries.</p>
+        <p>Durable decisions, not transcripts — the architecture you settled on, the constraints you discovered, the approaches you tried and reverted, and the reasons behind them. Each session also logs the commits it made and the AI's own closing summary, automatically. And nothing is ever lost: when the working memory hits its size cap, older entries rotate into <code>.praxis/archive/</code> — one file per month, forever — instead of being deleted.</p>
       </details>
       <details>
         <summary>How is this different from maintaining CLAUDE.md by hand?</summary>

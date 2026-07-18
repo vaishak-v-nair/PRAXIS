@@ -60,8 +60,9 @@ Praxis closes the loop: the context survives the session.
   memory. Claude reads `CLAUDE.md` automatically, so memory loads every session with
   zero manual steps.
 - **Auto-capture** — `init` installs a `Stop` hook. When a session ends,
-  `praxis capture` appends a lightweight summary: what you were working on,
-  which files were touched.
+  `praxis capture` appends a summary on its own: what you were working on,
+  which files were touched, the commits the session produced, and the AI's
+  own closing words — no command to remember.
 - **Snapshots** — a `PreCompact` hook fires right before Claude squeezes a full
   session. That is the moment detail is about to be lost — Praxis saves the
   context size, your recent asks and the files touched, first.
@@ -92,7 +93,8 @@ On Windows it starts with the very first install and lives in your system tray: 
 
 At the moments that matter, the mascot itself floats up from the corner of your
 screen — no popup box, no window, just the axolotl and one plain-English line
-("Saved. Your next session starts already briefed."). It never takes focus,
+with the live numbers behind it ("Your Claude session is 88% full. praxis
+switch starts a fresh one - your memory comes along."). It never takes focus,
 clicks pass straight through it, and it fades away on its own after a few
 seconds. Turn it off any time with `"overlay": false` in `.praxis/config.json`
 (balloon toasts return as the fallback).
