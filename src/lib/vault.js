@@ -63,8 +63,36 @@ function ensureHub(dir, projectName) {
       `the memory and decision trail of your AI coding sessions.\n\n` +
       `- [[${projectName} - Memory]] — the living project memory Claude reads\n` +
       `- Sessions/ — one note per coding session, newest tells the story\n` +
-      `- Commits/ — the AI context behind traced commits\n`,
+      `- Commits/ — the AI context behind traced commits\n` +
+      `- Archive/ — entries rotated out of the working memory, kept forever\n`,
   );
+}
+
+/**
+ * The permanent copy of what rotated out of the working memory. One note per
+ * month, entries appended oldest-first — the vault never forgets, even after
+ * the working file has moved on.
+ */
+export function appendArchiveNote(dir, projectName, entries) {
+  if (!dir || !Array.isArray(entries) || !entries.length) return false;
+  ensureHub(dir, projectName);
+  const month = new Date().toISOString().slice(0, 7);
+  const file = path.join(dir, 'Archive', `${month}.md`);
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(
+        file,
+        `---\ntags: [praxis, archive]\nproject: "[[${projectName}]]"\n---\n\n` +
+          `# Archive — ${month}\n\n` +
+          `> Session entries moved out of [[${projectName} - Memory]] when it reached its size cap. Nothing is lost. Oldest first.\n\n`,
+      );
+    }
+    fs.appendFileSync(file, redact(entries.join('\n\n')) + '\n\n');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Mirror .praxis/memory.md into the vault (already redacted at the source). */

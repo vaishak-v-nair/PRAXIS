@@ -68,6 +68,10 @@ Praxis closes the loop: the context survives the session.
 - **Always on** — a `SessionStart` hook brings the tray companion up the moment
   a Claude session opens. Health is ambient, not a command you remember to run.
 - **Rich capture** — `/praxis-save` asks Claude to write a real decision-level summary.
+- **Nothing is ever lost** — the working memory stays small so Claude loads fast,
+  but entries rotated out of it move to `.praxis/archive/sessions/` (one file per
+  month, oldest first), never to the void. With an Obsidian vault connected
+  (`praxis vault <path>`), the archive is mirrored there too.
 
 ## The companion
 
@@ -142,6 +146,7 @@ twin — use whichever is closer to your hands.
 | `.praxis/memory.md` | Your living project memory — the thing Claude reads |
 | `.praxis/config.json` | Local settings: capture on/off, size cap, redaction |
 | `.praxis/checkpoints/` | `praxis checkpoint` — the RESUME brief + full session archives |
+| `.praxis/archive/` | Entries rotated out of the working memory — kept forever, monthly files |
 | `CLAUDE.md` | A managed `PRAXIS:START/END` block. **Your own content is never touched.** |
 | `.claude/settings.json` | `Stop` + `PreCompact` + `SessionStart` hooks, merged in without disturbing existing hooks |
 | `.claude/commands/` | The `/praxis-*` slash commands — one per praxis command, project-scoped |

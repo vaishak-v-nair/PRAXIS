@@ -102,5 +102,28 @@ test('addSessionEntry prepends, redacts, and caps size', () => {
   out = fs.readFileSync(file, 'utf8');
   assert.ok(Buffer.byteLength(out) < 6000, 'log stayed bounded');
   assert.match(out, /## Project/, 'Project section preserved through trimming');
-  assert.match(out, /trimmed by PRAXIS/, 'trim note present');
+  assert.match(out, /moved to \.praxis\/archive/, 'trim note points at the archive');
+});
+
+test('trimmed entries are archived, never deleted', () => {
+  const dir = tmp();
+  const file = path.join(dir, 'memory.md');
+  const archiveDir = path.join(dir, 'archive', 'sessions');
+  fs.writeFileSync(file, defaultMemory());
+
+  addSessionEntry(file, 'keep-me-oldest', '- first fact, later rotated out', { maxBytes: 2048 });
+  for (let i = 0; i < 10; i++) {
+    addSessionEntry(file, `bulk-${i}`, '- '.padEnd(500, 'x'), { maxBytes: 2048 });
+  }
+
+  const working = fs.readFileSync(file, 'utf8');
+  assert.doesNotMatch(working, /keep-me-oldest/, 'oldest entry rotated out of working memory');
+
+  const month = new Date().toISOString().slice(0, 7);
+  const archFile = path.join(archiveDir, `${month}.md`);
+  assert.ok(fs.existsSync(archFile), 'monthly archive file exists');
+  const arch = fs.readFileSync(archFile, 'utf8');
+  assert.match(arch, /keep-me-oldest/, 'rotated entry landed in the archive');
+  assert.match(arch, /first fact, later rotated out/, 'entry body intact in the archive');
+  assert.match(arch, /Nothing is deleted/, 'archive file explains itself');
 });

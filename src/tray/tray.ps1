@@ -190,7 +190,7 @@ $SUGGEST = @{
   happy     = 'Fresh start. Your memory loads automatically each time a session opens.'
   idle      = 'All caught up. /praxis-save before you wrap up keeps today''s decisions.'
   warning   = 'Memory is filling. /praxis-forget stale entries, or raise maxLogBytes in .praxis/config.json.'
-  limit     = 'At the cap. Praxis trims the oldest entries automatically - /praxis-save the essentials first.'
+  limit     = 'At the cap. Oldest entries move to .praxis/archive - nothing is lost. /praxis-save the essentials first.'
   switching = 'Carrying your context across sessions. Hold on...'
   restored  = 'Context written back. The next session opens pre-briefed.'
 }
@@ -439,8 +439,8 @@ public class PraxisOverlayWindow : Form {
 
 # what the mascot says, per state - plain English, one action, no jargon
 $OVERLAY_MSG = @{
-  warning   = 'Your notes are getting full. I trim the oldest ones myself - nothing to do.'
-  limit     = 'Notes hit the cap. Type /praxis-save in Claude to keep what matters.'
+  warning   = 'Your notes are getting full. I move the oldest into the archive - nothing is lost.'
+  limit     = 'Notes hit the cap. Older ones are safe in the archive. /praxis-save keeps the essentials up front.'
   switching = 'Saving this session...'
   restored  = 'Saved. Your next session starts already briefed.'
   happy     = 'I live down here now. I pop up when your project memory needs you.'
@@ -610,8 +610,8 @@ $ni.Visible = $true
 # toasts pushed at the moments that matter (vision: notifications ARE the
 # product for most people; the popover is for looking deeper)
 $TOAST = @{
-  warning  = 'Memory is filling - 60% of the cap used. Praxis keeps it trimmed.'
-  limit    = 'Memory is near its cap. Praxis trims the oldest entries - /praxis-save the essentials.'
+  warning  = 'Memory is filling - 60% of the cap used. Older entries move to the archive.'
+  limit    = 'Memory is near its cap. Oldest entries move to the archive - /praxis-save the essentials.'
   restored = 'Context written back. The next session opens pre-briefed.'
 }
 

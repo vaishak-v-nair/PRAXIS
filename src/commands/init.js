@@ -40,6 +40,24 @@ export async function init() {
   }
   done.push('.praxis/memory.md + config.json');
 
+  // the permanent archive: what rotates out of the working memory lands here,
+  // organized and forever — the working file stays small, nothing is lost
+  const archiveDir = path.join(p.praxisDir, 'archive');
+  if (!fs.existsSync(archiveDir)) {
+    fs.mkdirSync(path.join(archiveDir, 'sessions'), { recursive: true });
+    fs.writeFileSync(
+      path.join(archiveDir, 'README.md'),
+      '# PRAXIS Archive\n\n' +
+        'Nothing your sessions produce is ever deleted.\n\n' +
+        '- `sessions/` — entries moved out of `memory.md` when it reaches its size cap, one file per month, oldest first.\n' +
+        '- `../checkpoints/` — full conversation archives written by `praxis checkpoint`.\n\n' +
+        'The working memory (`.praxis/memory.md`) stays small so Claude loads fast;\n' +
+        'this folder is the long-term record. Point an Obsidian vault at praxis\n' +
+        '(`praxis vault <path>`) and the archive is mirrored there too.\n',
+    );
+    done.push('.praxis/archive — long-term store, nothing ever deleted');
+  }
+
   // CLAUDE.md managed block
   const cmd = patchClaudeMd(p.claudeMd);
   done.push(cmd.existed ? 'CLAUDE.md (PRAXIS block refreshed)' : 'CLAUDE.md (created)');

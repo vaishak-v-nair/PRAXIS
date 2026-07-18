@@ -5,7 +5,7 @@ import { ensureMemory, addSessionEntry } from '../lib/memory.js';
 import { writeState } from '../lib/state.js';
 import { analyzeTranscript, classifyContext, writeHealthFile, DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
 import { cleanUserText } from '../lib/transcript.js';
-import { vaultDirFor, mirrorMemory, writeSessionNote } from '../lib/vault.js';
+import { vaultDirFor, mirrorMemory, writeSessionNote, appendArchiveNote } from '../lib/vault.js';
 
 // Called by the Claude Code Stop hook. Reads the hook's JSON from stdin,
 // derives a lightweight deterministic summary of the session, and appends it to
@@ -162,7 +162,7 @@ export async function capture() {
       /* use defaults */
     }
 
-    addSessionEntry(
+    const entry = addSessionEntry(
       p.memoryFile,
       `${new Date().toISOString()} - ${snapshot ? 'pre-compact snapshot' : 'session'}`,
       body,
@@ -176,6 +176,7 @@ export async function capture() {
       const vd = vaultDirFor(cfg, project, undefined, p.root);
       if (vd) {
         mirrorMemory(vd, project, fs.readFileSync(p.memoryFile, 'utf8'));
+        if (entry.archived && entry.archived.length) appendArchiveNote(vd, project, entry.archived);
         writeSessionNote(vd, project, {
           snapshot,
           asks,

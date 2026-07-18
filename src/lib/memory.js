@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { redact } from './redact.js';
 
 const LOG_MARKER = '## Session Log';
@@ -63,14 +64,18 @@ export function addSessionEntry(file, heading, body, opts = {}) {
 
   const join = (arr) => arr.join('\n\n');
   let trimmed = false;
+  const archived = [];
   while (entries.length > 1 && Buffer.byteLength(join(entries)) > maxBytes) {
-    entries.pop();
+    archived.unshift(entries.pop()); // oldest first
     trimmed = true;
+  }
+  if (archived.length && opts.archive !== false) {
+    archiveEntries(file, archived, opts.archiveDir);
   }
 
   let logBody = join(entries);
   if (trimmed) {
-    logBody += `\n\n_(older entries trimmed by PRAXIS to stay under ${Math.round(maxBytes / 1024)}KB)_`;
+    logBody += `\n\n_(older entries moved to .praxis/archive/sessions — nothing is lost)_`;
   }
 
   const rebuilt =
@@ -79,7 +84,31 @@ export function addSessionEntry(file, heading, body, opts = {}) {
     logBody + '\n';
 
   fs.writeFileSync(file, rebuilt);
-  return { trimmed, entryCount: entries.length };
+  return { trimmed, entryCount: entries.length, archived };
+}
+
+/**
+ * Entries rotated out of the working memory are never deleted — they move to
+ * a permanent, month-per-file archive beside it. Best-effort: an archive
+ * failure must never break the hook that called us.
+ */
+function archiveEntries(memoryFile, entries, dirOverride) {
+  try {
+    const dir = dirOverride || path.join(path.dirname(memoryFile), 'archive', 'sessions');
+    fs.mkdirSync(dir, { recursive: true });
+    const month = new Date().toISOString().slice(0, 7);
+    const file = path.join(dir, `${month}.md`);
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(
+        file,
+        `# PRAXIS Archive — ${month}\n` +
+          `<!-- Session entries moved here when the working memory hit its size cap. Nothing is deleted. Oldest first. -->\n\n`,
+      );
+    }
+    fs.appendFileSync(file, entries.join('\n\n') + '\n\n');
+  } catch {
+    /* archive is a safety net, never a blocker */
+  }
 }
 
 function splitEntries(text) {
@@ -89,5 +118,5 @@ function splitEntries(text) {
     .split(/\n(?=### )/)
     .map((s) => s.trim())
     .filter(Boolean)
-    .filter((s) => !s.startsWith('_(older entries trimmed'));
+    .filter((s) => !s.startsWith('_(older entries'));
 }
