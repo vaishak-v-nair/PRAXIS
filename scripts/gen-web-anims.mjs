@@ -11,8 +11,14 @@ import { execFileSync } from 'node:child_process';
 import sharp from 'sharp';
 import ffmpeg from 'ffmpeg-static';
 
-const W = 412, H = 316; // panel display size; source 3840x2160 center-cropped to this aspect
-const CROP = '2816:2160';
+// Panel display size. The source is 3840x2160 (16:9, wider than the panel):
+// cropping to the panel's aspect CLIPS the mascot (tail/head touch the crop
+// edges on idle/limit frames), so instead the FULL frame is scaled to 412-wide
+// (412x232) and letterboxed with transparent padding to 412x316 — the mascot
+// always complete, with breathing room.
+const W = 412, H = 316;
+const SCALED_H = 232; // 412 / (3840/2160)
+const PAD_TOP = Math.floor((H - SCALED_H) / 2);
 const HOLD_EXTRA = 400; // ms added to each segment's last frame
 
 // [video, seek, duration(s) = one full loop at 1x, fps, repeats]
@@ -48,13 +54,21 @@ for (const [state, video, ss, dur, fps, repeats] of SEGMENTS) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-flow-'));
   execFileSync(ffmpeg, [
     '-ss', String(ss), '-t', String(dur), '-i', video,
-    '-vf', `fps=${fps},crop=${CROP},scale=${W}:${H}:flags=lanczos,colorkey=0x000000:0.10:0.05`,
+    '-vf', `fps=${fps},scale=${W}:${SCALED_H}:flags=lanczos,colorkey=0x000000:0.10:0.05`,
     path.join(tmp, 'f_%03d.png'),
   ], { stdio: 'ignore' });
   const files = fs.readdirSync(tmp).sort();
   const segFrames = [];
   for (const f of files) {
-    const buf = await sharp(path.join(tmp, f)).ensureAlpha().raw().toBuffer();
+    const buf = await sharp(path.join(tmp, f))
+      .ensureAlpha()
+      .extend({
+        top: PAD_TOP,
+        bottom: H - SCALED_H - PAD_TOP,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .raw()
+      .toBuffer();
     despeckle(buf, W, H);
     segFrames.push(buf);
   }
@@ -77,3 +91,14 @@ await sharp(Buffer.concat(frames), {
 
 const total = delays.reduce((a, b) => a + b, 0);
 console.log(`flow.webp: ${frames.length} frames, ${(total / 1000).toFixed(1)}s cycle, ${Math.round(fs.statSync('web/_assets/flow.webp').size / 1024)} KB`);
+
+// The state-label sync in web/_src.html needs the cumulative segment ends
+// (a segment's last frame carries HOLD_EXTRA, which marks the boundary).
+// Paste this over FLOW_SEG whenever segment timing changes.
+let acc = 0;
+const segEnds = [];
+for (const d of delays) {
+  acc += d;
+  if (d > 500) segEnds.push(acc);
+}
+console.log(`FLOW_SEG for _src.html: var FLOW_SEG=[${segEnds.join(',')}];`);

@@ -649,14 +649,18 @@ document.querySelectorAll('.term').forEach(function(term){
   tio.observe(term);
 });
 
-/* tray flow sync: 70 frames x 125ms = 8750ms, 5 states x 1750ms */
+/* tray flow sync: each state plays its FULL loop, so segments are not equal.
+   FLOW_SEG = cumulative end (ms) of each state segment inside the webp —
+   regenerate with scripts/gen-web-anims.mjs, which prints this array. */
+var FLOW_SEG=[5454,10376,17293,20087,27004];
 var flow=document.getElementById('flow');
 if(flow){
   var spans=[].slice.call(document.querySelectorAll('#fstates span')),fstart=null;
   function ftick(){
     if(fstart===null)return;
-    var e=(performance.now()-fstart)%8750;
-    var idx=Math.min(4,Math.floor(e/1750));
+    var e=(performance.now()-fstart)%FLOW_SEG[FLOW_SEG.length-1];
+    var idx=0;
+    while(idx<FLOW_SEG.length-1&&e>=FLOW_SEG[idx])idx++;
     spans.forEach(function(s,i){s.classList.toggle('on',i===idx);});
     requestAnimationFrame(ftick);
   }
