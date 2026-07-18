@@ -344,14 +344,15 @@ footer .fcol a:hover{color:var(--rose)}
     <div class="term rv d2" id="term">
       <div class="bar"><i style="background:var(--limit)"></i><i style="background:var(--warn)"></i><i style="background:var(--ok)"></i><span class="t">.praxis / memory.md — written automatically</span></div>
       <pre><span class="ln"><span class="h">## Project</span></span>
-<span class="ln">Acme API &middot; Fastify + Postgres.</span>
-<span class="ln">Auth: short-lived JWT. <span class="c">cache.ts memoizes claims &mdash;</span></span>
-<span class="ln"><span class="c">load-bearing, do not "simplify".</span></span>
+<span class="ln">Acme shop &mdash; Node API + Postgres.</span>
+<span class="ln"><span class="c">cache.ts looks odd but keeps checkout fast.</span></span>
+<span class="ln"><span class="c">It is there on purpose &mdash; do not "clean it up".</span></span>
 <span class="ln"> </span>
 <span class="ln"><span class="h">## Session Log</span></span>
-<span class="ln">### tue &mdash; auth refactor</span>
-<span class="ln">- token refresh moved to a background job</span>
-<span class="ln"><span class="c">- tried a Redis lock (reverted: overkill)</span><span class="caret"></span></span></pre>
+<span class="ln">### tuesday &mdash; login rework</span>
+<span class="ln">- token refresh now runs in the background</span>
+<span class="ln"><span class="c">- tried Redis for it &mdash; too complex, removed.</span></span>
+<span class="ln"><span class="c">  the reason is saved, so it never gets re-tried</span><span class="caret"></span></span></pre>
     </div>
   </div>
 </section>
@@ -453,19 +454,19 @@ footer .fcol a:hover{color:var(--rose)}
       <div class="bar"><i style="background:var(--limit)"></i><i style="background:var(--warn)"></i><i style="background:var(--ok)"></i><span class="t">praxis trace</span></div>
       <pre><span class="ln"><span class="h">$ praxis trace</span></span>
 <span class="ln"></span>
-<span class="ln">7efb103  feat(telemetry): go live behind the worker</span>
+<span class="ln">a41f2c9  fix: stop users getting logged out</span>
 <span class="ln"></span>
 <span class="ln">praxis trace &mdash; the AI context behind this commit</span>
 <span class="ln"></span>
 <span class="ln">Asked:</span>
-<span class="ln">  &middot; make telemetry live end-to-end</span>
-<span class="ln">Touched: src/lib/telemetry.js &middot; test/telemetry.test.js</span>
-<span class="ln">Ran: 11 commands</span>
+<span class="ln">  &middot; "users keep getting logged out &mdash; fix it"</span>
+<span class="ln">Touched: src/auth/refresh.js &middot; test/refresh.test.js</span>
 <span class="ln">In its words:</span>
-<span class="ln">  "Endpoint flipped to the deployed worker. The package</span>
-<span class="ln">   ships a URL and zero credentials &mdash; a test enforces that."</span>
+<span class="ln">  "Tokens now renew quietly in the background,</span>
+<span class="ln">   so sessions survive laptop sleep. A test</span>
+<span class="ln">   makes sure the bug cannot come back."</span>
 <span class="ln"></span>
-<span class="ln"><span class="c">&mdash; session 100% full at commit &middot; praxis v0.6</span></span></pre>
+<span class="ln"><span class="c">&mdash; the AI's own note, saved with the commit</span></span></pre>
     </div>
   </div>
 </section>
@@ -553,7 +554,7 @@ footer .fcol a:hover{color:var(--rose)}
     <p class="fineprint rv d2" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--card-dim);margin-top:12px">click to copy &middot; windows, macos &amp; linux &middot; node 18+</p>
     <div class="doors rv d3">
       <span><b>1</b>&nbsp; before Claude — run it once in your terminal</span>
-      <span><b>2</b>&nbsp; inside Claude — type <em>/</em> &nbsp;&rarr;&nbsp; /praxis-recap &middot; /praxis-save &middot; /praxis-health &middot; /praxis-switch &middot; /praxis-explain &middot; five more</span>
+      <span><b>2</b>&nbsp; inside Claude — type <em>/</em> &nbsp;&rarr;&nbsp; /praxis-recap &middot; /praxis-save &middot; /praxis-health &middot; /praxis-switch &middot; /praxis-explain &middot; thirteen more</span>
     </div>
     <div class="links rv d3"><a class="tlink" href="https://github.com/vaishak-v-nair/PRAXIS">View the source on GitHub &rarr;</a></div>
   </div>
