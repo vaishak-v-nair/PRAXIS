@@ -49,6 +49,9 @@ Wait for it to finish (a few seconds), then in the folder of your project type:
 praxis
 ```
 
+(Skipping the install? `npx praxis-memory` does the same thing — everything
+still works; just write `npx praxis-memory` wherever you see `praxis` below.)
+
 ## Step 3 — what success looks like
 
 PRAXIS prints a welcome, sets itself up, and from then on it works in the

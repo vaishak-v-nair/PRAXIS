@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
 import { miniHeader, bigBanner, sage, amber, red, rose, bold, grey, dim, timeAgo, dailyQuote } from '../lib/ui.js';
+import { praxisCmd } from '../lib/runner.js';
 import { healthReport } from '../lib/health.js';
 
 function pkgVersion() {
@@ -70,7 +71,7 @@ export function status(opts = {}) {
     console.log('  ' + grey('claude   ') + grey('○ not connected — start ') + bold('claude') + grey(' here and PRAXIS comes alive'));
   } else if (hr.live) {
     const dot = hr.level === 'critical' ? red('●') : hr.level === 'fresh' ? sage('●') : amber('●');
-    console.log('  ' + grey('claude   ') + dot + ` active now — ${hr.pct}% full` + grey(' · praxis health for detail'));
+    console.log('  ' + grey('claude   ') + dot + ` active now — ${hr.pct}% full` + grey(` · ${praxisCmd()} health for detail`));
   } else if (hr.idle) {
     console.log('  ' + grey('claude   ') + amber('◐') + ` idle ${hr.pct}% full` + grey(` — open but paused, ${hr.idleMinutes}m since the last message`));
   } else {
@@ -79,7 +80,7 @@ export function status(opts = {}) {
 
   console.log('\n  ' + dim('Loaded into Claude Code automatically via the PRAXIS block in CLAUDE.md.'));
   console.log('  ' + dim('Inside a session, type ') + rose('/praxis-status') + dim(' or ') + rose('/praxis-save') + dim('.'));
-  console.log('  ' + dim('Watching a live session? ') + rose('praxis hud') + dim(' in a second terminal shows it in plain English.'));
-  console.log('  ' + dim('All commands: ') + rose('praxis help') + '\n');
+  console.log('  ' + dim('Watching a live session? ') + rose(`${praxisCmd()} hud`) + dim(' in a second terminal shows it in plain English.'));
+  console.log('  ' + dim('All commands: ') + rose(`${praxisCmd()} help`) + '\n');
   if (opts.welcome) console.log('  ' + dim('“' + dailyQuote() + '”') + '\n');
 }

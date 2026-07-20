@@ -16,10 +16,10 @@ and hands it back to Claude automatically the next time you open the project.
 [![local-first](https://img.shields.io/badge/data-never%20leaves%20your%20machine-dfa03a)](#safety)
 
 ```bash
-npm install -g praxis-memory && praxis
+npx praxis-memory
 ```
 
-*One command — same on **Windows, macOS and Linux** (Node 18+). It sets up the hooks, the memory file, the tray companion, everything — then every session after remembers. The global install matters: the hooks (auto-capture, pre-compact snapshots, tray auto-start) call `praxis` by name, so it needs to be on your PATH. Just trying it out? `npx praxis-memory` works for a look around.*
+*One command — same on **Windows, macOS and Linux** (Node 18+). It sets up the hooks, the memory file, the tray companion, everything — then every session after remembers. No global install needed: the hooks (auto-capture, pre-compact snapshots, tray auto-start) run through `npx`, so they work from day one. Prefer the short `praxis` command? Optional: `npm install -g praxis-memory` — every command below then drops the `npx praxis-memory` prefix.*
 
 *Never used a terminal? **[Start here](docs/START-HERE.md)** — five minutes, no prior knowledge, works the same in VS Code, Cursor, or a plain terminal window.*
 
@@ -120,6 +120,8 @@ praxis roi            # the receipt: sessions, commits, hours, dollars (--days N
 praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
 praxis feedback       # the two questions that shape what gets built next
 ```
+
+*No global install? Every command works as `npx praxis-memory <command>` — e.g. `npx praxis-memory status`.*
 
 Inside Claude Code, type `/` and the Praxis commands appear:
 

@@ -9,6 +9,7 @@ import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchSettings } from '../lib/settings.js';
 import { bigBanner, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
+import { praxisCmd } from '../lib/runner.js';
 import { tray } from './tray.js';
 import { readFileSync } from 'node:fs';
 
@@ -50,10 +51,10 @@ export async function init() {
       '# PRAXIS Archive\n\n' +
         'Nothing your sessions produce is ever deleted.\n\n' +
         '- `sessions/` — entries moved out of `memory.md` when it reaches its size cap, one file per month, oldest first.\n' +
-        '- `../checkpoints/` — full conversation archives written by `praxis checkpoint`.\n\n' +
+        '- `../checkpoints/` — full conversation archives written by the checkpoint command.\n\n' +
         'The working memory (`.praxis/memory.md`) stays small so Claude loads fast;\n' +
         'this folder is the long-term record. Point an Obsidian vault at praxis\n' +
-        '(`praxis vault <path>`) and the archive is mirrored there too.\n',
+        '(`' + praxisCmd() + ' vault <path>`) and the archive is mirrored there too.\n',
     );
     done.push('.praxis/archive — long-term store, nothing ever deleted');
   }
@@ -151,23 +152,24 @@ export async function init() {
     setTelemetry(/^y(es)?$/i.test(String(ans).trim()));
   }
 
+  const c = praxisCmd();
   if (!firstRun) {
-    console.log('\n  ' + dim('All commands: ') + rose('praxis help') + '\n');
+    console.log('\n  ' + dim('All commands: ') + rose(`${c} help`) + '\n');
     return;
   }
   console.log(`
   ${bold('Next steps')}
   ${grey('1.')} Open this project in Claude Code — your memory loads automatically.
   ${grey('2.')} End a session and PRAXIS logs it. Type ${rose('/praxis-save')} for a rich summary.
-  ${grey('3.')} ${bold('praxis status')} — see what it remembers, any time.
-  ${grey('4.')} ${bold('praxis hud')} in a second terminal — watch the session live, in plain English.
+  ${grey('3.')} ${bold(`${c} status`)} — see what it remembers, any time.
+  ${grey('4.')} ${bold(`${c} hud`)} in a second terminal — watch the session live, in plain English.
 
   ${dim('If a Claude Code session is already open, restart it (or start a new')}
   ${dim('session) so the / menu picks up the new commands.')}
 
-  ${dim('important: the hooks (auto-capture, snapshots, tray auto-start) call')}
-  ${dim('`praxis` by name — install it for real: ')}${bold('npm install -g praxis-memory')}
-  ${dim('Without that, /praxis-save still covers you.')}
+  ${dim('The hooks (auto-capture, snapshots, tray auto-start) run through npx,')}
+  ${dim('so they work with no global install. Want the short `praxis` command?')}
+  ${dim('Optional: ')}${bold('npm install -g praxis-memory')}
 
   ${dim('“' + dailyQuote() + '”')}
 `);

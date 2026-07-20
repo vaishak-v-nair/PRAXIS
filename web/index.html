@@ -344,7 +344,7 @@ footer .fcol a:hover{color:var(--rose)}
     <div class="chips">
       <div class="chip rv d1"><div class="ct">$ the CLI</div><p>One command sets up the hooks. <b>npx praxis-memory</b> and the loop is running — nothing else to configure.</p></div>
       <div class="chip rv d2"><div class="ct">&#9998; the memory file</div><p><b>.praxis/memory.md</b> — plain markdown in your repo. Redacted, size-capped, readable by any tool or teammate. Older entries rotate to a forever-archive — nothing is ever deleted.</p></div>
-      <div class="chip rv d3"><div class="ct">&#9673; the companion</div><p><b>praxis tray</b> — the axolotl beside your clock, its emotion tracking session health live. Windows today; macOS &amp; Linux next.</p></div>
+      <div class="chip rv d3"><div class="ct">&#9673; the companion</div><p><b>the tray companion</b> — starts with setup, no extra command: the axolotl beside your clock, its emotion tracking session health live. Windows today; macOS &amp; Linux next.</p></div>
     </div>
   </div>
 </section>
@@ -410,7 +410,7 @@ footer .fcol a:hover{color:var(--rose)}
     <span class="kick rv">Design principles</span>
     <h2 class="h2 rv d1">Memory that stays on <em>your</em> machine.</h2>
     <div class="rows">
-      <div class="wrow rv"><span class="n">i.</span><h3>Local by design</h3><p>The entire capture loop runs beside your code. No server, no account — your code and conversations never leave. The one thing that ever can: anonymous usage counts, strictly opt-in, and <code>praxis telemetry show</code> prints the exact payload first.</p></div>
+      <div class="wrow rv"><span class="n">i.</span><h3>Local by design</h3><p>The entire capture loop runs beside your code. No server, no account — your code and conversations never leave. The one thing that ever can: anonymous usage counts, strictly opt-in, and <code>npx praxis-memory telemetry show</code> prints the exact payload first.</p></div>
       <div class="wrow rv"><span class="n">ii.</span><h3>Zero added cost</h3><p>Praxis rides the Claude Code subscription you already run. It makes no API calls of its own and adds nothing to your bill.</p></div>
       <div class="wrow rv"><span class="n">iii.</span><h3>Owned by the repo</h3><p>Memory lives in your project, gitignored by default. Commit it to share context with your team, or keep it private.</p></div>
       <div class="wrow rv"><span class="n">iv.</span><h3>Self-loading</h3><p><code>CLAUDE.md</code> includes the memory file, so every new session reads it without being asked. No paste, no prompt engineering.</p></div>
@@ -442,7 +442,7 @@ footer .fcol a:hover{color:var(--rose)}
       <span class="kick rv">The companion</span>
       <h2 class="h2 rv d1">Session health, <em>at a glance.</em></h2>
       <p class="lead rv d2">The axolotl is Praxis's status bar. Its glow encodes the state of your context window — healthy, filling up, at the limit, switching over, restored — and when it speaks, it speaks the real numbers, live: <i>"Your Claude session is 88% full."</i></p>
-      <p class="lead rv d3">Shipped today on Windows — and it starts itself with your very first install. The axolotl breathes beside your clock, its glow tracking the session live; a toast appears only at the moments that matter, and a click opens the full panel: animated mascot, memory stats, recent entries, suggestions. macOS and Linux are next; <code style="font-family:var(--mono);font-size:.85em">praxis status</code> covers every platform meanwhile.</p>
+      <p class="lead rv d3">Shipped today on Windows — and it starts itself with your very first install. The axolotl breathes beside your clock, its glow tracking the session live; a toast appears only at the moments that matter, and a click opens the full panel: animated mascot, memory stats, recent entries, suggestions. macOS and Linux are next; <code style="font-family:var(--mono);font-size:.85em">npx praxis-memory status</code> covers every platform meanwhile.</p>
     </div>
     <div class="panel rv d2">
       <div class="phead">praxis — session health</div>
@@ -469,7 +469,7 @@ footer .fcol a:hover{color:var(--rose)}
     </div>
     <div class="term rv d2">
       <div class="bar"><i style="background:var(--limit)"></i><i style="background:var(--warn)"></i><i style="background:var(--ok)"></i><span class="t">praxis trace</span></div>
-      <pre><span class="ln"><span class="h">$ praxis trace</span></span>
+      <pre><span class="ln"><span class="h">$ npx praxis-memory trace</span></span>
 <span class="ln"></span>
 <span class="ln">a41f2c9  fix: stop users getting logged out</span>
 <span class="ln"></span>
@@ -524,7 +524,7 @@ footer .fcol a:hover{color:var(--rose)}
     <div class="list rv d1">
       <details>
         <summary>Does my code ever leave my machine?</summary>
-        <p>No. The capture hook, the memory file, the tray app and trace notes all run on your machine; the memory is a plain file in your repository. The only network feature is strictly opt-in: anonymous usage counts — never code, never conversations. <code>praxis telemetry show</code> prints the exact payload, and <code>off</code> wipes even the anonymous install id.</p>
+        <p>No. The capture hook, the memory file, the tray app and trace notes all run on your machine; the memory is a plain file in your repository. The only network feature is strictly opt-in: anonymous usage counts — never code, never conversations. <code>npx praxis-memory telemetry show</code> prints the exact payload, and <code>off</code> wipes even the anonymous install id.</p>
       </details>
       <details>
         <summary>What exactly does it remember?</summary>
@@ -544,7 +544,7 @@ footer .fcol a:hover{color:var(--rose)}
       </details>
       <details>
         <summary>Which tools does it work with?</summary>
-        <p>Claude Code is measured deeply today. <code>praxis switch</code> already packs your context and hands it to Gemini CLI, Codex, Cursor or Antigravity, and trace notes work on any git host. The memory stays one portable markdown file, readable by any editor or agent.</p>
+        <p>Claude Code is measured deeply today. <code>npx praxis-memory switch</code> already packs your context and hands it to Gemini CLI, Codex, Cursor or Antigravity, and trace notes work on any git host. The memory stays one portable markdown file, readable by any editor or agent.</p>
       </details>
       <details>
         <summary>Does it work on Windows, macOS and Linux?</summary>
@@ -556,7 +556,11 @@ footer .fcol a:hover{color:var(--rose)}
       </details>
       <details>
         <summary>Is the tray app available now?</summary>
-        <p>Yes — on Windows, since v0.2: run <code>praxis tray</code> and the axolotl sits by your clock, changing emotion with your session's real state (<code>praxis tray --stop</code> to quit). macOS and Linux builds are next; <code>praxis status</code> gives the same health readout everywhere meanwhile.</p>
+        <p>Yes — on Windows, since v0.2: it starts by itself with setup, and <code>npx praxis-memory tray</code> brings the axolotl back any time, changing emotion with your session's real state (<code>--stop</code> to quit). macOS and Linux builds are next; <code>npx praxis-memory status</code> gives the same health readout everywhere meanwhile.</p>
+      </details>
+      <details>
+        <summary>It says "praxis: command not found" — is it broken?</summary>
+        <p>No — you just don't have the optional global install. <code>npx praxis-memory</code> is the full product: setup, hooks, tray, every command as <code>npx praxis-memory &lt;command&gt;</code>. The short <code>praxis &lt;command&gt;</code> form only exists after <code>npm install -g praxis-memory</code>. Praxis's own hooks run through npx, so auto-capture and the tray work either way.</p>
       </details>
     </div>
   </div>

@@ -8,8 +8,6 @@ If no tool was named, ask which one: gemini · codex · claude · cursor · anti
 
 1. Suggest `/praxis-save` first if this session made decisions worth keeping —
    the freshest context rides along in the handoff.
-2. Run `praxis switch <tool>` with the Bash tool.
+2. Run `npx -y praxis-memory switch <tool>` with the Bash tool.
 3. Show its output and walk the user through the printed next steps (the launch
    command is already on their clipboard).
-
-If the command is not found, tell the user: `npm install -g praxis-memory`

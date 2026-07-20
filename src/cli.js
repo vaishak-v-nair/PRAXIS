@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init } from './commands/init.js';
@@ -23,7 +23,9 @@ import { gate } from './commands/gate.js';
 import { roi } from './commands/roi.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
-import { miniHeader, bold, grey } from './lib/ui.js';
+import { praxisCmd } from './lib/runner.js';
+import { patchSettings } from './lib/settings.js';
+import { miniHeader, bold, grey, sage } from './lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -37,30 +39,36 @@ function version() {
 }
 
 function help() {
+  const c = praxisCmd();
+  const pad = ' '.repeat(Math.max(0, c.length - 'praxis'.length));
   console.log('\n  ' + miniHeader(version()) + '\n');
   console.log(`  ${bold('Usage')}
-  ${bold('npx praxis-memory')}     set up PRAXIS here ${grey('(or show status if already set up)')}
-  ${bold('praxis init')}           set up PRAXIS in the current project
-  ${bold('praxis status')}         what PRAXIS remembers, and session health
-  ${bold('praxis recap')}          catch me up on this project, right in the terminal
-  ${bold('praxis save')}           log the current session into memory, mid-flight
-  ${bold('praxis remember "<f>"')} save a fact or decision into project memory now
-  ${bold('praxis forget "<t>"')}   remove matching lines from memory ${grey('(asks first)')}
-  ${bold('praxis health')}         how full is this Claude session, really — and where to go next
-  ${bold('praxis hud')}            live view of your Claude session, in plain English ${grey('(second terminal)')}
-  ${bold('praxis switch <tool>')}  pack a handoff brief and move to gemini · codex · claude · cursor
-  ${bold('praxis checkpoint')}     save the whole session to md files, then /compact and keep going ${grey('· [folder]')}
-  ${bold('praxis trace')}          the AI context behind a commit ${grey('· on / off / log / <hash>')}
-  ${bold('praxis vault <path>')}   write sessions, commits & memory into your Obsidian vault
-  ${bold('praxis cost')}           what did that just cost? API-equivalent dollars ${grey('· --all')}
-  ${bold('praxis gate [ref]')}     slop-risk score for a commit — triage before review
-  ${bold('praxis roi')}            the receipt: sessions, commits, hours, dollars ${grey('· --days N')}
-  ${bold('praxis tray')}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
-  ${bold('praxis feedback')}       the two questions that shape what gets built next
-  ${bold('praxis telemetry')}      what leaves your machine (spoiler: counts, never content) ${grey('· show / on / off')}
-  ${grey('praxis capture        (internal) called by the Claude Code Stop hook')}
+  ${bold('npx praxis-memory')}${pad}     set up PRAXIS here ${grey('(or show status if already set up)')}
+  ${bold(`${c} init`)}           set up PRAXIS in the current project
+  ${bold(`${c} status`)}         what PRAXIS remembers, and session health
+  ${bold(`${c} recap`)}          catch me up on this project, right in the terminal
+  ${bold(`${c} save`)}           log the current session into memory, mid-flight
+  ${bold(`${c} remember "<f>"`)} save a fact or decision into project memory now
+  ${bold(`${c} forget "<t>"`)}   remove matching lines from memory ${grey('(asks first)')}
+  ${bold(`${c} health`)}         how full is this Claude session, really — and where to go next
+  ${bold(`${c} hud`)}            live view of your Claude session, in plain English ${grey('(second terminal)')}
+  ${bold(`${c} switch <tool>`)}  pack a handoff brief and move to gemini · codex · claude · cursor
+  ${bold(`${c} checkpoint`)}     save the whole session to md files, then /compact and keep going ${grey('· [folder]')}
+  ${bold(`${c} trace`)}          the AI context behind a commit ${grey('· on / off / log / <hash>')}
+  ${bold(`${c} vault <path>`)}   write sessions, commits & memory into your Obsidian vault
+  ${bold(`${c} cost`)}           what did that just cost? API-equivalent dollars ${grey('· --all')}
+  ${bold(`${c} gate [ref]`)}     slop-risk score for a commit — triage before review
+  ${bold(`${c} roi`)}            the receipt: sessions, commits, hours, dollars ${grey('· --days N')}
+  ${bold(`${c} tray`)}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
+  ${bold(`${c} feedback`)}       the two questions that shape what gets built next
+  ${bold(`${c} telemetry`)}      what leaves your machine (spoiler: counts, never content) ${grey('· show / on / off')}
+  ${grey(`${c} capture        (internal) called by the Claude Code Stop hook`)}
 
-  ${grey('Local-first. No server. No account. Nothing leaves your machine.')}
+  ${grey('Local-first. No server. No account. Nothing leaves your machine.')}${
+    c === 'praxis'
+      ? ''
+      : '\n  ' + grey('Tip: `npm install -g praxis-memory` gives you the short `praxis` command.')
+  }
 `);
 }
 
@@ -152,6 +160,19 @@ switch (cmd) {
   case undefined:
     // Smart default: first run sets up, later runs give the full welcome.
     if (existsSync(projectPaths().praxisDir)) {
+      // self-repair: versions before 0.9.1 wrote hooks as bare `praxis ...`,
+      // which fail every session for npx-only installs ("command not found").
+      // The front door fixes them without asking anyone to re-init.
+      try {
+        const p = projectPaths();
+        mkdirSync(p.claudeDir, { recursive: true });
+        const res = patchSettings(p.settingsFile);
+        if (res.repaired) {
+          console.log('\n  ' + sage('✓') + ' repaired the Claude Code hooks — they now run through npx' + grey(' (no global install needed)'));
+        }
+      } catch {
+        /* best-effort; init still covers it */
+      }
       status({ welcome: true });
       await tray(['--ensure']); // the companion comes back with every run
     } else {

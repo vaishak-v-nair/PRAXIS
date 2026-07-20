@@ -456,7 +456,7 @@ function Get-LiveMsg([string]$state, $s) {
     if ($sessionDriven -and $s.sess) { $msg = 'This session is ' + $s.sess.pct + '% full. Good moment to finish the thought.' }
     elseif ($s.kb) { $msg = 'Notes at ' + $s.kb + ' of ' + $s.capKb + ' KB. I move the oldest into the archive - nothing is lost.' }
   } elseif ($state -eq 'limit') {
-    if ($sessionDriven -and $s.sess) { $msg = 'Session ' + $s.sess.pct + '% full. praxis switch carries your memory to a fresh one.' }
+    if ($sessionDriven -and $s.sess) { $msg = 'Session ' + $s.sess.pct + '% full. /praxis-switch carries your memory to a fresh one.' }
     elseif ($s.kb) { $msg = 'Notes hit the ' + $s.capKb + ' KB cap. Older ones are safe in the archive.' }
   } elseif ($state -eq 'restored' -and $s.entries) {
     $msg = 'Saved - ' + $s.entries + ' entries in memory. Your next session starts already briefed.'
@@ -694,7 +694,7 @@ $timer.add_Tick({
       $script:healthPopped = $popKey
       if ($s.sess.level -eq 'critical') {
         $emotion = 'limit'
-        $msg = 'Your Claude session is ' + $s.sess.pct + '% full. praxis switch starts a fresh one - your memory comes along.'
+        $msg = 'Your Claude session is ' + $s.sess.pct + '% full. /praxis-switch starts a fresh one - your memory comes along.'
       } else {
         $emotion = 'warning'
         $msg = 'Your Claude session is ' + $s.sess.pct + '% full. Good moment to finish the thought.'

@@ -17,6 +17,7 @@ import { classifyContext, DEFAULT_CONTEXT_LIMIT, writeHealthFile } from '../lib/
 import { plainify } from '../lib/plain.js';
 import { projectPaths } from '../lib/paths.js';
 import { rose, sage, amber, blue, red, bold, grey, dim, stripAnsi } from '../lib/ui.js';
+import { praxisCmd } from '../lib/runner.js';
 
 const POLL_MS = 250; // re-read the transcript
 const RESCAN_MS = 3000; // look for a newer session file
@@ -36,7 +37,7 @@ export async function hud(args = []) {
 
   Do this:
   1. Open a terminal in this folder and start ${bold('claude')}.
-  2. Open a second terminal next to it and run ${bold('praxis hud')}.
+  2. Open a second terminal next to it and run ${bold(`${praxisCmd()} hud`)}.
 
   The HUD shows what is happening in plain English, updating live.
 `);

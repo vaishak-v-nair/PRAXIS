@@ -2,6 +2,7 @@
 // Colors auto-disable when not a TTY or when NO_COLOR is set.
 
 import { MASCOT_ART, MASCOT_ART_WIDTH } from './mascot-art.js';
+import { praxisCmd } from './runner.js';
 
 const forceRich = process.env.PRAXIS_RICH === '1';
 const useColor = (forceRich || !!process.stdout.isTTY) && !process.env.NO_COLOR;
@@ -83,7 +84,7 @@ export function bigBanner(version, leftExtras = []) {
     ...menu.map(([n, d]) => rose(n.padEnd(nameW + 2)) + grey(d)),
     grey('+ ') + rose('/praxis-') + grey('checkpoint · health · switch · trace · cost · … — one per command'),
     '',
-    grey('praxis help — everything else'),
+    grey(praxisCmd() + ' help — everything else'),
   ];
   const leftW = Math.max(MASCOT_ART_WIDTH, ...leftExtras.map((l) => stripAnsi(l).length), 18);
   const rightW = Math.max(...right.map((l) => stripAnsi(l).length));

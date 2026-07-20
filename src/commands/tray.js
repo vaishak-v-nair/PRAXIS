@@ -3,6 +3,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
+import { praxisCmd } from '../lib/runner.js';
 import { sage, amber, red, blue, gold, rose, bold, grey, dim } from '../lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +24,7 @@ export async function tray(args = []) {
   if (process.platform !== 'win32') {
     if (ensure) return;
     console.log('\n  The tray companion ships for ' + bold('Windows') + ' today.');
-    console.log('  macOS and Linux are next on the roadmap — until then, ' + bold('praxis status') + '');
+    console.log('  macOS and Linux are next on the roadmap — until then, ' + bold(`${praxisCmd()} status`) + '');
     console.log('  gives you the same session health in the terminal.\n');
     return;
   }
@@ -78,7 +79,7 @@ export async function tray(args = []) {
       const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
       if (pid && pidAlive(pid)) {
         if (!ensure) {
-          console.log('\n  tray companion is already running ' + grey('(praxis tray --stop to stop it)') + '\n');
+          console.log('\n  tray companion is already running ' + grey(`(${praxisCmd()} tray --stop to stop it)`) + '\n');
         }
         return;
       }
@@ -143,7 +144,16 @@ export async function tray(args = []) {
   // Launch through a throwaway PowerShell + Start-Process: the host ends up
   // fully detached from this console (node's `detached` flag is unreliable
   // for hidden WinForms hosts).
-  const quoted = psArgs.map((a) => `'${String(a).replace(/'/g, "''")}'`).join(',');
+  // Start-Process joins -ArgumentList items with spaces WITHOUT quoting them,
+  // so any path containing a space (e.g. "E:\AI Coding\project") splits into
+  // two arguments and the host dies before writing its pidfile. Args with
+  // whitespace therefore carry their own embedded double quotes.
+  const quoted = psArgs
+    .map((a) => {
+      const s = String(a).replace(/'/g, "''");
+      return /\s/.test(s) ? `'"${s}"'` : `'${s}'`;
+    })
+    .join(',');
   execFileSync(
     'powershell.exe',
     ['-NoProfile', '-Command', `Start-Process powershell.exe -ArgumentList ${quoted} -WindowStyle Hidden`],
@@ -165,7 +175,7 @@ export async function tray(args = []) {
     }
   }
   if (!confirmed) {
-    console.log('\n  ' + amber('!') + ' tray companion did not report back — try ' + bold('praxis tray --once') + ' to debug.\n');
+    console.log('\n  ' + amber('!') + ' tray companion did not report back — try ' + bold(`${praxisCmd()} tray --once`) + ' to debug.\n');
     return;
   }
 
@@ -179,5 +189,5 @@ export async function tray(args = []) {
       blue('switching') + grey(' · ') +
       gold('restored'),
   );
-  console.log('    ' + rose('praxis tray --stop') + dim('  when you want it gone.') + '\n');
+  console.log('    ' + rose(`${praxisCmd()} tray --stop`) + dim('  when you want it gone.') + '\n');
 }

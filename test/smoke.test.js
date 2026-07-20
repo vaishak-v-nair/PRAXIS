@@ -63,11 +63,36 @@ test('patchSettings adds all hooks without clobbering existing ones', () => {
   const s = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.ok(s.hooks.PreToolUse, 'existing hooks preserved');
   assert.equal(s.hooks.Stop.length, 1, 'no duplicate Stop hook');
-  assert.match(JSON.stringify(s.hooks.Stop), /praxis capture/);
+  // hooks must work for npx-only installs — bare `praxis` is not on PATH there
+  assert.match(JSON.stringify(s.hooks.Stop), /npx -y praxis-memory capture/);
   assert.equal(s.hooks.PreCompact.length, 1, 'snapshot hook present once');
-  assert.match(JSON.stringify(s.hooks.PreCompact), /praxis capture/);
+  assert.match(JSON.stringify(s.hooks.PreCompact), /npx -y praxis-memory capture/);
   assert.equal(s.hooks.SessionStart.length, 1, 'tray auto-start hook present once');
-  assert.match(JSON.stringify(s.hooks.SessionStart), /praxis tray --ensure/);
+  assert.match(JSON.stringify(s.hooks.SessionStart), /npx -y praxis-memory tray --ensure/);
+});
+
+test('patchSettings repairs legacy bare-praxis hooks in place', () => {
+  const dir = tmp();
+  const file = path.join(dir, 'settings.json');
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      hooks: {
+        Stop: [{ hooks: [{ type: 'command', command: 'praxis capture' }] }],
+        SessionStart: [{ hooks: [{ type: 'command', command: 'praxis tray --ensure' }] }],
+      },
+    }),
+  );
+  const first = patchSettings(file);
+  assert.equal(first.already, false, 'repair counts as a change');
+  const s = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(s.hooks.Stop.length, 1, 'legacy Stop hook replaced, not duplicated');
+  assert.match(JSON.stringify(s.hooks.Stop), /npx -y praxis-memory capture/);
+  assert.doesNotMatch(JSON.stringify(s.hooks.Stop), /"praxis capture"/, 'broken command gone');
+  assert.equal(s.hooks.SessionStart.length, 1, 'legacy tray hook replaced, not duplicated');
+  assert.match(JSON.stringify(s.hooks.SessionStart), /npx -y praxis-memory tray --ensure/);
+  const second = patchSettings(file);
+  assert.equal(second.already, true, 'second run is a no-op');
 });
 
 test('buildFeedbackUrl pre-fills a labeled GitHub issue', () => {

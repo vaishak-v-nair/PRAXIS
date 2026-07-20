@@ -20,7 +20,7 @@ context and keep going — same session, nothing lost. Follow every step.
    If `RESUME.md` already exists, fold anything still relevant from it into the
    new brief instead of blindly overwriting.
 
-3. Run `praxis checkpoint --from-claude` in the shell. It archives the full
+3. Run `npx -y praxis-memory checkpoint --from-claude` in the shell. It archives the full
    conversation, mirrors into an Obsidian vault when one is set up, and logs
    the brief into project memory — all pre-flight-checked, nothing overwritten
    silently. If it reports a problem, fix that first and re-run it.

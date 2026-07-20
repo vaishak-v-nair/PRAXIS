@@ -6,6 +6,7 @@ import { healthReport, suggestNext, detectTools, writeHealthFile } from '../lib/
 import { projectPaths } from '../lib/paths.js';
 import { TOOLS } from '../lib/tools.js';
 import { rose, sage, amber, red, blue, bold, grey, dim } from '../lib/ui.js';
+import { praxisCmd } from '../lib/runner.js';
 
 export async function health(args = []) {
   const report = healthReport();
@@ -24,7 +25,7 @@ export async function health(args = []) {
         bold('Claude Code'.padEnd(14)) +
         grey('○ not connected — no session in this folder yet') +
         `\n\n  Start ${bold('claude')} here and I measure it live. Everything else already works:` +
-        `\n  ${bold('praxis status')} · ${bold('praxis switch')} · ${bold('praxis feedback')}\n`,
+        `\n  ${bold(`${praxisCmd()} status`)} · ${bold(`${praxisCmd()} switch`)} · ${bold(`${praxisCmd()} feedback`)}\n`,
     );
     printTools(installed);
     return;
