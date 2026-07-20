@@ -72,16 +72,43 @@ export async function tray(args = []) {
     }
   }
 
-  // already running? say so BEFORE staging — the live host may hold these
-  // files open, and restaging is pointless while it runs anyway
+  // A running host keeps executing the STAGED copy of tray.ps1 forever —
+  // without this check, upgrades never reach the tray until someone happens
+  // to run --stop. Compare shipped vs staged: same → leave the host alone;
+  // different → restart it on the new version (silently under --ensure, so
+  // upgrades ride the SessionStart hook into every project).
+  let stagedFresh = false;
+  try {
+    stagedFresh = fs
+      .readFileSync(path.join(trayDir, 'tray.ps1'))
+      .equals(fs.readFileSync(path.join(TRAY_SRC, 'tray.ps1')));
+  } catch {
+    /* nothing staged yet */
+  }
+
   if (!args.includes('--once')) {
     try {
       const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
       if (pid && pidAlive(pid)) {
-        if (!ensure) {
-          console.log('\n  tray companion is already running ' + grey(`(${praxisCmd()} tray --stop to stop it)`) + '\n');
+        if (stagedFresh) {
+          if (!ensure) {
+            console.log('\n  tray companion is already running ' + grey(`(${praxisCmd()} tray --stop to stop it)`) + '\n');
+          }
+          return;
         }
-        return;
+        try {
+          execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+        } catch {
+          /* already gone */
+        }
+        try {
+          fs.rmSync(pidFile, { force: true });
+        } catch {
+          /* fine */
+        }
+        if (!ensure) console.log('\n  tray companion was running an older version — restarting it fresh.');
+        // give the dying host a beat to release its file handles before restaging
+        await new Promise((r) => setTimeout(r, 400));
       }
     } catch {
       /* not running */

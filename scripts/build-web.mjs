@@ -49,13 +49,18 @@ const HEAD = `<!DOCTYPE html>
 <link rel="icon" href="${navicon}">
 <link rel="canonical" href="${SITE}/">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="PRAXIS">
 <meta property="og:title" content="PRAXIS — your AI never forgets your project">
 <meta property="og:description" content="Open-source local memory, session health, a decision trail, and a cost meter for Claude Code and every AI coding agent. Nothing leaves your machine.">
 <meta property="og:url" content="${SITE}/">
-<meta property="og:image" content="https://raw.githubusercontent.com/vaishak-v-nair/PRAXIS/main/docs/mascot.gif">
+<meta property="og:image" content="${SITE}/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="PRAXIS — local-first memory for Claude Code. The axolotl mascot beside the command: npx praxis-memory.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PRAXIS — your AI never forgets your project">
 <meta name="twitter:description" content="Local memory, session health, decision trail and cost meter for Claude Code. Nothing leaves your machine.">
+<meta name="twitter:image" content="${SITE}/og.png">
 `;
 
 let body = fs.readFileSync(SRC, 'utf8')
