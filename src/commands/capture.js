@@ -8,6 +8,7 @@ import { writeState } from '../lib/state.js';
 import { analyzeTranscript, classifyContext, writeHealthFile, DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
 import { cleanUserText } from '../lib/transcript.js';
 import { vaultDirFor, mirrorMemory, writeSessionNote, appendArchiveNote } from '../lib/vault.js';
+import { recordReceipt } from '../lib/receipt/record.js';
 
 // Called by the Claude Code Stop hook. Reads the hook's JSON from stdin,
 // derives a lightweight deterministic summary of the session, and appends it to
@@ -138,8 +139,8 @@ export async function capture() {
     let lastClaude = '';
     let commits = [];
     let analysis = null;
+    let text = '';
     if (typeof data.transcript_path === 'string') {
-      let text = '';
       try {
         text = stripBom(fs.readFileSync(data.transcript_path, 'utf8'));
       } catch {
@@ -223,6 +224,23 @@ export async function capture() {
       }
     } catch {
       /* the vault is a mirror, never a blocker */
+    }
+
+    // Silent proof-of-work: a session's TRUE end (Stop, not a mid-session
+    // PreCompact squeeze) leaves a hash-chained, signed receipt of what the
+    // agent DID — evidence only, ZERO model calls. The judge is opt-in
+    // (`praxis receipt --verify` or the MCP tool); it never fires in a hook.
+    // A receipt failure must never break the session.
+    try {
+      if (!snapshot && text && typeof data.transcript_path === 'string') {
+        await recordReceipt(
+          p.receiptsDir,
+          { text, sessionId: path.basename(data.transcript_path, '.jsonl') },
+          { project: path.basename(p.root), now: new Date().toISOString(), verify: false },
+        );
+      }
+    } catch {
+      /* receipts are a bonus on the hook path, never a blocker */
     }
 
     writeState(p.praxisDir, 'restored'); // tray: context safely written back

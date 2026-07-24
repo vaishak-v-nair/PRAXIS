@@ -8,6 +8,7 @@ import { projectPaths } from '../lib/paths.js';
 import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchSettings } from '../lib/settings.js';
+import { patchMcpConfig } from '../lib/mcp/config.js';
 import { bigBanner, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
 import { tray } from './tray.js';
@@ -72,6 +73,19 @@ export async function init() {
       : '.claude/settings.json — capture on Stop · snapshot before compact · tray on SessionStart',
   );
 
+  // .mcp.json — the platform surface. With this, Claude Code hands the model the
+  // praxis_* tools automatically: receipts, verify and recall need no command.
+  try {
+    const mc = patchMcpConfig(p.mcpFile);
+    done.push(
+      mc.already
+        ? '.mcp.json (PRAXIS tools already registered)'
+        : '.mcp.json — PRAXIS tools live in Claude Code, no command to type',
+    );
+  } catch {
+    /* MCP registration is best-effort; the CLI + hooks still work without it */
+  }
+
   // slash commands
   fs.mkdirSync(p.commandsDir, { recursive: true });
   const slashCmds = [
@@ -90,6 +104,7 @@ export async function init() {
     'praxis-cost.md',
     'praxis-gate.md',
     'praxis-roi.md',
+    'praxis-receipt.md',
     'praxis-vault.md',
     'praxis-telemetry.md',
     'praxis-tray.md',

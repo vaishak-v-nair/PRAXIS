@@ -21,6 +21,8 @@ import { forget } from './commands/forget.js';
 import { save } from './commands/save.js';
 import { gate } from './commands/gate.js';
 import { roi } from './commands/roi.js';
+import { receipt } from './commands/receipt.js';
+import { mcp } from './commands/mcp.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
 import { praxisCmd } from './lib/runner.js';
@@ -59,6 +61,7 @@ function help() {
   ${bold(`${c} cost`)}           what did that just cost? API-equivalent dollars ${grey('· --all')}
   ${bold(`${c} gate [ref]`)}     slop-risk score for a commit — triage before review
   ${bold(`${c} roi`)}            the receipt: sessions, commits, hours, dollars ${grey('· --days N')}
+  ${bold(`${c} receipt`)}        proof of what the AI did this session ${grey('· --verify · --html · --list')}
   ${bold(`${c} tray`)}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
   ${bold(`${c} feedback`)}       the two questions that shape what gets built next
   ${bold(`${c} telemetry`)}      what leaves your machine (spoiler: counts, never content) ${grey('· show / on / off')}
@@ -152,6 +155,12 @@ switch (cmd) {
     break;
   case 'roi':
     roi(process.argv.slice(3));
+    break;
+  case 'receipt':
+    await receipt(process.argv.slice(3));
+    break;
+  case 'mcp':
+    await mcp();
     break;
   case '-v':
   case '--version':

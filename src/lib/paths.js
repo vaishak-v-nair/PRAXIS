@@ -10,6 +10,8 @@ export function projectPaths(cwd = process.cwd()) {
     praxisDir: path.join(cwd, '.praxis'),
     memoryFile: path.join(cwd, '.praxis', 'memory.md'),
     configFile: path.join(cwd, '.praxis', 'config.json'),
+    receiptsDir: path.join(cwd, '.praxis', 'receipts'),
+    mcpFile: path.join(cwd, '.mcp.json'),
     claudeDir: path.join(cwd, '.claude'),
     settingsFile: path.join(cwd, '.claude', 'settings.json'),
     commandsDir: path.join(cwd, '.claude', 'commands'),
