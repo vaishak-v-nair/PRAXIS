@@ -63,6 +63,9 @@ Praxis closes the loop: the context survives the session.
   `praxis capture` appends a summary on its own: what you were working on,
   which files were touched, the commits the session produced, and the AI's
   own closing words — no command to remember.
+- **Receipts** — the same `Stop` hook also seals a signed, hash-chained receipt
+  of what the AI actually did this session (commands, files, tests) — evidence
+  only, zero model calls. `praxis receipt` reads it back.
 - **Snapshots** — a `PreCompact` hook fires right before Claude squeezes a full
   session. That is the moment detail is about to be lost — Praxis saves the
   context size, your recent asks and the files touched, first.
@@ -116,7 +119,8 @@ praxis checkpoint     # save the whole session to md files, then /compact and ke
 praxis trace          # the AI context behind a commit (on · off · log · <hash>)
 praxis cost           # what did that just cost? API-equivalent dollars (--all)
 praxis gate [ref]     # slop-risk score for a commit — triage before you review
-praxis roi            # the receipt: sessions, commits, hours, dollars (--days N)
+praxis roi            # sessions, commits, hours, dollars (--days N)
+praxis receipt        # proof of what the AI did this session (--verify · --html · --list)
 praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
 praxis feedback       # the two questions that shape what gets built next
 ```
@@ -138,6 +142,7 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `/praxis-feedback` | the two questions that shape what gets built |
 | `/praxis-hud` | how to watch this session live, in plain English |
 | `/praxis-explain` | re-explain Claude's last answer with zero jargon — for people who don't read code |
+| `/praxis-receipt` | the receipt: what the AI really did — verify claims, or get the shareable card |
 | `/praxis-trace` · `/praxis-cost` · `/praxis-gate` · `/praxis-roi` · `/praxis-vault` · `/praxis-telemetry` · `/praxis-tray` | the same commands as the CLI, explained in plain English by Claude |
 
 Every `praxis` command has a slash twin, and every slash command has a terminal
@@ -151,7 +156,9 @@ twin — use whichever is closer to your hands.
 | `.praxis/config.json` | Local settings: capture on/off, size cap, redaction |
 | `.praxis/checkpoints/` | `praxis checkpoint` — the RESUME brief + full session archives |
 | `.praxis/archive/` | Entries rotated out of the working memory — kept forever, monthly files |
+| `.praxis/receipts/` | One signed, hash-chained receipt per session — see [RECEIPT-SPEC.md](RECEIPT-SPEC.md) |
 | `CLAUDE.md` | A managed `PRAXIS:START/END` block. **Your own content is never touched.** |
+| `.mcp.json` | The praxis MCP server, registered alongside any servers you already have |
 | `.claude/settings.json` | `Stop` + `PreCompact` + `SessionStart` hooks, merged in without disturbing existing hooks |
 | `.claude/commands/` | The `/praxis-*` slash commands — one per praxis command, project-scoped |
 | `~/.claude/commands/` | The same commands, user-wide — so `/` shows them in **every** project |
@@ -282,6 +289,52 @@ Together with memory, health and trace, praxis answers the three questions
 every AI-using developer ends up asking: what did it do, what did it cost, and
 can I trust it.
 
+## Receipts — proof, not vibes
+
+"Done! All tests pass, pushed to origin." — did it, though? Every session now
+seals a **receipt**: a hash-chained, Ed25519-signed record of what the AI
+*actually did* — every command it ran (from every channel it ran them
+through), every file it touched, whether tests really executed. Written
+silently by the same Stop hook, zero model calls, zero seconds added.
+
+```
+ $ praxis receipt
+
+ PRAXIS receipt   r-4e91ac07   ✓ VERIFIED
+ ────────────────────────────────────────────────
+ work       23 commands · 6 files · tests run · git activity
+ channels   Bash, PowerShell
+ integrity  chain intact · signature valid
+
+ claims   3 TRUE · 1 FALSE · 1 UNVERIFIABLE
+   ✓  all tests pass
+   ✗  updated the docs   ← FALSE
+```
+
+- **`praxis receipt`** — read the latest receipt (`--list` for all).
+- **`praxis receipt --verify`** — opt-in: one model call has an adversarial
+  judge rule each of the AI's claims **TRUE / FALSE / UNVERIFIABLE** against
+  the recorded evidence. Absence of evidence is never treated as a lie, a
+  missing judge never invents a verdict — an unjudged receipt says
+  `UNVERIFIED`, honestly.
+- **`praxis receipt --html`** — a self-contained card you can attach to a PR
+  or send to whoever asked "is it actually done?". Opens offline, no tracking.
+
+Receipts are tamper-*evident*, not tamper-proof: the final line signs the
+whole chain, so nothing can be quietly rewritten after sealing. The format is
+an open spec — [RECEIPT-SPEC.md](RECEIPT-SPEC.md) — verifiable with nothing
+but sha256 and Ed25519, no praxis install required. Like everything else:
+local files in `.praxis/receipts/`, never uploaded.
+
+## The platform: commands that disappear
+
+`praxis init` also registers PRAXIS as an **MCP server** (`.mcp.json`), so
+Claude Code hands the model the praxis tools directly: `praxis_receipt`,
+`praxis_verify`, `praxis_receipts`, `praxis_recall`. The AI checks its own
+receipt before telling you it finished; asks memory what it knew last week —
+no command typed, by you or by it. The CLI stays for humans and scripts; the
+intelligence works behind the platform either way.
+
 ## Your Obsidian vault, auto-fed
 
 Already keep a second brain in Obsidian? Point praxis at it once:
@@ -307,7 +360,11 @@ redacted like everything else, and `praxis vault off` disconnects any time
   never to write secrets.
 - **Never auto-commits** — `init` adds `.praxis/` to `.gitignore` by default. Commit
   the memory deliberately if you want shared team context.
-- **Local only** — v0.1 makes zero network calls.
+- **Local only** — memory, receipts, health, trace: all local files, zero
+  network calls. The two exceptions are explicit and opt-in: `praxis receipt
+  --verify` runs *your own* `claude` CLI once to judge the claims, and
+  anonymous usage counts are sent only if you said yes at setup
+  (`praxis telemetry show` prints exactly what).
 
 ## Roadmap
 
@@ -323,10 +380,12 @@ version (0.x.y) just counts releases inside v0; the milestone that matters is v1
 - Pre-compact snapshots: what you were working on, saved the moment before Claude squeezes the session.
 - Trace v0: the AI's decision trail on every commit, in plain git notes — `praxis trace`.
 - Checkpoint: save the whole session to markdown (+ Obsidian), `/compact`, continue in the same session — `praxis checkpoint`.
+- Receipts v0: a signed, tamper-evident record of what the AI did every session, with an opt-in adversarial judge for its claims — `praxis receipt` · [RECEIPT-SPEC.md](RECEIPT-SPEC.md).
+- MCP server: the praxis tools (receipt · verify · recall) live inside Claude Code automatically — registered at init, no command typed.
 
 **Still inside v0**
 - Tray companion for macOS and Linux.
-- MCP server — memory Claude can query, beyond the size cap.
+- Receipts everywhere claims travel: PR comments, share links, the judge's voice tuned.
 - The HUD as the *primary* way to watch a session, not a sidecar.
 - Deep health for the other tools (Gemini CLI, Codex), richer summarization.
 
@@ -339,7 +398,7 @@ they wouldn't work without. Until then, everything is v0.
 ```bash
 git clone https://github.com/vaishak-v-nair/PRAXIS.git && cd PRAXIS
 npm link          # puts `praxis` on your PATH (needed for the auto-hook)
-npm test          # node --test
+npm test          # node --test "test/*.test.js"
 ```
 
 ## License
