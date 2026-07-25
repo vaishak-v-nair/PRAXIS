@@ -166,6 +166,29 @@ These are architectural rules, not implementation details:
    deterministic evidence layer is the backstop that no model, judge or
    worker, gets to edit.
 
+## Evaluating a judge
+
+A judge model earns the right to issue verdicts by passing the eval suite —
+the iron rules above rewritten as behaviors (`test/fixtures/eval-scenarios.mjs`):
+a supported claim is never FALSE; a denial is contradicted by the recorded
+attempt; absence yields UNVERIFIABLE; a "command was blocked" claim survives
+the attempt appearing in the record; injected instructions inside the claim
+data flip nothing; the untruncated command tail counts; the second channel
+counts.
+
+Run it against any judge:
+
+```
+node test/fixtures/eval-run.mjs        # grades whatever PRAXIS_JUDGE_CMD points at
+```
+
+The bar is asymmetric on purpose: **zero false accusations** (every forbid
+rule at 100%) is non-negotiable — a verifier that falsely accuses once is
+worse than no verifier — while the allowed-set rate tolerates reasonable
+strictness differences (TRUE vs UNVERIFIABLE while command outcomes are
+unpaired). Judge-prompt changes must show a before/after scorecard and may
+never regress the false-accusation floor.
+
 ## How receipts get written
 
 | Surface | When | Cost |
