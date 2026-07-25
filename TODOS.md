@@ -1,8 +1,8 @@
 # TODOS
 
-Deferred work with context. Added by /plan-ceo-review 2026-07-23 (receipts plan).
-NOTE: this file references the unannounced receipts direction — keep untracked
-until the 1.0 loud launch (site/story freeze applies to this file too).
+Deferred work with context. Added by /plan-ceo-review 2026-07-23 (receipts plan);
+tracked publicly since v0.9.2 — receipts shipped and the direction is announced
+in the README. The website stays frozen until the 1.0 loud launch.
 
 ## P2 — macOS/Linux tray port
 
