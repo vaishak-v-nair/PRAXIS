@@ -139,6 +139,33 @@ algorithm above is the spec — any implementation can do it.
   gitignored by default; sharing a receipt (or its rendered HTML card) is an
   explicit, per-file act.
 
+## Judge independence
+
+The verdict layer is only worth something if the grader is not the graded.
+These are architectural rules, not implementation details:
+
+1. **The judge is a separate process with a fresh context.** It never shares a
+   conversation, cache, or working directory with the agent that did the work.
+   It runs in a neutral directory precisely so its own session can never be
+   mistaken for project work.
+2. **The agent's narrative is never evidence.** The judge receives two inputs,
+   explicitly labeled: the deterministic evidence record (harvested from the
+   transcript by pure code — the agent has no hand in writing it) and the
+   agent's claims, wrapped in untrusted-data markers. The claims are the thing
+   *on trial*; the deterministic record is the only witness. A confident
+   summary cannot rubber-stamp itself, because a `FALSE` or `TRUE` verdict must
+   cite the deterministic record verbatim.
+3. **The judge is swappable — and cross-vendor judging is encouraged.** The
+   judge command is injectable (`PRAXIS_JUDGE_CMD`, any CLI that reads a prompt
+   and returns JSON). Let one vendor's model do the work and a different
+   vendor's model rule the claims; the receipt format doesn't care.
+4. **Honest limit:** a judge from the same vendor as the worker shares that
+   vendor's blind spots. Same-vendor judging is still meaningful (fresh
+   context, adversarial instructions, cited-evidence requirement), but for
+   adversarial assurance, use a different vendor — and remember the
+   deterministic evidence layer is the backstop that no model, judge or
+   worker, gets to edit.
+
 ## How receipts get written
 
 | Surface | When | Cost |
