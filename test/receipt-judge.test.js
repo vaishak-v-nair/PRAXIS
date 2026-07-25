@@ -115,3 +115,9 @@ test.after(() => {
   delete process.env.PRAXIS_JUDGE_CMD;
   delete process.env.PRAXIS_JUDGE_FIXTURE_MODE;
 });
+
+test('rule 5: the judge is told commands are attempts, not outcomes', () => {
+  const p = buildJudgePrompt({ commands_run: [] }, []);
+  assert.match(p, /ATTEMPTS, not outcomes/);
+  assert.match(p, /blocked\/failed/);
+});

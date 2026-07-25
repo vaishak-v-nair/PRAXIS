@@ -23,6 +23,13 @@
 //      Repo-global state (git log across time) is a separate collector, labeled
 //      shared/unattributed, because a concurrent session's commits are not this
 //      session's evidence.
+//   5. Presence means ATTEMPTED, never SUCCEEDED (2026-07-25 live dogfood). The
+//      record harvests tool INVOCATIONS; a command denied by permissions or
+//      failed at runtime looks identical to one that ran. The judge once ruled
+//      "npm publish was blocked" FALSE because `npm publish` appeared in the
+//      record — but that line was the DENIED attempt itself. Until outcomes are
+//      paired in (roadmap), the record must say so and the judge must treat
+//      presence as attempt-only.
 
 import { redact } from '../redact.js';
 
@@ -87,7 +94,8 @@ export function collectEvidence(transcriptText) {
     // rule 2: the record declares what it saw and refuses to claim completeness
     channels_harvested: [...channels].sort(),
     completeness_note:
-      'commands_run covers the harvested channels only. Channels not listed are unknown to this record; within harvested channels the list is complete. Absence of an action here means UNVERIFIABLE, never FALSE.',
+      'commands_run covers the harvested channels only. Channels not listed are unknown to this record; within harvested channels the list is complete. Absence of an action here means UNVERIFIABLE, never FALSE. ' +
+      'IMPORTANT: commands_run records tool INVOCATIONS (attempts) — it does not record whether a command succeeded, failed, or was denied by a permission system. The presence of a command proves it was attempted, never that it executed successfully; a claim that a command was blocked or failed cannot be ruled FALSE by its presence alone.',
     commands_run: commands,
     files_edited: [...filesEdited].sort(),
     git_activity: gitActivity,

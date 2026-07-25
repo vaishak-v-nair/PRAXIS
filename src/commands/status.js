@@ -6,6 +6,7 @@ import { readMemory } from '../lib/memory.js';
 import { miniHeader, bigBanner, sage, amber, red, rose, bold, grey, dim, timeAgo, dailyQuote } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
 import { healthReport } from '../lib/health.js';
+import { listReceipts } from '../lib/receipt/render.js';
 
 function pkgVersion() {
   try {
@@ -76,6 +77,29 @@ export function status(opts = {}) {
     console.log('  ' + grey('claude   ') + amber('◐') + ` idle ${hr.pct}% full` + grey(` — open but paused, ${hr.idleMinutes}m since the last message`));
   } else {
     console.log('  ' + grey('claude   ') + grey(`○ no recent session — last one reached ${hr.pct}% full`));
+  }
+
+  // proof-of-work: the receipts this project's sessions have left behind
+  const receipts = listReceipts(p.receiptsDir);
+  if (receipts.length) {
+    const latest = receipts[0];
+    const badge =
+      latest.verdict === 'VERIFIED'
+        ? sage('✓ VERIFIED')
+        : latest.verdict === 'CLAIMS_FAILED'
+          ? red('✗ CLAIMS FAILED')
+          : latest.verdict === 'PARTIAL'
+            ? amber('~ PARTIAL')
+            : grey('· ' + latest.verdict);
+    console.log(
+      '  ' +
+        grey('receipts ') +
+        `${receipts.length} sealed · latest ${latest.label} ` +
+        badge +
+        grey(` · ${praxisCmd()} receipt`),
+    );
+  } else {
+    console.log('  ' + grey('receipts ') + grey('○ none yet — every session seals one automatically when it ends'));
   }
 
   console.log('\n  ' + dim('Loaded into Claude Code automatically via the PRAXIS block in CLAUDE.md.'));

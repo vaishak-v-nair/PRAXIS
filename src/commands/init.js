@@ -175,7 +175,8 @@ export async function init() {
   console.log(`
   ${bold('Next steps')}
   ${grey('1.')} Open this project in Claude Code — your memory loads automatically.
-  ${grey('2.')} End a session and PRAXIS logs it. Type ${rose('/praxis-save')} for a rich summary.
+  ${grey('2.')} End a session and PRAXIS logs it — and seals a signed receipt of what
+     the AI actually did. ${bold(`${c} receipt`)} shows the proof.
   ${grey('3.')} ${bold(`${c} status`)} — see what it remembers, any time.
   ${grey('4.')} ${bold(`${c} hud`)} in a second terminal — watch the session live, in plain English.
 

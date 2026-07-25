@@ -133,3 +133,9 @@ test('collectRepoState never throws when git is absent', () => {
   assert.deepEqual(state.recent_commits, []);
   assert.equal(state.shared, true);
 });
+
+test('rule 5: the record says presence = attempt, never proof of success', () => {
+  const ev = collectEvidence('');
+  assert.match(ev.completeness_note, /INVOCATIONS \(attempts\)/);
+  assert.match(ev.completeness_note, /cannot be ruled FALSE by its presence alone/);
+});

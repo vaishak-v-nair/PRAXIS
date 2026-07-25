@@ -6,7 +6,8 @@ import fs from 'node:fs';
 import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
 import { extractBrief, extractRecentEntries } from '../lib/handoff.js';
-import { miniHeader, bold, grey, rose, sage } from '../lib/ui.js';
+import { miniHeader, bold, grey, rose, sage, red } from '../lib/ui.js';
+import { listReceipts } from '../lib/receipt/render.js';
 
 export function recap() {
   const p = projectPaths();
@@ -38,5 +39,16 @@ export function recap() {
   } else {
     console.log('  ' + grey('(No sessions logged yet.)'));
   }
+  // the trust line: what the sessions can PROVE, not just what they say
+  const receipts = listReceipts(p.receiptsDir);
+  if (receipts.length) {
+    const latest = receipts[0];
+    const mark = latest.verdict === 'VERIFIED' ? sage('✓') : latest.verdict === 'CLAIMS_FAILED' ? red('✗') : grey('·');
+    console.log(
+      '\n  ' + bold('Proof') + `  ${receipts.length} sealed receipt${receipts.length === 1 ? '' : 's'} · latest ` +
+        mark + ` ${latest.verdict} ` + grey(`(${latest.label} — praxis receipt)`),
+    );
+  }
+
   console.log('\n  ' + grey('Full memory: ') + rose('.praxis/memory.md') + '\n');
 }

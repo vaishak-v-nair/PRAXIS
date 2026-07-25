@@ -42,8 +42,37 @@ $memoryFile = Join-Path $ProjectRoot '.praxis\memory.md'
 $configFile = Join-Path $ProjectRoot '.praxis\config.json'
 $stateFile  = Join-Path $ProjectRoot '.praxis\state.json'
 $healthFile = Join-Path $ProjectRoot '.praxis\health.json'
+$receiptsDir = Join-Path $ProjectRoot '.praxis\receipts'
 $startTime  = Get-Date
 $projName   = Split-Path $ProjectRoot -Leaf
+
+# ---------- receipt badge ----------
+# The newest sealed receipt's verdict, read cheaply: tail one line, regex the
+# verdict out - never a full JSON parse (an evidence line can be megabytes).
+# Cached by file identity + mtime; receipts only change when a session ends.
+$script:rcptCacheKey = ''
+$script:rcptCache = $null
+function Get-ReceiptBadge {
+  try {
+    $f = Get-ChildItem -Path $receiptsDir -Filter '*.jsonl' -ErrorAction Stop |
+      Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $f) { return $null }
+    $key = $f.FullName + '|' + $f.LastWriteTimeUtc.Ticks
+    if ($key -eq $script:rcptCacheKey) { return $script:rcptCache }
+    $last = Get-Content -Path $f.FullName -Tail 1 -Encoding UTF8
+    $verdict = ''
+    $m = [regex]::Match([string]$last, '"verdict":"([A-Z_]+)"')
+    if ($m.Success) { $verdict = $m.Groups[1].Value }
+    $badge = $null
+    if ($verdict -eq 'VERIFIED')          { $badge = @{ text = ([char]0x2713 + ' verified');     color = '#6fbd8c' } }
+    elseif ($verdict -eq 'CLAIMS_FAILED') { $badge = @{ text = ([char]0x2715 + ' claims failed'); color = '#e0604d' } }
+    elseif ($verdict -eq 'PARTIAL')       { $badge = @{ text = '~ partial';                       color = '#edb54f' } }
+    elseif ($verdict)                     { $badge = @{ text = ([char]0x00B7 + ' receipt sealed'); color = '#a8988a' } }
+    $script:rcptCacheKey = $key
+    $script:rcptCache = $badge
+    return $badge
+  } catch { return $null }
+}
 
 # ---------- ambient session health ----------
 # Health is not a command someone remembers to type: the host itself tails the
@@ -274,7 +303,8 @@ $div1.Size = New-Object System.Drawing.Size(306, 1)
 $div1.BackColor = $colEdge
 $inner.Controls.Add($div1)
 
-$recHead = L 14 220 308 16 'R E C E N T   M E M O R Y' 8 $true $colDim ''
+$recHead = L 14 220 170 16 'R E C E N T   M E M O R Y' 8 $true $colDim ''
+$rcptLbl = L 184 220 138 16 '' 8 $true $colDim 'TopRight'
 $rec1 = L 14 240 308 18 '' 9.25 $false $colInk ''
 $rec2 = L 14 260 308 18 '' 9.25 $false $colInk ''
 $rec3 = L 14 280 308 18 '' 9.25 $false $colInk ''
@@ -340,6 +370,8 @@ function Refresh-Panel {
   if ($r.Count -gt 1) { $rec2.Text = ([char]0x00B7 + ' ' + $r[1]) }
   if ($r.Count -gt 2) { $rec3.Text = ([char]0x00B7 + ' ' + $r[2]) }
   if ($r.Count -eq 0) { $rec1.Text = ([char]0x00B7 + ' nothing captured yet - end a session, or /praxis-save') }
+  $rb = Get-ReceiptBadge
+  if ($rb) { $rcptLbl.Text = $rb.text; $rcptLbl.ForeColor = (C $rb.color) } else { $rcptLbl.Text = '' }
   if ($SUGGEST.ContainsKey($s.name)) { $sugLbl.Text = $SUGGEST[$s.name] }
   return $s
 }

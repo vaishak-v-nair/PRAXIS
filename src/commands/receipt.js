@@ -49,12 +49,14 @@ export async function receipt(argv = []) {
       return;
     }
     const tr = { text: fs.readFileSync(file, 'utf8'), sessionId: path.basename(file, '.jsonl') };
-    console.log('\n  ' + grey('Running the judge on this session…'));
+    console.log('\n  ' + grey('Running the judge on this session… (up to ~4 minutes — one real model call)'));
     const r = await recordReceipt(p.receiptsDir, tr, {
       project: path.basename(p.root),
       now: new Date().toISOString(),
       verify: true,
-      judge: realJudge,
+      // a human explicitly asked and is waiting: give the judge real room.
+      // (Hook and tool paths keep the tighter default.)
+      judge: (input) => realJudge(input, { timeoutMs: 240000 }),
     });
     console.log(renderTerminal(loadReceipt(p.receiptsDir, r.id, r.version)));
     if (!r.verified) console.log('  ' + grey(`judge unavailable: ${r.judgeError} — evidence sealed, claims left honest.`) + '\n');

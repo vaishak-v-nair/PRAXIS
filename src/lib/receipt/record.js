@@ -29,6 +29,36 @@ export function summarizeVerdicts(verdicts) {
 }
 
 /**
+ * Right-size the judge's INPUT for very large sessions. The sealed record keeps
+ * every command untruncated (iron rule 3 protects the RECORD); the judge only
+ * needs a window it can actually reason over inside its time budget. Honesty is
+ * preserved by construction: the trimmed view says exactly what was omitted,
+ * and the judge's absence rule (UNVERIFIABLE, never FALSE) already covers
+ * anything outside the window. Proven necessity: a 35-block real session blew
+ * the judge's timeout; the claim-signal subset verified correctly in budget.
+ *
+ * Recency wins because end-of-session claims ("done", "all tests pass") are
+ * about recent work — the newest evidence is the relevant evidence.
+ */
+export function rightSizeForJudge(evidence, claimProse, { maxCommands = 60, maxActivity = 15, maxFiles = 200, maxClaimBlocks = 10 } = {}) {
+  const omitted = Math.max(0, (evidence.commands_run || []).length - maxCommands);
+  const view = {
+    ...evidence,
+    commands_run: (evidence.commands_run || []).slice(-maxCommands),
+    git_activity: (evidence.git_activity || []).slice(-maxActivity),
+    test_activity: (evidence.test_activity || []).slice(-maxActivity),
+    build_activity: (evidence.build_activity || []).slice(-maxActivity),
+    files_edited: (evidence.files_edited || []).slice(0, maxFiles),
+    completeness_note:
+      (evidence.completeness_note || '') +
+      (omitted > 0
+        ? ` JUDGE VIEW: only the most recent ${maxCommands} of ${(evidence.commands_run || []).length} commands are shown here (the sealed record holds all of them, untruncated). A command absent from this view may still have run — absence remains UNVERIFIABLE, never FALSE.`
+        : ''),
+  };
+  return { evidence: view, claimProse: (claimProse || []).slice(-maxClaimBlocks), omittedCommands: omitted };
+}
+
+/**
  * Record (and seal) one session's receipt.
  *
  * @param {string} receiptsDir  .praxis/receipts
@@ -54,7 +84,9 @@ export async function recordReceipt(receiptsDir, tr, { project = null, now = nul
   }
 
   const claimProse = collectClaimProse(tr.text, { claimSignalOnly: true });
-  const j = await judge({ evidence, claimProse });
+  // the RECORD keeps everything; the judge reasons over a right-sized window
+  const view = rightSizeForJudge(evidence, claimProse);
+  const j = await judge({ evidence: view.evidence, claimProse: view.claimProse });
   if (!j.ok) {
     // the judge was unavailable — seal honest, never invent a verdict
     finalize(receiptsDir, id, { verdict: 'UNVERIFIED', claims: [], now });
