@@ -12,6 +12,7 @@ import { praxisCmd } from '../lib/runner.js';
 
 function badge(status) {
   if (status === 'running') return amber('● running');
+  if (status === 'draft') return amber('▲ draft  ');
   if (status === 'done') return sage('✓ done   ');
   if (status === 'failed') return rose('✗ failed ');
   if (status === 'gone') return rose('○ gone   ');
@@ -41,6 +42,12 @@ export async function jobs(argv = []) {
     } else {
       console.log('\n  ' + grey('no output yet' + (status === 'running' ? ' — still thinking' : '')));
     }
+    if (status === 'draft') {
+      console.log('\n  ' + amber('▲ DRAFT') + ' — nothing on disk was touched. If this is a plan you want done:');
+      console.log('    ' + bold(`${praxisCmd()} approve ${meta.id}`) + grey('   · just an answer? close it: ') + `${praxisCmd()} approve ${meta.id} --deny`);
+    }
+    if (meta.approvedTo) console.log('\n  ' + grey('approved → execution job ' + meta.approvedTo));
+    if (meta.approvedFrom) console.log('\n  ' + grey('execution twin of draft ' + meta.approvedFrom));
     console.log('\n  ' + grey('full output: .praxis/jobs/' + meta.id + '/out.log') + '\n');
     return;
   }

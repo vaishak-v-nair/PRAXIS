@@ -73,6 +73,8 @@ function pidAlive(pid) {
 /**
  * A job's honest status, derived — never trusted from stale meta alone:
  *  running   — the recorded pid is still alive
+ *  draft     — finished a SAFE-DRAFT run (plan mode) and awaits your call:
+ *              approve to execute, deny to close. THE INBOX STATE.
  *  done      — recorded exit 0
  *  failed    — recorded non-zero exit
  *  gone      — no exit recorded and the pid is dead (crash, kill, reboot)
@@ -81,7 +83,10 @@ function pidAlive(pid) {
  */
 export function jobStatus(meta) {
   if (!meta) return 'unknown';
-  if (meta.exitCode === 0) return 'done';
+  if (meta.exitCode === 0) {
+    if (meta.mode === 'plan' && meta.approval === 'pending') return 'draft';
+    return 'done';
+  }
   if (meta.exitCode != null) return 'failed';
   if (pidAlive(meta.pid)) return 'running';
   return 'gone';

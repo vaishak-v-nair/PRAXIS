@@ -24,6 +24,7 @@ import { roi } from './commands/roi.js';
 import { receipt } from './commands/receipt.js';
 import { run } from './commands/run.js';
 import { jobs } from './commands/jobs.js';
+import { approve } from './commands/approve.js';
 import { mcp } from './commands/mcp.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
@@ -56,8 +57,9 @@ function help() {
   ${bold(`${c} save`)}           log the current session into memory, mid-flight
 
   ${bold('The deck')} ${grey('— Mission Control (new): agents working for you in the background')}
-  ${bold(`${c} run "<task>"`)}   hand a task to an agent, keep your terminal ${grey('· survives closing it')}
+  ${bold(`${c} run "<task>"`)}   hand a task to an agent, keep your terminal ${grey('· safe draft by default')}
   ${bold(`${c} jobs`)}           every background job, honest status, last words ${grey('· jobs <id>')}
+  ${bold(`${c} approve`)}        the inbox: drafts wait for you ${grey('· approve <id> executes · --deny closes')}
 
   ${bold('When you want them')}
   ${bold(`${c} remember "<f>"`)} save a fact into memory now ${grey(`· ${c} forget "<t>" removes it`)}
@@ -172,6 +174,9 @@ switch (cmd) {
     break;
   case 'jobs':
     await jobs(process.argv.slice(3));
+    break;
+  case 'approve':
+    await approve(process.argv.slice(3));
     break;
   case 'mcp':
     await mcp();

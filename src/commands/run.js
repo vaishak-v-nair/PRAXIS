@@ -1,16 +1,17 @@
 // `praxis run "<task>"` — hand a task to an AI agent and get your terminal back.
 //
-// Mission Control's first verb. The agent CLI is spawned DETACHED with its
-// output streaming to the job's own log files, so the job survives this
-// command exiting (and the terminal closing). `praxis jobs` is the deck where
-// you watch it land.
+// Mission Control's first verb. A detached RUNNER survives this command (and
+// the terminal); the agent is the runner's own child, so exit codes are real.
+// `praxis jobs` is the deck; `praxis approve` is the inbox.
 //
-// v0 honesty: the job runs with the agent CLI's DEFAULT permissions — an
-// unattended agent that can edit anything is a decision, not a default. Tasks
-// that need write access will pause or fail until the permission story ships
-// (deck approvals). Injectable via PRAXIS_RUN_CMD for tests and other tools.
+// The safety model: the default run is a SAFE DRAFT (plan mode) — questions
+// get answered, write tasks produce a plan, nothing on disk is touched.
+// Execution happens only through `praxis approve` (or explicit flags).
+// Injectable via PRAXIS_RUN_CMD for tests and other tools.
 
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { projectPaths } from '../lib/paths.js';
 import { newJobId, createJob, updateMeta } from '../lib/jobs/store.js';
@@ -33,121 +34,89 @@ export function resolveRunCmd(tool = 'claude') {
   return null;
 }
 
-// Windows can't spawn .cmd shims directly without a shell (EINVAL).
-function toSpawn(argv) {
-  const [cmd, ...args] = argv;
-  if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(cmd)) {
-    return { file: process.env.ComSpec || 'cmd.exe', args: ['/c', cmd, ...args] };
+/**
+ * Start a detached agent job. The engine behind `praxis run` AND `praxis
+ * approve` (which starts the execution twin of an approved draft).
+ *
+ * mode is the safety story:
+ *   'plan'        — SAFE DRAFT (default): questions get answered, write tasks
+ *                   produce a plan, NOTHING on disk is touched.
+ *   'acceptEdits' — execute: file edits pre-approved (the approve flow).
+ *   'bypassPermissions' — full auto, everything allowed (--full-auto, loud).
+ */
+export async function startJob({ task, tool = 'claude', mode = 'plan', approvedFrom = null, cwd }) {
+  const p = projectPaths(cwd);
+  const base = resolveRunCmd(tool);
+  if (!base) return { error: 'no-adapter' };
+
+  // permission flags only apply to the real claude adapter — an injected
+  // test/other-tool command gets exactly the argv it asked for
+  const argvFull = process.env.PRAXIS_RUN_CMD ? base : [...base, '--permission-mode', mode];
+
+  const id = newJobId();
+  const { dir } = createJob(p.praxisDir, { id, task, tool, argv: argvFull, cwd: p.root });
+  updateMeta(p.praxisDir, id, { mode, approval: mode === 'plan' ? 'pending' : 'none', approvedFrom });
+  fs.writeFileSync(path.join(dir, 'task.txt'), task); // stdin payload, no quoting minefield
+
+  // the RUNNER is the detached survivor; the agent is the runner's own child,
+  // so the exit code stamped into meta is REAL — no done-because-it-printed
+  // heuristics (a job that died on an API error must read FAILED).
+  const runnerPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'jobs', 'runner.mjs');
+  let runner;
+  try {
+    runner = spawn(process.execPath, [runnerPath, dir], {
+      detached: true, // survives this CLI and the terminal that called it
+      stdio: 'ignore', // the runner owns the job's log files itself
+      env: { ...process.env, PRAXIS_JOB_ID: id },
+    });
+  } catch (e) {
+    updateMeta(p.praxisDir, id, { exitCode: -1, endedAt: new Date().toISOString(), exitSource: 'runner-spawn-failed' });
+    return { error: 'spawn: ' + (e && e.message), id };
   }
-  return { file: cmd, args };
+  updateMeta(p.praxisDir, id, { pid: runner.pid });
+  runner.unref();
+  return { id };
 }
 
 export async function run(argv = []) {
   const flags = new Set(argv.filter((a) => a.startsWith('--')));
   const positional = argv.filter((a) => !a.startsWith('--'));
   const task = positional.join(' ').trim();
-  const p = projectPaths();
+  const c = praxisCmd();
 
   if (!task) {
     console.log('\n  ' + bold('praxis run "<task>"') + grey(' — hand a task to an agent, keep your terminal.'));
-    console.log('  ' + grey('example: ') + 'praxis run "write release notes for the last 5 commits into NOTES.md"');
-    console.log('  ' + grey('then:    ') + `${praxisCmd()} jobs` + grey('  — the deck: every job, status, and its receipt') + '\n');
+    console.log('  ' + grey('default  ') + 'SAFE DRAFT — questions get answered; write tasks produce a plan, nothing is touched');
+    console.log('  ' + grey('flags    ') + '--allow-edits' + grey(' (file edits pre-approved) · ') + '--full-auto' + grey(' (everything allowed — trusted repos only)'));
+    console.log('  ' + grey('then     ') + `${c} jobs` + grey(' — the deck · ') + `${c} approve <id>` + grey(' — execute a draft') + '\n');
     return;
   }
 
   const tool = flags.has('--codex') ? 'codex' : flags.has('--gemini') ? 'gemini' : 'claude';
-  const base = resolveRunCmd(tool);
-  if (!base) {
+  const mode = flags.has('--full-auto') ? 'bypassPermissions' : flags.has('--allow-edits') ? 'acceptEdits' : 'plan';
+
+  if (mode === 'bypassPermissions') {
+    console.log('\n  ' + rose('! full auto:') + ' the agent may run commands and edit anything here, unattended.');
+  }
+
+  const r = await startJob({ task, tool, mode });
+  if (r.error === 'no-adapter') {
     console.log('\n  ' + rose('No adapter for ' + tool + ' yet') + grey(' — claude runs today; codex and gemini adapters are on the roadmap.') + '\n');
     process.exitCode = 1;
     return;
   }
-
-  const id = newJobId();
-  const { outFile, errFile } = createJob(p.praxisDir, { id, task, tool, argv: base, cwd: p.root });
-
-  const out = fs.openSync(outFile, 'a');
-  const err = fs.openSync(errFile, 'a');
-  const { file, args } = toSpawn(base);
-
-  let child;
-  try {
-    child = spawn(file, args, {
-      cwd: p.root,
-      detached: true, // survives this CLI and the terminal that called it
-      stdio: ['pipe', out, err],
-      env: { ...process.env, PRAXIS_JOB_ID: id },
-    });
-  } catch (e) {
-    updateMeta(p.praxisDir, id, { exitCode: -1, endedAt: new Date().toISOString() });
-    console.log('\n  ' + rose('Could not start the agent: ') + (e && e.message) + '\n');
+  if (r.error) {
+    console.log('\n  ' + rose('Could not start the agent: ') + r.error + '\n');
     process.exitCode = 1;
     return;
   }
 
-  child.on('error', () => {
-    try {
-      updateMeta(p.praxisDir, id, { exitCode: -1, endedAt: new Date().toISOString() });
-    } catch {
-      /* best effort */
-    }
-  });
-
-  updateMeta(p.praxisDir, id, { pid: child.pid });
-
-  // the task goes in on stdin — no shell-quoting minefield, no argv length limit
-  try {
-    child.stdin.write(task);
-    child.stdin.end();
-  } catch {
-    /* error handler above records it */
-  }
-
-  // watcher: a lightweight sibling that records the exit code when the agent
-  // finishes, even though THIS process is about to exit. Also detached.
-  try {
-    const watcher = spawn(process.execPath, ['-e', WATCHER_SRC], {
-      detached: true,
-      stdio: 'ignore',
-      env: { ...process.env, PRAXIS_WATCH_PID: String(child.pid), PRAXIS_WATCH_META: p.praxisDir + '/jobs/' + id + '/meta.json' },
-    });
-    watcher.unref();
-  } catch {
-    /* without a watcher the deck still shows running/gone honestly */
-  }
-
-  child.unref();
-
-  console.log('\n  ' + sage('✓') + ' job ' + bold(id) + ' started — ' + grey(tool + ' is working on it in the background'));
+  console.log('\n  ' + sage('✓') + ' job ' + bold(r.id) + ' started — ' + grey(tool + ' is working on it in the background'));
   console.log('  ' + grey('task     ') + task.slice(0, 90) + (task.length > 90 ? '…' : ''));
-  console.log('  ' + grey('watch    ') + `${praxisCmd()} jobs` + grey('   · output: .praxis/jobs/' + id + '/out.log'));
+  if (mode === 'plan') {
+    console.log('  ' + grey('safety   ') + 'safe draft — if this task changes anything, you get a plan to approve first');
+  }
+  console.log('  ' + grey('watch    ') + `${c} jobs` + grey('   · output: .praxis/jobs/' + r.id + '/out.log'));
   console.log('  ' + grey('Your terminal is yours again. The job survives closing it.') + '\n');
 }
 
-// The watcher polls the agent pid; when it dies, it stamps endedAt (+ exit 0
-// heuristic: out.log grew and no error marker → we can't read the real exit
-// code of a process we didn't parent, so record 0 when output exists, -1 when
-// the log is empty). Honest limitation, noted in meta as exitSource.
-const WATCHER_SRC = `
-const fs = require('fs');
-const pid = Number(process.env.PRAXIS_WATCH_PID);
-const metaFile = process.env.PRAXIS_WATCH_META;
-function alive(p){ try { process.kill(p,0); return true; } catch { return false; } }
-const t = setInterval(() => {
-  if (alive(pid)) return;
-  clearInterval(t);
-  try {
-    const meta = JSON.parse(fs.readFileSync(metaFile,'utf8'));
-    if (meta.exitCode == null) {
-      let size = 0;
-      try { size = fs.statSync(metaFile.replace(/meta\\.json$/,'out.log')).size; } catch {}
-      meta.exitCode = size > 0 ? 0 : -1;
-      meta.exitSource = 'watcher-heuristic';
-      meta.endedAt = new Date().toISOString();
-      fs.writeFileSync(metaFile, JSON.stringify(meta, null, 2));
-    }
-  } catch {}
-  process.exit(0);
-}, 1500);
-setTimeout(() => process.exit(0), 6 * 60 * 60 * 1000); // watcher never outlives 6h
-`;
