@@ -46,7 +46,7 @@ export function resolveRunCmd(tool = 'claude') {
  *   'acceptEdits' — execute: file edits pre-approved (the approve flow).
  *   'bypassPermissions' — full auto, everything allowed (--full-auto, loud).
  */
-export async function startJob({ task, tool = 'claude', mode = 'plan', approvedFrom = null, cwd }) {
+export async function startJob({ task, tool = 'claude', mode = 'plan', approvedFrom = null, goal = null, cwd }) {
   const p = projectPaths(cwd);
   const base = resolveRunCmd(tool);
   if (!base) return { error: 'no-adapter' };
@@ -57,7 +57,7 @@ export async function startJob({ task, tool = 'claude', mode = 'plan', approvedF
 
   const id = newJobId();
   const { dir } = createJob(p.praxisDir, { id, task, tool, argv: argvFull, cwd: p.root });
-  updateMeta(p.praxisDir, id, { mode, approval: mode === 'plan' ? 'pending' : 'none', approvedFrom });
+  updateMeta(p.praxisDir, id, { mode, approval: mode === 'plan' ? 'pending' : 'none', approvedFrom, goal });
   fs.writeFileSync(path.join(dir, 'task.txt'), task); // stdin payload, no quoting minefield
 
   // the RUNNER is the detached survivor; the agent is the runner's own child,
