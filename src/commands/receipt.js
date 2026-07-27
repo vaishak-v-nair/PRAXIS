@@ -23,6 +23,21 @@ function tag(v) {
   return grey('· ' + (v || 'UNVERIFIED').padEnd(10));
 }
 
+/** Judge failures reach humans in plain English — raw spawn errors are for logs. */
+export function humanizeJudgeError(reason) {
+  const r = String(reason || '');
+  if (/ENOENT/i.test(r)) {
+    return 'the judge needs the `claude` CLI, which was not found on this machine. Install Claude Code, or point PRAXIS_JUDGE_CMD at any model CLI.';
+  }
+  if (/timeout/i.test(r)) {
+    return 'the judge ran out of time — a busy model or a very large session. The evidence is sealed; try again in a quieter moment.';
+  }
+  if (/spawn/i.test(r)) {
+    return 'the judge command could not start (' + r + '). Check PRAXIS_JUDGE_CMD.';
+  }
+  return 'the judge did not return a usable ruling (' + r + '). The evidence is sealed; no verdict was invented.';
+}
+
 export async function receipt(argv = []) {
   const p = projectPaths();
   const flags = new Set(argv.filter((a) => a.startsWith('--')));
@@ -58,8 +73,8 @@ export async function receipt(argv = []) {
       // (Hook and tool paths keep the tighter default.)
       judge: (input) => realJudge(input, { timeoutMs: 240000 }),
     });
-    console.log(renderTerminal(loadReceipt(p.receiptsDir, r.id, r.version)));
-    if (!r.verified) console.log('  ' + grey(`judge unavailable: ${r.judgeError} — evidence sealed, claims left honest.`) + '\n');
+    console.log(renderTerminal(loadReceipt(p.receiptsDir, r.id, r.version), { suggestVerify: false }));
+    if (!r.verified) console.log('  ' + grey('No verdict: ' + humanizeJudgeError(r.judgeError)) + '\n');
     return;
   }
 
@@ -69,9 +84,15 @@ export async function receipt(argv = []) {
   if (!id) {
     const rows = listReceipts(p.receiptsDir);
     if (!rows.length) {
+      // only point at --verify when there is actually a session to verify —
+      // a brand-new project would just hit a dead end
+      const hasSession = !!newestTranscript(transcriptDir(p.root));
       console.log(
         '\n  ' +
-          grey('No receipts yet — they record automatically when a session ends.\n  End a Claude Code session, or run `praxis receipt --verify` now.') +
+          grey(
+            'No receipts yet — they record automatically when a session ends.' +
+              (hasSession ? '\n  A session is active: `praxis receipt --verify` seals and judges it right now.' : '\n  Work with Claude Code here once, and the first receipt appears on its own.'),
+          ) +
           '\n',
       );
       return;
@@ -86,11 +107,14 @@ export async function receipt(argv = []) {
     return;
   }
 
-  // --html / --open — write the self-contained card
+  // --html / --open — write the self-contained card. Default lands in the
+  // PROJECT ROOT, visible and attachable — not buried in gitignored .praxis/
+  // (the whole point of the card is to travel: PRs, chats, "is it done?" asks).
   if (flags.has('--html') || flags.has('--open')) {
-    const out = positional[1] || path.join(p.receiptsDir, `${loaded.id}${loaded.version > 1 ? '.v' + loaded.version : ''}.html`);
+    const out = positional[1] || path.join(p.root, `praxis-receipt-${loaded.id}${loaded.version > 1 ? '.v' + loaded.version : ''}.html`);
     fs.writeFileSync(out, renderHtml(loaded));
-    console.log('\n  ' + sage('✓') + ' receipt written  ' + grey(out) + '\n');
+    console.log('\n  ' + sage('✓') + ' receipt card written  ' + grey(out));
+    console.log('  ' + grey('Self-contained file — attach it to the PR, or send it to whoever asked "is it done?"') + '\n');
     return;
   }
 

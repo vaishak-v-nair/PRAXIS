@@ -62,7 +62,12 @@ export function buildTools(ctx = {}) {
           return `Receipt ${r.id} recorded (evidence only): ${r.evidence.counts.commands} commands across [${r.evidence.channels_harvested.join(', ')}], ${r.evidence.counts.files_edited} files touched. Pass verify=true to have the judge rule the agent's claims.`;
         }
         if (!r.verified) {
-          return `Receipt ${r.id}: evidence recorded, but the judge was unavailable (${r.judgeError}). Claims left UNVERIFIED — no verdict fabricated.`;
+          const why = /ENOENT/i.test(String(r.judgeError))
+            ? 'the judge needs the claude CLI, which was not found'
+            : /timeout/i.test(String(r.judgeError))
+              ? 'the judge timed out'
+              : String(r.judgeError);
+          return `Receipt ${r.id}: evidence recorded, but no verdict — ${why}. Claims left UNVERIFIED, nothing fabricated.`;
         }
         const sum = r.summary;
         const failLine = sum.failed.length ? ` FAILED: ${sum.failed.map((c) => `"${c}"`).join('; ')}.` : '';

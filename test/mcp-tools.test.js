@@ -80,7 +80,7 @@ test('praxis_receipt degrades honestly when the judge is unavailable', async () 
   const list = tools(cwd, { judge: async () => ({ ok: false, reason: 'timeout' }) });
   const out = await byName(list, 'praxis_receipt').handler({ verify: true });
   assert.match(out, /UNVERIFIED/);
-  assert.match(out, /timeout/);
+  assert.match(out, /timed out|timeout/);
 });
 
 test('praxis_verify confirms an untampered sealed receipt', async () => {

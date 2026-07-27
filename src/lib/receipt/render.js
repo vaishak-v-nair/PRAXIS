@@ -111,8 +111,10 @@ function shortId(s) {
   return s.length > 14 ? s.slice(0, 10) + '…' : s;
 }
 
-/** Render a loaded receipt for the terminal. Pass renderTerminal(loadReceipt(...)). */
-export function renderTerminal(r) {
+/** Render a loaded receipt for the terminal. Pass renderTerminal(loadReceipt(...)).
+ *  opts.suggestVerify=false suppresses the --verify hint (e.g. right after a
+ *  verify attempt failed — suggesting the thing that just failed is a loop). */
+export function renderTerminal(r, { suggestVerify = true } = {}) {
   if (!r) return '\n  No such receipt.\n';
   const ev = r.evidence || {};
   const L = [];
@@ -136,7 +138,7 @@ export function renderTerminal(r) {
   } else {
     L.push('');
     L.push('  ' + grey('evidence only — no claims judged yet.'));
-    L.push('  ' + dim('run ') + 'praxis receipt --verify' + dim(" to have the judge rule the agent's claims."));
+    if (suggestVerify) L.push('  ' + dim('run ') + 'praxis receipt --verify' + dim(" to have the judge rule the agent's claims."));
   }
   L.push('');
   return L.join('\n');

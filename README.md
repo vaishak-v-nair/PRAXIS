@@ -4,11 +4,13 @@
 
 # PRAXIS
 
-### Your AI never forgets your project.
+### Your AI says "done." PRAXIS proves it.
 
-**Praxis is an open-source, local memory for Claude Code.** It distills every coding
-session into one durable markdown file — the decisions, the constraints, the reasons —
-and hands it back to Claude automatically the next time you open the project.
+**Praxis is the open-source trust layer for AI-written code.** Every session leaves a
+sealed, tamper-evident **receipt** of what the AI *actually did* — and an independent
+judge rules each of its claims **TRUE / FALSE / UNVERIFIABLE** against that evidence.
+It also gives your AI a durable **memory**: every session distilled into one markdown
+file, handed back automatically next time, so you never re-explain your project.
 
 [![npm](https://img.shields.io/npm/v/praxis-memory?color=d6547a&label=npm)](https://www.npmjs.com/package/praxis-memory)
 [![license](https://img.shields.io/badge/license-MIT-4fa376)](LICENSE)

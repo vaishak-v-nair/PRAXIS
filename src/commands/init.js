@@ -174,14 +174,14 @@ export async function init() {
   }
   console.log(`
   ${bold('Next steps')}
-  ${grey('1.')} Open this project in Claude Code — your memory loads automatically.
-  ${grey('2.')} End a session and PRAXIS logs it — and seals a signed receipt of what
+  ${grey('1.')} Open this project in Claude Code ${bold('(restart it if it was already open)')} —
+     your memory and the / commands load at session start, not mid-session.
+  ${grey('2.')} ${bold('Claude Code will ask once')} whether to enable the ${bold('praxis')} tools (the
+     .mcp.json this setup just wrote). Say yes — that's what lets the AI
+     check its own receipt without you typing anything.
+  ${grey('3.')} End a session and PRAXIS logs it — and seals a signed receipt of what
      the AI actually did. ${bold(`${c} receipt`)} shows the proof.
-  ${grey('3.')} ${bold(`${c} status`)} — see what it remembers, any time.
-  ${grey('4.')} ${bold(`${c} hud`)} in a second terminal — watch the session live, in plain English.
-
-  ${dim('If a Claude Code session is already open, restart it (or start a new')}
-  ${dim('session) so the / menu picks up the new commands.')}
+  ${grey('4.')} ${bold(`${c} status`)} any time — memory, session health, latest receipt verdict.
 
   ${dim('The hooks (auto-capture, snapshots, tray auto-start) run through npx,')}
   ${dim('so they work with no global install. Want the short `praxis` command?')}

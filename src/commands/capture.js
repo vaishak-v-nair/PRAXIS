@@ -168,6 +168,11 @@ export async function capture() {
       }
     }
 
+    // a session where nothing happened writes nothing — "(no file changes
+    // detected)" entries were pure noise in recap. The receipt below still
+    // seals (a record of an empty session is honest; a memory of one is junk).
+    const nothingHappened = !snapshot && !files.length && !asks.length && !commits.length;
+
     const rel = files.map((f) => shorten(f, cwd));
     const k = (n) => (n >= 1000 ? Math.round(n / 1000) + 'k' : String(n));
     const body = [
@@ -199,31 +204,33 @@ export async function capture() {
       /* use defaults */
     }
 
-    const entry = addSessionEntry(
-      p.memoryFile,
-      `${new Date().toISOString()} - ${snapshot ? 'pre-compact snapshot' : 'session'}`,
-      body,
-      { maxBytes, redact: redactOn },
-    );
+    if (!nothingHappened) {
+      const entry = addSessionEntry(
+        p.memoryFile,
+        `${new Date().toISOString()} - ${snapshot ? 'pre-compact snapshot' : 'session'}`,
+        body,
+        { maxBytes, redact: redactOn },
+      );
 
-    // Obsidian bridge: the session becomes a linked note in the user's vault
-    try {
-      const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
-      const project = path.basename(p.root);
-      const vd = vaultDirFor(cfg, project, undefined, p.root);
-      if (vd) {
-        mirrorMemory(vd, project, fs.readFileSync(p.memoryFile, 'utf8'));
-        if (entry.archived && entry.archived.length) appendArchiveNote(vd, project, entry.archived);
-        writeSessionNote(vd, project, {
-          snapshot,
-          asks,
-          files: rel.slice(0, 20),
-          turns,
-          tokens: analysis ? analysis.contextTokens : 0,
-        });
+      // Obsidian bridge: the session becomes a linked note in the user's vault
+      try {
+        const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
+        const project = path.basename(p.root);
+        const vd = vaultDirFor(cfg, project, undefined, p.root);
+        if (vd) {
+          mirrorMemory(vd, project, fs.readFileSync(p.memoryFile, 'utf8'));
+          if (entry.archived && entry.archived.length) appendArchiveNote(vd, project, entry.archived);
+          writeSessionNote(vd, project, {
+            snapshot,
+            asks,
+            files: rel.slice(0, 20),
+            turns,
+            tokens: analysis ? analysis.contextTokens : 0,
+          });
+        }
+      } catch {
+        /* the vault is a mirror, never a blocker */
       }
-    } catch {
-      /* the vault is a mirror, never a blocker */
     }
 
     // Silent proof-of-work: a session's TRUE end (Stop, not a mid-session

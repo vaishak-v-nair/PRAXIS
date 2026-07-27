@@ -44,28 +44,30 @@ function help() {
   const c = praxisCmd();
   const pad = ' '.repeat(Math.max(0, c.length - 'praxis'.length));
   console.log('\n  ' + miniHeader(version()) + '\n');
-  console.log(`  ${bold('Usage')}
+  console.log(`  ${bold('Start')}
   ${bold('npx praxis-memory')}${pad}     set up PRAXIS here ${grey('(or show status if already set up)')}
-  ${bold(`${c} init`)}           set up PRAXIS in the current project
-  ${bold(`${c} status`)}         what PRAXIS remembers, and session health
+
+  ${bold('The daily four')} ${grey('— most days you need nothing else (and the hooks run these for you)')}
+  ${bold(`${c} status`)}         memory, session health, latest receipt verdict
+  ${bold(`${c} receipt`)}        proof of what the AI did ${grey('· --verify judge it · --html share card · --list')}
   ${bold(`${c} recap`)}          catch me up on this project, right in the terminal
   ${bold(`${c} save`)}           log the current session into memory, mid-flight
-  ${bold(`${c} remember "<f>"`)} save a fact or decision into project memory now
-  ${bold(`${c} forget "<t>"`)}   remove matching lines from memory ${grey('(asks first)')}
+
+  ${bold('When you want them')}
+  ${bold(`${c} remember "<f>"`)} save a fact into memory now ${grey(`· ${c} forget "<t>" removes it`)}
   ${bold(`${c} health`)}         how full is this Claude session, really — and where to go next
-  ${bold(`${c} hud`)}            live view of your Claude session, in plain English ${grey('(second terminal)')}
+  ${bold(`${c} hud`)}            live view of the session, in plain English ${grey('(second terminal)')}
   ${bold(`${c} switch <tool>`)}  pack a handoff brief and move to gemini · codex · claude · cursor
-  ${bold(`${c} checkpoint`)}     save the whole session to md files, then /compact and keep going ${grey('· [folder]')}
+  ${bold(`${c} checkpoint`)}     save the whole session to md files, /compact, keep going ${grey('· [folder]')}
   ${bold(`${c} trace`)}          the AI context behind a commit ${grey('· on / off / log / <hash>')}
   ${bold(`${c} vault <path>`)}   write sessions, commits & memory into your Obsidian vault
   ${bold(`${c} cost`)}           what did that just cost? API-equivalent dollars ${grey('· --all')}
   ${bold(`${c} gate [ref]`)}     slop-risk score for a commit — triage before review
-  ${bold(`${c} roi`)}            the receipt: sessions, commits, hours, dollars ${grey('· --days N')}
-  ${bold(`${c} receipt`)}        proof of what the AI did this session ${grey('· --verify · --html · --list')}
+  ${bold(`${c} roi`)}            sessions, commits, hours, dollars over time ${grey('· --days N')}
   ${bold(`${c} tray`)}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
   ${bold(`${c} feedback`)}       the two questions that shape what gets built next
   ${bold(`${c} telemetry`)}      what leaves your machine (spoiler: counts, never content) ${grey('· show / on / off')}
-  ${grey(`${c} capture        (internal) called by the Claude Code Stop hook`)}
+  ${grey(`${c} init · ${c} capture — setup and the (internal) Stop-hook entry`)}
 
   ${grey('Local-first. No server. No account. Nothing leaves your machine.')}${
     c === 'praxis'
