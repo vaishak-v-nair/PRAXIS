@@ -59,7 +59,7 @@ test('resolveRunCmd: injectable, and claude is the default adapter', () => {
   process.env.PRAXIS_RUN_CMD = '["node","agent.mjs"]';
   assert.deepEqual(resolveRunCmd('claude'), ['node', 'agent.mjs']);
   delete process.env.PRAXIS_RUN_CMD;
-  assert.deepEqual(resolveRunCmd('claude'), ['claude', '-p', '--output-format', 'text']);
+  assert.deepEqual(resolveRunCmd('claude'), ['claude', '-p', '--output-format', 'json']);
   assert.equal(resolveRunCmd('codex'), null); // roadmap, not pretense
 });
 

@@ -35,12 +35,18 @@ export async function jobs(argv = []) {
     console.log('  ' + grey('task     ') + meta.task);
     console.log('  ' + grey('tool     ') + meta.tool + grey('  · started ' + timeAgo(new Date(meta.startedAt))));
     if (meta.endedAt) console.log('  ' + grey('ended    ') + timeAgo(new Date(meta.endedAt)) + (meta.exitSource ? grey(' · exit via ' + meta.exitSource) : ''));
-    const tail = tailOutput(p.praxisDir, meta.id);
+    // the agent's parsed final words beat raw envelope JSON every time
+    const tail = meta.resultTail
+      ? meta.resultTail.split('\n').filter(Boolean).slice(-12)
+      : tailOutput(p.praxisDir, meta.id);
     if (tail.length) {
       console.log('\n  ' + bold('last words'));
       for (const line of tail) console.log('    ' + dim(line.slice(0, 110)));
     } else {
       console.log('\n  ' + grey('no output yet' + (status === 'running' ? ' — still thinking' : '')));
+    }
+    if (meta.receiptId) {
+      console.log('\n  ' + bold('receipt  ') + meta.receiptId + '  ' + grey((meta.receiptVerdict || 'UNVERIFIED') + ' · view: ' + praxisCmd() + ' receipt ' + meta.receiptId));
     }
     if (status === 'draft') {
       console.log('\n  ' + amber('▲ DRAFT') + ' — nothing on disk was touched. If this is a plan you want done:');
@@ -59,7 +65,8 @@ export async function jobs(argv = []) {
   }
   console.log('\n  ' + bold('THE DECK') + grey('  · ' + rows.length + ' job' + (rows.length === 1 ? '' : 's') + ' · newest first') + '\n');
   for (const r of rows.slice(0, 15)) {
-    console.log('  ' + badge(r.status) + '  ' + bold(r.id) + '  ' + grey((r.task || '').slice(0, 60) + ((r.task || '').length > 60 ? '…' : '')));
+    const seal = r.receiptId ? grey(' · ' + r.receiptId) : '';
+    console.log('  ' + badge(r.status) + '  ' + bold(r.id) + '  ' + grey((r.task || '').slice(0, 60) + ((r.task || '').length > 60 ? '…' : '')) + seal);
   }
   if (rows.length > 15) console.log('  ' + grey(`… ${rows.length - 15} older`));
   console.log('\n  ' + grey(`close-up: ${praxisCmd()} jobs <id>`) + '\n');

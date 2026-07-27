@@ -84,7 +84,9 @@ export async function approve(argv = []) {
     }
   }
 
-  const planTail = tailOutput(p.praxisDir, id, 40).join('\n').slice(-2400);
+  // the draft's plan: prefer the parsed agent text sealed at job end; fall
+  // back to raw log tail for adapters that never produced an envelope
+  const planTail = (meta.resultTail || tailOutput(p.praxisDir, id, 40).join('\n')).slice(-2400);
   const r = await startJob({ task: executionTask(meta, planTail), tool: meta.tool, mode: 'acceptEdits', approvedFrom: id });
   if (r.error) {
     console.log('\n  ' + rose('Could not start the execution job: ') + r.error + '\n');

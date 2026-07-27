@@ -29,8 +29,10 @@ export function resolveRunCmd(tool = 'claude') {
       return inj.trim().split(/\s+/);
     }
   }
-  // one adapter today; codex/gemini adapters are the roadmap, same shape
-  if (tool === 'claude') return ['claude', '-p', '--output-format', 'text'];
+  // one adapter today; codex/gemini adapters are the roadmap, same shape.
+  // json output carries session_id — how a job finds its own transcript and
+  // seals its receipt (the deck's "done" vs "proven" columns).
+  if (tool === 'claude') return ['claude', '-p', '--output-format', 'json'];
   return null;
 }
 

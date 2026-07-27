@@ -74,9 +74,18 @@ const cap = setTimeout(() => {
   setTimeout(() => process.exit(0), 500);
 }, capMs);
 
-child.on('close', (code) => {
+child.on('close', async (code) => {
   clearTimeout(cap);
   patchMeta({ exitCode: code == null ? -1 : code, endedAt: new Date().toISOString(), exitSource: 'runner' });
+  // the fusion: a finished job seals its own receipt (evidence-only, free).
+  // Dynamic import + catch-all: a broken receipt layer must never break jobs.
+  try {
+    const { sealJobReceipt } = await import(new URL('./receipt-link.js', import.meta.url));
+    const linked = await sealJobReceipt(path.join(dir, '..', '..'), { id: path.basename(dir), cwd: meta.cwd });
+    if (linked && Object.keys(linked).length) patchMeta(linked);
+  } catch {
+    /* deck shows the job without a receipt — honest either way */
+  }
   process.exit(0);
 });
 
