@@ -41,8 +41,12 @@ jobs:
       # No install step: PRAXIS has zero runtime dependencies, and the test
       # suite needs none either. If this ever needs `npm ci`, something was
       # added that should not have been.
+      #
+      # Run through the reporter rather than `npm test` directly: it streams the
+      # same output but also emits an annotation naming each failing test, so a
+      # red run explains itself instead of saying "exit code 1".
       - name: npm test
-        run: npm test
+        run: node scripts/ci/run-tests.mjs
 
   judge-fixture:
     if: github.repository == 'vaishak-v-nair/PRAXIS'

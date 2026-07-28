@@ -191,6 +191,34 @@ function keyDir() {
 /** Load the machine Ed25519 key, generating it on first use. The O_EXCL ('wx')
  *  create means if two finalizers race, exactly one writes the key and the
  *  loser falls through to read the winner's — the ledger never forks a key. */
+/** Block this thread briefly — the only way to wait inside a sync API. */
+function nap(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Read a key file that a racing process may be a few milliseconds from writing.
+ *
+ * The exclusive-create on the private key decides the winner, but the loser
+ * returns from that failure and immediately reads BOTH files — and the winner
+ * has not necessarily written the public one yet. Without this, two sessions
+ * ending at the same moment on a machine with no key yet could crash one of
+ * them on ENOENT. Rare, and a crash in the middle of sealing evidence is
+ * exactly the wrong place to be rare.
+ */
+function readKeyWithRetry(file, attempts = 50, waitMs = 20) {
+  for (let i = 0; ; i++) {
+    try {
+      const text = fs.readFileSync(file, 'utf8');
+      if (text.includes('-----END')) return text; // never parse a half-written PEM
+      if (i >= attempts) return text;
+    } catch (e) {
+      if (i >= attempts || (e.code !== 'ENOENT' && e.code !== 'EBUSY' && e.code !== 'EPERM')) throw e;
+    }
+    nap(waitMs);
+  }
+}
+
 export function ensureKey() {
   const dir = keyDir();
   const priv = path.join(dir, 'ed25519.pkcs8.pem');
@@ -202,13 +230,17 @@ export function ensureKey() {
     const pubPem = publicKey.export({ type: 'spki', format: 'pem' });
     try {
       fs.writeFileSync(priv, privPem, { flag: 'wx' }); // fails if another proc won
-      fs.writeFileSync(pub, pubPem);
+      // Publish the public half atomically: a loser that arrives mid-write must
+      // never read a truncated PEM and conclude the key is corrupt.
+      const staging = `${pub}.${process.pid}.tmp`;
+      fs.writeFileSync(staging, pubPem);
+      fs.renameSync(staging, pub);
     } catch (e) {
       if (!(e && e.code === 'EEXIST')) throw e; // real error, not a lost race
     }
   }
-  const privateKey = crypto.createPrivateKey(fs.readFileSync(priv, 'utf8'));
-  const publicKey = crypto.createPublicKey(fs.readFileSync(pub, 'utf8'));
+  const privateKey = crypto.createPrivateKey(readKeyWithRetry(priv));
+  const publicKey = crypto.createPublicKey(readKeyWithRetry(pub));
   const fingerprint = sha256hex(publicKey.export({ type: 'spki', format: 'der' }).toString('hex')).slice(0, 16);
   return { privateKey, publicKey, fingerprint };
 }

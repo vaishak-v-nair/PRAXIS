@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 
 import {
   SCHEMA_VERSION,
@@ -258,6 +258,38 @@ test('explainVerifyFailure names every failure mode in words', async () => {
     assert.ok(msg.length > 10 && !msg.includes(reason), `${reason} is explained, not echoed`);
   }
   assert.match(explainVerifyFailure({ reason: 'chain-broken', at: 4 }), /line 5/, 'line numbers are 1-based for humans');
+});
+
+test('first-seal race: a loser waits for the winner instead of crashing', () => {
+  // Two sessions ending at the same moment on a machine with no key yet. The
+  // exclusive-create picks a winner; the loser returns immediately and reads
+  // BOTH files — and the winner has not necessarily written the public one.
+  // Sealing evidence is the wrong place to crash on a millisecond.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-keyrace-'));
+  const keyDir = path.join(dir, 'keys');
+  fs.mkdirSync(keyDir, { recursive: true });
+  process.env.PRAXIS_KEY_DIR = keyDir;
+
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
+  const privPem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const pubPem = publicKey.export({ type: 'spki', format: 'pem' });
+
+  // The winner's state, caught mid-write: private key committed, public not yet.
+  fs.writeFileSync(path.join(keyDir, 'ed25519.pkcs8.pem'), privPem);
+
+  // A separate process finishes the job while we are already blocking on it.
+  const target = path.join(keyDir, 'ed25519.spki.pem').replace(/\\/g, '\\\\');
+  const code = `setTimeout(() => require('fs').writeFileSync('${target}', ${JSON.stringify(pubPem)}), 150)`;
+  const child = spawn(process.execPath, ['-e', code], { detached: true, stdio: 'ignore' });
+  child.unref();
+
+  const k = ensureKey();
+  assert.ok(k.fingerprint, 'the loser gets a usable key rather than an ENOENT');
+  assert.equal(
+    k.publicKey.export({ type: 'spki', format: 'pem' }).toString().trim(),
+    pubPem.toString().trim(),
+    'and it is the winner’s key, not a second one',
+  );
 });
 
 test('verify(dir,id) and verifyEntries agree with verifyFile', () => {
