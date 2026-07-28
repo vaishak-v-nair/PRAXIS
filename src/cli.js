@@ -28,6 +28,7 @@ import { approve } from './commands/approve.js';
 import { gov } from './commands/gov.js';
 import { deck } from './commands/deck.js';
 import { mcp } from './commands/mcp.js';
+import { doctor } from './commands/doctor.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
 import { praxisCmd } from './lib/runner.js';
@@ -76,6 +77,7 @@ function help() {
   ${bold(`${c} cost`)}           what did that just cost? API-equivalent dollars ${grey('· --all')}
   ${bold(`${c} gate [ref]`)}     slop-risk score for a commit — triage before review
   ${bold(`${c} roi`)}            sessions, commits, hours, dollars over time ${grey('· --days N')}
+  ${bold(`${c} doctor`)}         what is set up, what broke, and the fix for each ${grey('(local read only)')}
   ${bold(`${c} tray`)}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
   ${bold(`${c} feedback`)}       the two questions that shape what gets built next
   ${bold(`${c} telemetry`)}      what leaves your machine (spoiler: counts, never content) ${grey('· show / on / off')}
@@ -190,6 +192,9 @@ switch (cmd) {
     break;
   case 'mcp':
     await mcp();
+    break;
+  case 'doctor':
+    process.exitCode = doctor(process.argv.slice(3));
     break;
   case '-v':
   case '--version':

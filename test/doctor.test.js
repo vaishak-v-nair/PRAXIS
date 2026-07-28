@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 import {
   MIN_NODE,
@@ -169,6 +170,20 @@ test('preflight is the demo subset and never claims live is possible without an 
   assert.equal(typeof p.canLive, 'boolean');
   assert.equal(p.checks.length, 2, 'preflight stays small — it runs before every demo');
   if (!p.canLive) assert.ok(p.blockers.length > 0, 'a false canLive must name its blockers');
+});
+
+test('the doctor CLI exists and renders the library (D89 — demo copy names it)', () => {
+  const dir = tmpProject('cli');
+  const cli = path.resolve('src', 'cli.js');
+  const r = spawnSync(process.execPath, [cli, 'doctor'], { cwd: dir, encoding: 'utf8', timeout: 60000 });
+
+  assert.equal(r.status, 1, 'an uninitialized project exits non-zero — the report is honest, not decorative');
+  const out = String(r.stdout);
+  for (const label of ['Node.js', 'git', 'Agent CLI', 'Capture hooks', 'Memory auto-load', 'PRAXIS tools']) {
+    assert.ok(out.includes(label), `renders the "${label}" check`);
+  }
+  assert.match(out, /fix/, 'every failure shows its fix');
+  assert.ok(!/at .*\.js:\d+/.test(out + r.stderr), 'never dumps a stack trace at the user');
 });
 
 test('health delegates tool detection to the doctor library (D42) — one source of truth', () => {

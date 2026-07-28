@@ -108,6 +108,7 @@ export async function init() {
     'praxis-vault.md',
     'praxis-telemetry.md',
     'praxis-tray.md',
+    'praxis-doctor.md',
   ];
   for (const name of slashCmds) {
     fs.copyFileSync(path.join(TEMPLATES, name), path.join(p.commandsDir, name));

@@ -123,6 +123,7 @@ praxis cost           # what did that just cost? API-equivalent dollars (--all)
 praxis gate [ref]     # slop-risk score for a commit — triage before you review
 praxis roi            # sessions, commits, hours, dollars (--days N)
 praxis receipt        # proof of what the AI did this session (--verify · --html · --list)
+praxis doctor         # what's set up, what broke, and the fix for each — a local read
 praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
 praxis feedback       # the two questions that shape what gets built next
 ```
@@ -145,6 +146,7 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `/praxis-hud` | how to watch this session live, in plain English |
 | `/praxis-explain` | re-explain Claude's last answer with zero jargon — for people who don't read code |
 | `/praxis-receipt` | the receipt: what the AI really did — verify claims, or get the shareable card |
+| `/praxis-doctor` | diagnose the install — what works, what broke, how to fix it |
 | `/praxis-trace` · `/praxis-cost` · `/praxis-gate` · `/praxis-roi` · `/praxis-vault` · `/praxis-telemetry` · `/praxis-tray` | the same commands as the CLI, explained in plain English by Claude |
 
 Every `praxis` command has a slash twin, and every slash command has a terminal
