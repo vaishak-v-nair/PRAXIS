@@ -1,7 +1,7 @@
 {
   "name": "praxis-memory",
   "version": "0.9.4",
-  "description": "Give Claude Code a memory. Never re-explain your project again. Local-first — no server, no account, nothing leaves your machine.",
+  "description": "Your AI says \"done.\" PRAXIS proves it. Signed, tamper-evident receipts of what your coding agent actually did — plus durable project memory. Local-first: no server, no account, your code never leaves your machine.",
   "type": "module",
   "bin": {
     "praxis": "src/cli.js",
@@ -13,7 +13,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
     "test": "node --test \"test/*.test.js\""
@@ -21,6 +21,12 @@
   "keywords": [
     "claude-code",
     "claude",
+    "codex",
+    "agents",
+    "receipts",
+    "verification",
+    "agent-accountability",
+    "provenance",
     "mcp",
     "memory",
     "context",

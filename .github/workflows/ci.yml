@@ -1,0 +1,79 @@
+name: CI
+
+# The winning claim is trust. An untested matrix is an untrusted matrix, so
+# everything public waits on this being green (launch gate, condition 1).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test · ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Exactly the line package.json advertises in "engines" (>=22):
+        # 22 = Maintenance LTS, 24 = Active LTS, 26 = Current (LTS Oct 2026).
+        # Support is advertised only where CI exercises it.
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      # No install step: PRAXIS has zero runtime dependencies, and the test
+      # suite needs none either. If this ever needs `npm ci`, something was
+      # added that should not have been.
+      - name: npm test
+        run: npm test
+
+  judge-fixture:
+    name: judge scorecard discriminates (zero tokens)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # The scorecard is only worth something if it can tell a real judge from a
+      # rubber stamp. The canned stub must FAIL certification — if it ever
+      # passes, the eval suite has stopped measuring anything.
+      - name: canned stub judge must not pass certification
+        env:
+          PRAXIS_JUDGE_CMD: '["node","test/fixtures/judge-fixture.mjs"]'
+        run: |
+          if node test/fixtures/eval-run.mjs; then
+            echo "::error::the stub judge PASSED certification — the eval suite no longer discriminates"
+            exit 1
+          else
+            echo "stub judge failed certification, as it must"
+          fi
+
+  pack-smoke:
+    name: pack + install + launch · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # Packs the real tarball, installs it into an empty directory, runs it,
+      # and enforces the unpacked-size budget. This is the only job that tests
+      # what actually ships rather than the working tree.
+      - name: pack smoke
+        run: node scripts/ci/pack-smoke.mjs
