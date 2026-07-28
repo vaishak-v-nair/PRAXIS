@@ -1,0 +1,21 @@
+name: Judge drift monitor
+
+# Certification at release time proves the judge was sound on release day.
+# Models move underneath us, so the same suite runs weekly against the same
+# scenarios: a judge that quietly degrades between releases gets caught here
+# rather than by a user holding a wrong verdict.
+on:
+  schedule:
+    - cron: '17 6 * * 1' # Mondays, 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    uses: ./.github/workflows/live-evals.yml
+    with:
+      reason: weekly drift check
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

@@ -1,0 +1,110 @@
+name: Release
+
+# A trust product whose own releases are hand-rolled from a laptop is
+# self-refuting. Provenance can only be minted from CI, so this workflow IS the
+# release ritual: push a v-tag, approve the environment, npm publishes with a
+# provenance attestation. No long-lived npm token exists anywhere.
+#
+#   git tag v0.10.0 && git push origin v0.10.0
+#
+# One-time setup on npmjs.com (trusted publisher). All four values must match
+# this file EXACTLY or publish fails with a bare 404:
+#   organization/user : vaishak-v-nair
+#   repository        : PRAXIS
+#   workflow filename : release.yml
+#   environment name  : release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test · ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+
+  pack-smoke:
+    name: pack + install + launch · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/ci/pack-smoke.mjs
+
+  # Certification runs BEFORE the human approval gate, so what the founder
+  # approves is a build whose judge has already earned the right to rule.
+  # A degraded judge cannot reach npm.
+  certify:
+    name: judge certification
+    needs: [test, pack-smoke]
+    uses: ./.github/workflows/live-evals.yml
+    with:
+      reason: release
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  publish:
+    name: publish to npm (provenance)
+    needs: [certify]
+    runs-on: ubuntu-latest
+    # The human control point. Everything above is machine-verified; this is
+    # the one place a person says "ship it."
+    environment: release
+    permissions:
+      contents: write # to create the GitHub Release
+      id-token: write # to mint the provenance attestation via OIDC
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      # Runner npm can lag; trusted publishing needs >= 11.5.1.
+      - name: ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - name: the tag must match the version being published
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $PKG"
+            exit 1
+          fi
+          echo "publishing $PKG"
+
+      # No --provenance flag: OIDC trusted publishing mints the attestation
+      # automatically, and passing the flag with a token-less setup fails.
+      - name: npm publish
+        run: npm publish
+
+      # Where the changelog lives. Auto-generated notes plus a hand-written
+      # highlights block (added by editing the release) — this is the page the
+      # README points at as "What's new", and where support changes and any
+      # deprecation reasons are explained to a fleet that auto-upgrades.
+      - name: create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"

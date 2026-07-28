@@ -1,0 +1,41 @@
+name: Judge certification (live)
+
+# Defined ONCE and called from two places — the release workflow and the weekly
+# drift monitor — so the certification that gates a publish and the one that
+# watches for drift can never diverge (D36).
+on:
+  workflow_call:
+    inputs:
+      reason:
+        description: why this certification is running
+        type: string
+        required: false
+        default: certification
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    name: certify the judge (${{ inputs.reason }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: install the agent CLI the judge runs
+        run: npm install -g @anthropic-ai/claude-code
+
+      # Every scenario in the suite, read from the suite itself — never a
+      # hardcoded count, so scenarios added later are certified the day they
+      # land and any public "N of N" stays true by construction.
+      - name: run certification scenarios
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/ci/run-live-evals.mjs --concurrency 4
