@@ -1,4 +1,4 @@
-# PRAXIS Receipt Format — v1
+# PRAXIS Receipt Format — v2
 
 A **receipt** is the proof-of-work record of one AI coding session: what the
 agent actually did, what it claimed, and whether those claims held up. It is a
@@ -48,11 +48,23 @@ types:
 ### 1. `open` — always the first line
 
 ```json
-{"t":"open","v":1,"id":"r-1a2b3c4d","version":1,"sessionId":"<session>","project":"my-app","baseRef":null,"parent":null,"openedAt":"2026-07-24T10:00:00Z","hash":"…"}
+{"t":"open","v":2,"id":"r-1a2b3c4d","version":1,"sessionId":"<session>","project":"my-app","baseRef":null,"parent":null,"openedAt":"2026-07-24T10:00:00Z","provenance":null,"hash":"…"}
 ```
 
-`v` is the format version (this spec: `1`). `parent` names the prior version
+`v` is the format version (this spec: `2`). `parent` names the prior version
 (`"r-1a2b3c4d.v1"`) when `version > 1`.
+
+`provenance` records what produced this receipt: `null` for real work,
+`"demo-replay"` or `"demo-live"` for a receipt the built-in demo produced. It
+sits on line 0, so the chain and the final signature cover it — a demo receipt
+cannot be relabelled as real work without breaking verification. That is
+precisely why it is a sealed field and not a rendering choice.
+
+**The absence rule.** A receipt with no `provenance` field was sealed before the
+field existed (format v1) and is treated as **real**. Demo receipts always carry
+the field by construction, so absence can never mean "demo". Any consumer —
+the PR check, an index, your own script — MUST implement it this way, or old
+receipts silently become suspect.
 
 ### 2. `evidence` — zero or more
 
@@ -81,7 +93,7 @@ Iron rules the collector obeys (each learned from a real false accusation):
 ### 3. `final` — always the last line of a sealed receipt
 
 ```json
-{"t":"final","verdict":"VERIFIED","claims":[{"claim":"all tests pass","verdict":"TRUE","evidence_cited":"npm test","reasoning":"…"}],"finalizedAt":"…","hash":"…","sig":{"alg":"ed25519","key":"<16-hex fingerprint>","signature":"<base64>"}}
+{"t":"final","verdict":"VERIFIED","claims":[{"claim":"all tests pass","verdict":"TRUE","evidence_cited":"npm test","reasoning":"…"}],"finalizedAt":"…","hash":"…","sig":{"alg":"ed25519","key":"<16-hex fingerprint>","pub":"<base64 SPKI DER>","signature":"<base64>"}}
 ```
 
 Headline `verdict` is one of:
@@ -116,11 +128,29 @@ Per-claim verdicts are `TRUE`, `FALSE`, `UNVERIFIABLE`, or `NOT_A_CLAIM`. A
   `PRAXIS_KEY_DIR`). Created with an exclusive-create so concurrent first
   sealers cannot fork the key. `sig.key` is the first 16 hex chars of
   `sha256(spki_der_hex)` — enough to spot a key mismatch.
+- **The public key travels** (v2). `sig.pub` carries the signer's public key as
+  base64 SPKI DER, so anyone holding the file can check the signature. Without
+  it, only the machine that sealed a receipt could verify it, which would make
+  a portable evidence format pointless. `sig` is excluded from the hashed
+  payload, so adding this field leaves every v1 chain hash unchanged.
+
+  This weakens no guarantee. The threat model already states that the keyholder
+  signs their own receipts and that a fresh key can fabricate a corpus — the
+  embedded key does not change who can forge, it changes who can *check*. What
+  it adds is **key continuity**: a run of receipts sharing one fingerprint, or
+  a fingerprint that suddenly changes, is now visible to a reviewer.
 
 **Verifying** a receipt = recompute every chain hash in order, then check the
-final signature against the public key. PRAXIS does this with
-`praxis receipt` (integrity line) and the `praxis_verify` MCP tool, but the
-algorithm above is the spec — any implementation can do it.
+final signature against `sig.pub` (falling back to the local public key for v1
+receipts, which is only meaningful on the machine that sealed them). PRAXIS does
+this with `praxis receipt verify <file>` — offline, zero network, zero model
+calls, exit 0 or 1 so CI can gate on it — plus the `praxis receipt` integrity
+line and the `praxis_verify` MCP tool. The algorithm above is the spec; any
+implementation with sha256 and Ed25519 can do it.
+
+> `praxis receipt verify <file>` (free, offline, checks the file) is a different
+> thing from `praxis receipt --verify` (one paid model call, judges the current
+> session's claims). Both matter; only one costs money.
 
 ## Crash and failure semantics
 

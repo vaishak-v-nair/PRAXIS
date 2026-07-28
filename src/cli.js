@@ -55,7 +55,9 @@ function help() {
 
   ${bold('The daily four')} ${grey('— most days you need nothing else (and the hooks run these for you)')}
   ${bold(`${c} status`)}         memory, session health, latest receipt verdict
-  ${bold(`${c} receipt`)}        proof of what the AI did ${grey('· --verify judge it · --html share card · --list')}
+  ${bold(`${c} receipt`)}        proof of what the AI did ${grey('· --html share card · --list')}
+  ${grey(`${c} receipt verify <file>`)}  ${grey('offline proof — chain + signature, free')}
+  ${grey(`${c} receipt --verify`)}       ${grey('judge this session — one paid model call')}
   ${bold(`${c} recap`)}          catch me up on this project, right in the terminal
   ${bold(`${c} save`)}           log the current session into memory, mid-flight
 

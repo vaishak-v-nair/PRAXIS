@@ -122,7 +122,9 @@ praxis trace          # the AI context behind a commit (on · off · log · <has
 praxis cost           # what did that just cost? API-equivalent dollars (--all)
 praxis gate [ref]     # slop-risk score for a commit — triage before you review
 praxis roi            # sessions, commits, hours, dollars (--days N)
-praxis receipt        # proof of what the AI did this session (--verify · --html · --list)
+praxis receipt        # proof of what the AI did this session (--html · --list)
+praxis receipt verify <file>   # offline proof: chain + signature, free
+praxis receipt --verify        # judge this session's claims (one model call)
 praxis doctor         # what's set up, what broke, and the fix for each — a local read
 praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
 praxis feedback       # the two questions that shape what gets built next
@@ -316,6 +318,10 @@ silently by the same Stop hook, zero model calls, zero seconds added.
 ```
 
 - **`praxis receipt`** — read the latest receipt (`--list` for all).
+- **`praxis receipt verify <file>`** — proof, offline and free: recomputes the
+  hash chain and checks the signature against the key the receipt carries. No
+  network, no model call, exits 0 or 1 so CI can gate on it. This is what
+  someone runs on a receipt *you* handed *them*.
 - **`praxis receipt --verify`** — opt-in: one model call has an adversarial
   judge rule each of the AI's claims **TRUE / FALSE / UNVERIFIABLE** against
   the recorded evidence. Absence of evidence is never treated as a lie, a

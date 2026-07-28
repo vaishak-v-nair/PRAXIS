@@ -30,6 +30,24 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { redact } from '../redact.js';
 
+/**
+ * On-disk format version, written as `v` on the open line.
+ *
+ * v1 → v2 (0.10.0) adds two things and removes nothing:
+ *   - `provenance` on the open line: null for real work, "demo-replay" or
+ *     "demo-live" for a receipt the demo produced. It lives on line 0, so the
+ *     chain and the final signature cover it — a demo receipt cannot be
+ *     relabelled as real work without breaking verification. That is why it is
+ *     a sealed field and not a screen label.
+ *   - `sig.pub`: the signer's public key, so a receipt can be verified by
+ *     someone who does not hold the private key. See the note on verifyFile.
+ *
+ * THE ABSENCE RULE: a receipt with no `provenance` field was sealed before
+ * 0.10.0 and is treated as REAL. Demo receipts cannot lack the field by
+ * construction, so absence can never mean "demo".
+ */
+export const SCHEMA_VERSION = 2;
+
 /** Deterministic JSON: keys sorted at every level, so a payload hashes and
  *  re-hashes to the same string regardless of insertion order. */
 export function stableStringify(value) {
@@ -118,7 +136,7 @@ function headHash(entries) {
  *
  * @returns {{id:string, version:number, file:string, created:boolean}}
  */
-export function open(receiptsDir, { sessionId, project, baseRef = null, parent = null, now }) {
+export function open(receiptsDir, { sessionId, project, baseRef = null, parent = null, now, provenance = null }) {
   fs.mkdirSync(receiptsDir, { recursive: true });
   const id = receiptId(sessionId);
   let version = latestVersion(receiptsDir, id);
@@ -136,7 +154,7 @@ export function open(receiptsDir, { sessionId, project, baseRef = null, parent =
   const file = receiptFile(receiptsDir, id, version);
   writeEntry(file, null, {
     t: 'open',
-    v: 1,
+    v: SCHEMA_VERSION,
     id,
     version,
     sessionId: String(sessionId),
@@ -144,6 +162,7 @@ export function open(receiptsDir, { sessionId, project, baseRef = null, parent =
     baseRef,
     parent: parent || (version > 1 ? `${id}.v${version - 1}` : null),
     openedAt: now || null,
+    provenance: provenance || null,
   });
   return { id, version, file, created: true };
 }
@@ -213,9 +232,16 @@ export function finalize(receiptsDir, id, { verdict = 'UNVERIFIED', claims = [],
   // hash first (over redacted canonical), then sign the hash
   const redacted = JSON.parse(redact(stableStringify(payload)));
   const hash = chainHash(prevHash, redacted);
-  const { privateKey, fingerprint } = ensureKey();
+  const { privateKey, publicKey, fingerprint } = ensureKey();
   const signature = crypto.sign(null, Buffer.from(hash, 'hex'), privateKey).toString('base64');
-  const entry = { ...redacted, hash, sig: { alg: 'ed25519', key: fingerprint, signature } };
+  // The public key travels with the receipt (v2). Without it, only the machine
+  // that sealed a receipt could check its signature — which would make the
+  // offline verifier and the PR check useless on anyone else's evidence.
+  // It changes no guarantee: the threat model already says a keyholder signs
+  // their own receipts and a fresh key can fabricate a corpus. What this buys
+  // is that the check is possible at all, and that a SWITCHED key is visible.
+  const pub = publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+  const entry = { ...redacted, hash, sig: { alg: 'ed25519', key: fingerprint, pub, signature } };
   fs.appendFileSync(file, JSON.stringify(entry) + '\n');
   return { ok: true, hash, sig: entry.sig };
 }
@@ -227,9 +253,31 @@ export function finalize(receiptsDir, id, { verdict = 'UNVERIFIED', claims = [],
  */
 export function verify(receiptsDir, id, version) {
   const v = version || latestVersion(receiptsDir, id);
-  const file = receiptFile(receiptsDir, id, v);
-  const entries = readEntries(file);
-  if (!entries.length) return { ok: false, reason: 'empty-or-missing' };
+  return verifyEntries(readEntries(receiptFile(receiptsDir, id, v)));
+}
+
+/**
+ * What kind of work produced this receipt.
+ *
+ * THE ABSENCE RULE (v1 receipts predate the field): missing means REAL. Demo
+ * receipts always carry the field, so absence can never be a demo hiding.
+ * @returns {'real'|'demo-replay'|'demo-live'|string}
+ */
+export function provenanceOf(entries) {
+  const openEntry = (entries || []).find((e) => e && e.t === 'open');
+  if (!openEntry) return 'real';
+  if (!Object.prototype.hasOwnProperty.call(openEntry, 'provenance')) return 'real';
+  return openEntry.provenance || 'real';
+}
+
+/** True for anything the demo produced — never counted as evidence of real work. */
+export function isDemo(entries) {
+  return String(provenanceOf(entries)).startsWith('demo');
+}
+
+/** The chain-and-signature core, shared by every verification surface. */
+export function verifyEntries(entries) {
+  if (!entries || !entries.length) return { ok: false, reason: 'empty-or-missing' };
 
   let prev = null;
   for (let i = 0; i < entries.length; i++) {
@@ -241,13 +289,66 @@ export function verify(receiptsDir, id, version) {
   }
 
   const last = entries[entries.length - 1];
-  if (last.t !== 'final') return { ok: true, finalized: false, chain: true };
+  const provenance = provenanceOf(entries);
+  if (last.t !== 'final') return { ok: true, finalized: false, chain: true, provenance };
+
+  if (!last.sig || !last.sig.signature) {
+    return { ok: false, finalized: true, chain: true, provenance, reason: 'no-signature' };
+  }
 
   try {
-    const { publicKey } = ensureKey();
-    const good = crypto.verify(null, Buffer.from(last.hash, 'hex'), publicKey, Buffer.from(last.sig.signature, 'base64'));
-    return { ok: good, finalized: true, chain: true, signature: good };
+    let publicKey;
+    let embedded = false;
+    if (last.sig.pub) {
+      // v2: the signer's key travels with the receipt — verifiable anywhere.
+      publicKey = crypto.createPublicKey({
+        key: Buffer.from(last.sig.pub, 'base64'),
+        format: 'der',
+        type: 'spki',
+      });
+      embedded = true;
+    } else {
+      // v1: no key on board, so this can only be checked on the machine that
+      // sealed it. Elsewhere it reports honestly rather than failing red.
+      publicKey = ensureKey().publicKey;
+    }
+    const good = crypto.verify(
+      null,
+      Buffer.from(last.hash, 'hex'),
+      publicKey,
+      Buffer.from(last.sig.signature, 'base64'),
+    );
+    return {
+      ok: good,
+      finalized: true,
+      chain: true,
+      signature: good,
+      provenance,
+      keyFingerprint: last.sig.key || null,
+      embeddedKey: embedded,
+      reason: good ? undefined : embedded ? 'signature-invalid' : 'signature-unverifiable-here',
+    };
   } catch {
-    return { ok: false, finalized: true, chain: true, reason: 'signature-error' };
+    return { ok: false, finalized: true, chain: true, provenance, reason: 'signature-error' };
   }
+}
+
+/**
+ * Verify a receipt FILE — the offline path. Zero network, zero model calls,
+ * zero cost: recompute every chain hash, then check the signature against the
+ * key the receipt carries. This is what a stranger runs on evidence they were
+ * handed, and what the PR check runs in CI.
+ */
+export function verifyFile(file) {
+  let entries;
+  try {
+    if (!fs.existsSync(file)) return { ok: false, reason: 'not-found', file };
+    const stat = fs.statSync(file);
+    if (!stat.isFile()) return { ok: false, reason: 'not-a-file', file };
+    entries = readEntries(file);
+  } catch (e) {
+    return { ok: false, reason: 'unreadable', file, detail: e.message };
+  }
+  if (!entries.length) return { ok: false, reason: 'empty-or-unparseable', file };
+  return { ...verifyEntries(entries), file, entries: entries.length };
 }
