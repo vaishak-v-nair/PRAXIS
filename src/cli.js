@@ -30,11 +30,12 @@ import { deck } from './commands/deck.js';
 import { mcp } from './commands/mcp.js';
 import { doctor } from './commands/doctor.js';
 import { demo } from './commands/demo.js';
+import { warnDeprecated } from './lib/deprecate.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
 import { praxisCmd } from './lib/runner.js';
 import { patchSettings } from './lib/settings.js';
-import { miniHeader, bold, grey, sage } from './lib/ui.js';
+import { miniHeader, bold, grey, sage, dim } from './lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -70,22 +71,17 @@ function help() {
   ${bold(`${c} jobs`)}           every background job, honest status, last words ${grey('· jobs <id>')}
   ${bold(`${c} approve`)}        the inbox: drafts wait for you ${grey('· approve <id> executes · --deny closes')}
 
-  ${bold('When you want them')}
+  ${bold('The memory underneath')} ${grey('— context survives the session, so you never re-explain')}
   ${bold(`${c} remember "<f>"`)} save a fact into memory now ${grey(`· ${c} forget "<t>" removes it`)}
   ${bold(`${c} health`)}         how full is this Claude session, really — and where to go next
-  ${bold(`${c} hud`)}            live view of the session, in plain English ${grey('(second terminal)')}
-  ${bold(`${c} switch <tool>`)}  pack a handoff brief and move to gemini · codex · claude · cursor
-  ${bold(`${c} checkpoint`)}     save the whole session to md files, /compact, keep going ${grey('· [folder]')}
-  ${bold(`${c} trace`)}          the AI context behind a commit ${grey('· on / off / log / <hash>')}
-  ${bold(`${c} vault <path>`)}   write sessions, commits & memory into your Obsidian vault
-  ${bold(`${c} cost`)}           what did that just cost? API-equivalent dollars ${grey('· --all')}
-  ${bold(`${c} gate [ref]`)}     slop-risk score for a commit — triage before review
-  ${bold(`${c} roi`)}            sessions, commits, hours, dollars over time ${grey('· --days N')}
   ${bold(`${c} doctor`)}         what is set up, what broke, and the fix for each ${grey('(local read only)')}
-  ${bold(`${c} tray`)}           the axolotl in your system tray ${grey('(Windows · --stop to quit)')}
-  ${bold(`${c} feedback`)}       the two questions that shape what gets built next
-  ${bold(`${c} telemetry`)}      what leaves your machine (spoiler: counts, never content) ${grey('· show / on / off')}
+
+  ${bold('Also included')}
+  ${grey(`${c} switch <tool> · ${c} checkpoint · ${c} trace · ${c} gate · ${c} vault <path> · ${c} tray · ${c} telemetry · ${c} feedback`)}
   ${grey(`${c} init · ${c} capture — setup and the (internal) Stop-hook entry`)}
+
+  ${dim('Not our lane, and we will not pretend otherwise:')}
+  ${dim('token costs → npx ccusage    ·    live session monitoring → npx cctop')}
 
   ${grey('Local-first. No server. No account. Nothing leaves your machine.')}${
     c === 'praxis'
@@ -99,6 +95,11 @@ const cmd = process.argv[2];
 
 // tier-2 telemetry: one counter per command, opt-in only, counts-and-enums only
 record('cmd_' + (cmd || 'default'));
+
+// Commands other people build better are on their way out — they still run,
+// they just say where to go instead. See lib/deprecate.js for why this is a
+// notice and not a deletion.
+warnDeprecated(cmd);
 
 // Error boundary: a command must never dump a raw stack — especially the
 // SessionStart hook (`praxis tray --ensure`) and post-commit trace, where a

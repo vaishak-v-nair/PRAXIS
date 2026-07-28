@@ -81,3 +81,26 @@ test('live-eval runner: a single false accusation fails the whole run', () => {
 test('live-eval runner: default concurrency is sane', () => {
   assert.ok(DEFAULT_CONCURRENCY >= 1 && DEFAULT_CONCURRENCY <= 8);
 });
+
+test('deprecated commands still work, and say where to go instead', async () => {
+  const { deprecationNotice, isDeprecated, DEPRECATED, REMOVAL_VERSION } = await import('../src/lib/deprecate.js');
+  const { spawnSync } = await import('node:child_process');
+  const path = await import('node:path');
+
+  for (const name of Object.keys(DEPRECATED)) {
+    const n = deprecationNotice(name);
+    assert.match(n, new RegExp(`praxis ${name} is deprecated`));
+    assert.match(n, new RegExp(REMOVAL_VERSION.replace('.', '\\.')), 'the removal version is stated, not vague');
+    assert.match(n, /npx \w+/, 'and it names a command that replaces it');
+  }
+  assert.equal(isDeprecated('receipt'), false, 'the spine is not deprecated');
+  assert.equal(deprecationNotice('receipt'), null);
+
+  // The contract that matters: a deprecated command STILL RUNS. Every install
+  // auto-upgrades through npx, so a removal without warning breaks scripts.
+  const r = spawnSync(process.execPath, [path.resolve('src', 'cli.js'), 'cost'], { encoding: 'utf8', timeout: 60000 });
+  assert.notEqual(r.status, 127);
+  assert.match(r.stderr, /deprecated/, 'the notice goes to stderr so piped output stays clean');
+  assert.match(r.stderr, /ccusage/);
+  assert.ok(!/deprecated/.test(r.stdout), 'and never pollutes stdout');
+});

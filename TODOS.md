@@ -19,35 +19,33 @@ in the README. The website stays frozen until the 1.0 loud launch.
 - **Priority:** P2
 - **Depends on:** receipts Phase 2 shipped; catch-rate data justifying it.
 
-## P2 — `praxis statusline`: the ambient surface every OS can see
+## Remove `cost`, `roi` and `hud` at 0.11.0 (decided 2026-07-28)
 
-- **What:** A Claude Code statusline renderer — verdict of the latest receipt,
-  session fullness, and job/inbox counts on the prompt line. Wired with one
-  `statusLine` block in `settings.json`, exactly like the tray is wired with a
-  hook.
-- **Why:** the tray is Windows-only, so the ambient half of PRAXIS is invisible
-  to most users, and the macOS/Linux tray port is L-sized. The statusline is the
-  same ambient job at a fraction of the cost, cross-platform on day one — and
-  `statusLine` is an official, documented extension point, so it cannot break
-  the user's terminal the way stdout interception would.
-- **Evidence it is a real channel:** ccstatusline (github.com/sirmalloc/ccstatusline)
-  is a pure statusline formatter for Claude Code — no memory, no receipts, no
-  orchestration — and has ~12.1k stars, 530 forks, 361 commits, distributed by
-  `npx -y ccstatusline@latest`. That is not a competitor; it is proof that this
-  audience installs ambient tools eagerly through exactly this door.
-- **Pros:** first cross-platform ambient surface; a verdict badge on the prompt
-  line is the cheapest possible "receipts exist" reminder; nothing to keep
-  running (Claude Code invokes it).
-- **Cons:** a second render path for state the tray already shows (must read the
-  same cached breadcrumb, never re-parse receipt JSONL); statusline real estate
-  is contested — users who already run ccstatusline will not switch for a badge,
-  so the honest framing is "add a praxis segment", not "replace your statusline."
-- **Context:** raised 2026-07-28 while reviewing ccstatusline. NOT taken into the
-  launch gate: the gate is fixed at four conditions and week 1 stays pointed at
-  it (review-scope cap, D66). This is the first candidate for the week after.
-- **Effort:** S → with CC: XS-S
-- **Priority:** P2
-- **Depends on:** nothing technically. Sequencing: after the launch gate is met.
+- **What:** delete the three deprecated commands, their tests, and their
+  `/praxis-*` templates. Announce the removal in the 0.11.0 release notes.
+- **Why:** ccusage (~17k stars) reads the same local files, covers Codex and
+  other agents too, and is simply better at cost reporting. Live session
+  monitoring has at least seven maintained competitors (cctop, ClaudeTUI,
+  AgentHUD, claude-code-trace, claude-view, subagent-viewer, Agent-Monitor).
+  Keeping our weaker versions padded the tarball, the help, and the story —
+  and made a real user describe PRAXIS as a side-project.
+- **Context:** deprecated in 0.10.0 rather than deleted, because sixteen shipped
+  files run unpinned `npx -y praxis-memory` and every release lands on every
+  install automatically. The commands still run today and print a pointer.
+- **Effort:** XS
+- **Priority:** P1 — it rides the 0.11.0 release ritual.
+- **Depends on:** 0.10.0 shipped.
+
+## WITHDRAWN — `praxis statusline` (proposed and withdrawn 2026-07-28)
+
+Proposed as a cheap cross-platform ambient surface, then withdrawn the same day
+by the overlap audit that killed `cost`/`roi`/`hud`. ccstatusline (12.1k stars)
+and ClaudeTUI already own the statusline, and adding a fifth renderer of session
+state would have been the exact mistake we were busy correcting. Recorded here
+so it does not get re-proposed: **the ambient gap is real, but the answer is not
+another statusline.** If the ambient layer is ever revisited, it must carry
+something only PRAXIS has — a verdict — and it must beat an incumbent with
+12k stars to be worth shipping at all.
 
 ## P3 — GitHub App for Check Runs
 

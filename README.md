@@ -14,14 +14,14 @@ file, handed back automatically next time, so you never re-explain your project.
 
 [![npm](https://img.shields.io/npm/v/praxis-memory?color=d6547a&label=npm)](https://www.npmjs.com/package/praxis-memory)
 [![license](https://img.shields.io/badge/license-MIT-4fa376)](LICENSE)
-[![node](https://img.shields.io/badge/node-%E2%89%A518-4e8fd0)](https://nodejs.org)
+[![node](https://img.shields.io/badge/node-%E2%89%A522-4e8fd0)](https://nodejs.org)
 [![local-first](https://img.shields.io/badge/data-never%20leaves%20your%20machine-dfa03a)](#safety)
 
 ```bash
 npx praxis-memory
 ```
 
-*One command — same on **Windows, macOS and Linux** (Node 18+). It sets up the hooks, the memory file, the tray companion, everything — then every session after remembers. No global install needed: the hooks (auto-capture, pre-compact snapshots, tray auto-start) run through `npx`, so they work from day one. Prefer the short `praxis` command? Optional: `npm install -g praxis-memory` — every command below then drops the `npx praxis-memory` prefix.*
+*One command — same on **Windows, macOS and Linux** (Node 22+). It sets up the hooks, the memory file, the tray companion, everything — then every session after remembers. No global install needed: the hooks (auto-capture, pre-compact snapshots, tray auto-start) run through `npx`, so they work from day one. Prefer the short `praxis` command? Optional: `npm install -g praxis-memory` — every command below then drops the `npx praxis-memory` prefix.*
 
 **Want to see it before you install anything?**
 
@@ -128,13 +128,10 @@ praxis save           # log the current session into memory, mid-flight
 praxis remember "<f>" # save a fact or decision into project memory now
 praxis forget "<t>"   # remove matching lines from memory (asks first)
 praxis health         # how full is this Claude session, really — and where to go next
-praxis hud            # live view of your Claude session, in plain English (second terminal)
 praxis switch <tool>  # pack a handoff brief and move to gemini / codex / claude / cursor
 praxis checkpoint     # save the whole session to md files, then /compact and keep going
 praxis trace          # the AI context behind a commit (on · off · log · <hash>)
-praxis cost           # what did that just cost? API-equivalent dollars (--all)
 praxis gate [ref]     # slop-risk score for a commit — triage before you review
-praxis roi            # sessions, commits, hours, dollars (--days N)
 praxis receipt        # proof of what the AI did this session (--html · --list)
 praxis receipt verify <file>   # offline proof: chain + signature, free
 praxis receipt --verify        # judge this session's claims (one model call)
@@ -158,7 +155,6 @@ Inside Claude Code, type `/` and the Praxis commands appear:
 | `/praxis-switch` | hand this work off to gemini · codex · cursor · antigravity |
 | `/praxis-checkpoint` | save everything, `/compact`, continue in this same session |
 | `/praxis-feedback` | the two questions that shape what gets built |
-| `/praxis-hud` | how to watch this session live, in plain English |
 | `/praxis-explain` | re-explain Claude's last answer with zero jargon — for people who don't read code |
 | `/praxis-receipt` | the receipt: what the AI really did — verify claims, or get the shareable card |
 | `/praxis-doctor` | diagnose the install — what works, what broke, how to fix it |
@@ -183,39 +179,6 @@ twin — use whichever is closer to your hands.
 | `~/.claude/commands/` | The same commands, user-wide — so `/` shows them in **every** project |
 
 > `/` menu looks empty? Restart the open Claude Code session — it loads commands at start.
-
-## The HUD
-
-A working Claude session is a wall of scrolling text — file dumps, tool calls,
-JSON. `praxis hud` (in a second terminal) retells the **whole session as a
-story**: what you said, what Claude said back, what it actually did — one
-aligned, plain-English line each, with a real context-health bar on top:
-
-```
- $ praxis hud
-
- ✦ PRAXIS HUD  ·  E:\PRAXIS                        ▮▮▮▮▮▯▯▯▯▯  52% full
- ● Running a command  ·  just now
- ──────────────────────────────────────────────────────────────────────
-  19:02  you     fix the login bug
-  19:02   ·      Reading a file — src/auth.js ×3
-  19:03  claude  The token expiry check uses < instead of <=. Fixing it.
-  19:03   ·      Editing a file — src/auth.js
-  19:04   ·      Running a command — npm test
- ──────────────────────────────────────────────────────────────────────
-  q to quit  ·  watching your session live
-```
-
-It reads the session transcript file Claude Code already writes — it never
-touches or overrides Claude's terminal, so it can't break anything. Repeated
-steps collapse into one line (`×3`), a squeeze (compaction) shows up as a ⚠
-note, and when Claude asks *you* a question a red banner appears so you never
-miss it.
-
-Don't read code? The HUD glosses jargon inline — *"refactor (rewriting code
-without changing what it does)"* — and inside Claude, `/praxis-explain` makes
-it re-explain its last answer with zero jargon: what was asked, what actually
-changed, why it's better, what you should do now.
 
 ## Session health, and switching tools
 
@@ -279,34 +242,19 @@ teammate's AI-written PR with the *reasoning*, not just the diff:
 `git push origin refs/notes/praxis`. Secrets are redacted; files outside the
 repo are counted, never named.
 
-## What did the AI just cost, and can you trust it?
+## What PRAXIS does not do
 
-Every session transcript carries the exact token usage of every model turn.
-Nobody turns that into a number you can budget with. Praxis does — three
-plain-English commands, no server, same local engine:
+Two things people ask for are already done better elsewhere, and pretending
+otherwise would waste your time:
 
-```
- $ praxis cost
+- **Token costs and spend reports** → [**ccusage**](https://github.com/ryoppippi/ccusage).
+  It reads the same local files PRAXIS does, covers Codex and other agents too,
+  and is genuinely excellent. px ccusage\n- **Live session monitoring** → [**cctop**](https://github.com/stefanprodan/cctop).
+  A proper top-style view of every running session.
 
- $14.20  API-equivalent · this session
-   sonnet-5        $11.40   3.1M tokens · 60 responses
-   haiku-4-5        $2.80   1.4M tokens · 22 responses
-```
-
-- **`praxis cost`** — *what did that just cost?* API-equivalent dollars per
-  model, this session or the whole project (`--all`). On a subscription, read
-  it as the value you extracted; the rates are overridable in config.
-- **`praxis gate [ref]`** — a slop-risk score (0-100) for a commit from local
-  signals: churn, files touched, tests untouched, how full the session was at
-  commit time, whether it carries a trace note. A five-second triage before a
-  human spends 90 minutes reviewing. A signal, never a verdict.
-- **`praxis roi`** — the receipt: sessions, active AI hours, commits (and how
-  many carry a decision trail), total and per-commit cost over the last N days.
-  Real numbers from your transcripts and git — you decide if it was worth it.
-
-Together with memory, health and trace, praxis answers the three questions
-every AI-using developer ends up asking: what did it do, what did it cost, and
-can I trust it.
+praxis cost, praxis roi and praxis hud still work today, print a pointer
+to those tools, and are removed in 0.11.0. We would rather do one thing that
+nobody else does than five that somebody else does better.
 
 ## Receipts — proof, not vibes
 
