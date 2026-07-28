@@ -2,6 +2,11 @@ name: CI
 
 # The winning claim is trust. An untested matrix is an untrusted matrix, so
 # everything public waits on this being green (launch gate, condition 1).
+#
+# Every job is guarded on the repository name. The confidential mirror
+# (PRAXIS-pvt) receives this file through a branch merge, and without the guard
+# it runs the whole matrix there too — burning metered private Actions minutes
+# and reporting red for secrets that only exist on the public repo.
 on:
   push:
     branches: [main]
@@ -17,6 +22,7 @@ concurrency:
 
 jobs:
   test:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: test · ${{ matrix.os }} · node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -39,6 +45,7 @@ jobs:
         run: npm test
 
   judge-fixture:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: judge scorecard discriminates (zero tokens)
     runs-on: ubuntu-latest
     steps:
@@ -61,6 +68,7 @@ jobs:
           fi
 
   pack-smoke:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: pack + install + launch · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:

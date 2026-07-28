@@ -13,6 +13,11 @@ name: Release
 #   repository        : PRAXIS
 #   workflow filename : release.yml
 #   environment name  : release
+#
+# Every job is guarded on the repository name, and this workflow is the reason
+# the guard is not optional: the confidential mirror receives this file through
+# a branch merge, so a v-tag pushed there would otherwise try to publish
+# praxis-memory from a repository the npm trusted publisher does not recognise.
 on:
   push:
     tags: ['v*']
@@ -22,6 +27,7 @@ permissions:
 
 jobs:
   test:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: test · ${{ matrix.os }} · node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -37,6 +43,7 @@ jobs:
       - run: npm test
 
   pack-smoke:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: pack + install + launch · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -54,6 +61,7 @@ jobs:
   # approves is a build whose judge has already earned the right to rule.
   # A degraded judge cannot reach npm.
   certify:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: judge certification
     needs: [test, pack-smoke]
     uses: ./.github/workflows/live-evals.yml
@@ -63,6 +71,7 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   publish:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: publish to npm (provenance)
     needs: [certify]
     runs-on: ubuntu-latest

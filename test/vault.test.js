@@ -10,7 +10,13 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-vault-'));
 
 test('vault notes: hub, memory mirror, session, commit — linked and redacted', () => {
   const root = tmp();
-  const dir = vaultDirFor({ vault: root }, 'MyApp');
+  // `home` is passed explicitly rather than defaulted. Letting it default made
+  // this test pass only on machines where the temp directory happens to sit
+  // inside the home directory — true on this developer's Windows box, false on
+  // every CI runner (/tmp vs /home/runner, /var/folders vs /Users/runner).
+  // The confinement check was doing its job; the test was asking the wrong
+  // question.
+  const dir = vaultDirFor({ vault: root }, 'MyApp', os.tmpdir());
   assert.equal(dir, path.join(root, 'Praxis', 'MyApp'));
 
   assert.ok(mirrorMemory(dir, 'MyApp', '# Memory\n- decided X\n'));
@@ -69,4 +75,23 @@ test('vault path is confined to home OR repo tree (hostile-repo defense)', () =>
     vaultDirFor({ vault: path.join(repo, 'v') }, 'X', home, repo),
     path.join(repo, 'v', 'Praxis', 'X'),
   );
+});
+
+test('confinement survives the real filesystem, not just string comparison', () => {
+  // A vault genuinely inside home must be honoured even when the two paths are
+  // spelled differently — 8.3 short names on Windows, /var vs /private/var on
+  // macOS, a symlinked home on Linux. Silently refusing a legitimate vault is
+  // a bug the user would experience as "praxis vault just doesn't work".
+  const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-realhome-')));
+  const inside = path.join(home, 'Obsidian', 'vault');
+  fs.mkdirSync(inside, { recursive: true });
+  assert.ok(vaultPathAllowed(inside, home), 'a real path inside home is allowed');
+
+  // And a path that merely LOOKS inside home must still be rejected once the
+  // filesystem is consulted — this is the hole realpath closes.
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-outside-'));
+  assert.ok(!vaultPathAllowed(outside, home), 'a sibling temp dir is still rejected');
+
+  // A vault configured before its folder exists must still be allowed.
+  assert.ok(vaultPathAllowed(path.join(home, 'not-created-yet'), home), 'non-existent paths fall back to resolve');
 });

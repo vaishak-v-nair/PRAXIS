@@ -14,10 +14,34 @@ export function vaultRoot(cfg) {
   return cfg && typeof cfg.vault === 'string' && cfg.vault.trim() ? cfg.vault.trim() : null;
 }
 
+/**
+ * Resolve to the path the filesystem really means.
+ *
+ * Two things this fixes, both discovered the first time CI ran off this
+ * developer's machine:
+ *   - Windows 8.3 short names. A runner's temp dir is `C:\Users\RUNNER~1\...`
+ *     while its home is `C:\Users\runneradmin` — string comparison says those
+ *     are unrelated, so a vault legitimately inside home was silently refused.
+ *   - Symlinks. Without realpath, a link sitting inside home but pointing at
+ *     /etc passes confinement, which is precisely the write this check exists
+ *     to stop.
+ *
+ * Falls back to a plain resolve when the path does not exist yet — a vault is
+ * usually configured before its folder is created.
+ */
+function realish(p) {
+  const resolved = path.resolve(p);
+  try {
+    return fs.realpathSync.native(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
 function under(base, target) {
   if (!base) return false;
   try {
-    const rel = path.relative(path.resolve(base), path.resolve(target));
+    const rel = path.relative(realish(base), realish(target));
     return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
   } catch {
     return false;
