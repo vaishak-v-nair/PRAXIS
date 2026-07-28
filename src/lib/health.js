@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { transcriptDir, newestTranscript } from './transcript.js';
-import { TOOLS, ALTERNATES_FOR_CLAUDE, isInstalled } from './tools.js';
+import { TOOLS, ALTERNATES_FOR_CLAUDE } from './tools.js';
 
 export const DEFAULT_CONTEXT_LIMIT = 200000;
 
@@ -116,12 +116,13 @@ export function suggestNext(level, installed = {}) {
   };
 }
 
-/** Which tools exist on this machine: PATH, install dirs, registry, /Applications. */
-export function detectTools() {
-  const installed = {};
-  for (const [key, t] of Object.entries(TOOLS)) installed[key] = isInstalled(t);
-  return installed;
-}
+/**
+ * Which tools exist on this machine: PATH, install dirs, registry, /Applications.
+ * Delegated to the doctor library so health, `praxis doctor` and the demo's
+ * preflight can never disagree about what is installed (D42). Re-exported here
+ * because this has been health's public surface since v0.3.
+ */
+export { detectTools } from './doctor.js';
 
 /**
  * Full report for a project dir. Reads the newest session transcript.
