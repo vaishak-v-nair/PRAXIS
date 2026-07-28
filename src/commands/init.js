@@ -173,6 +173,22 @@ export async function init() {
     console.log('\n  ' + dim('All commands: ') + rose(`${c} help`) + '\n');
     return;
   }
+  // The conversion bridge (D77): someone who has never seen a receipt is one
+  // command away from holding one. This line retires itself the moment a real
+  // receipt exists, so it never nags an established install.
+  let hasReceipt = false;
+  try {
+    hasReceipt = fs.existsSync(p.receiptsDir) && fs.readdirSync(p.receiptsDir).some((f) => f.endsWith('.jsonl'));
+  } catch {
+    /* no receipts dir yet */
+  }
+  if (!hasReceipt) {
+    console.log(`
+  ${bold('See what this actually produces — right now, in one minute:')}
+  ${rose(`${c} demo`)}  ${grey('a real recorded session, sealed into a receipt on your disk.')}
+  ${grey('No agent needed, no account, no network.')}`);
+  }
+
   console.log(`
   ${bold('Next steps')}
   ${grey('1.')} Open this project in Claude Code ${bold('(restart it if it was already open)')} —

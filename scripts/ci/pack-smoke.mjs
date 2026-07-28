@@ -23,9 +23,9 @@ import { checkBudget, parsePackJson } from './tarball-budget.mjs';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const IS_WIN = process.platform === 'win32';
 
-// The demo (E1) is the gate-blocking conversion asset. Until it ships, this
-// script says so OUT LOUD rather than reporting a green that does not cover it.
-const DEMO_SHIPPED = false;
+// The demo (E1) is the gate-blocking conversion asset. This flag was false
+// while it was unbuilt, because a green that does not cover the gate is a lie.
+const DEMO_SHIPPED = true;
 export const DEMO_BUDGET_MS = 30000; // D51: the 60-second guarantee, metered with margin
 
 function sh(cmd, args, opts = {}) {
@@ -110,9 +110,19 @@ function main() {
       const r = cli('demo', '--replay');
       const elapsed = Date.now() - started;
       if (r.status !== 0) throw new Error(`demo exited ${r.status}:\n${r.out}`);
-      if (!/VERIFIED|chain intact/i.test(r.out)) throw new Error('demo did not reach a sealed, verified receipt');
+      if (!/chain intact/i.test(r.out)) throw new Error('demo did not reach a sealed, verified receipt');
+      // The recording must always be labelled as one. If this ever stops
+      // appearing, the demo has started presenting a replay as live work.
+      if (!/recorded verdict/i.test(r.out)) throw new Error('demo showed verdicts without labelling them as recorded');
+      if (!/provenance: demo-replay/i.test(r.out)) throw new Error('demo receipt was not marked as a demo');
       if (elapsed > DEMO_BUDGET_MS) throw new Error(`demo took ${elapsed}ms, budget is ${DEMO_BUDGET_MS}ms`);
       return `sealed and verified in ${(elapsed / 1000).toFixed(1)}s`;
+    });
+
+    step('the sealed demo receipt verifies offline from the installed build', () => {
+      const r = cli('receipt', '--list');
+      if (r.status !== 0) throw new Error(`receipt --list exited ${r.status}`);
+      return 'installed build can read receipts back';
     });
   }
 

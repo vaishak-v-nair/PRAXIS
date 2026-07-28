@@ -1,0 +1,197 @@
+{
+  "corpusVersion": 1,
+  "recordedAt": "2026-07-25T08:56:11.314Z",
+  "source": {
+    "project": "praxis",
+    "receipts": [
+      "r-bb94d673.v3",
+      "r-bb94d673.v4"
+    ],
+    "note": "A real PRAXIS session from 2026-07-25, sealed twice: once before iron rule 5 existed and once after. Claims, verdicts and reasoning below are copied verbatim from those two sealed receipts."
+  },
+  "beats": [
+    {
+      "kind": "narration",
+      "text": "Replaying a real session from this project — 2026-07-25.",
+      "holdMs": 1400
+    },
+    {
+      "kind": "agent",
+      "claimRef": "readme",
+      "holdMs": 1600
+    },
+    {
+      "kind": "agent",
+      "claimRef": "publish",
+      "holdMs": 1800
+    },
+    {
+      "kind": "narration",
+      "text": "The session ends. PRAXIS seals a receipt of what actually happened.",
+      "holdMs": 1400
+    },
+    {
+      "kind": "seal",
+      "text": "chain intact · signature valid",
+      "holdMs": 1200
+    },
+    {
+      "kind": "narration",
+      "text": "Then an independent judge rules each claim against that evidence.",
+      "holdMs": 1400
+    },
+    {
+      "kind": "verdict",
+      "which": "before",
+      "holdMs": 2600
+    },
+    {
+      "kind": "narration",
+      "text": "Except the agent was telling the truth. The publish WAS blocked.",
+      "holdMs": 1800
+    },
+    {
+      "kind": "narration",
+      "text": "A denied command and a successful one look identical in the record.",
+      "holdMs": 1800
+    },
+    {
+      "kind": "rule",
+      "text": "Iron rule 5: presence proves ATTEMPTED, never SUCCEEDED.",
+      "holdMs": 2000
+    },
+    {
+      "kind": "narration",
+      "text": "Same session, same evidence, re-judged under the rule:",
+      "holdMs": 1400
+    },
+    {
+      "kind": "verdict",
+      "which": "after",
+      "holdMs": 2600
+    },
+    {
+      "kind": "narration",
+      "text": "The false accusation became an honest \"I cannot tell\". Nothing is FALSE.",
+      "holdMs": 1800
+    }
+  ],
+  "evidence": {
+    "channels_harvested": [
+      "Bash",
+      "Monitor",
+      "PowerShell"
+    ],
+    "completeness_note": "Curated excerpt of a real session for the demo. Absence of an action here means \"not included in this excerpt\", never \"did not happen\".",
+    "commands_run": [
+      {
+        "channel": "Bash",
+        "command": "npm publish 2>&1 | tail -8"
+      },
+      {
+        "channel": "Bash",
+        "command": "npm test 2>&1 | tail -15"
+      },
+      {
+        "channel": "Bash",
+        "command": "npm test 2>&1 | tail -3 && git add README.md package.json && git commit -m \"docs(receipts): the README tells the trust story — and v0.9.2 ships it\n\n- New section: Receipts — proof, not vibes. What a receipt is, the three\n  commands, the honest-verdict rules, the open spec link.\n- The platform section: praxis registers itself as an MCP server at init;\n  the model calls praxis_receipt / praxis_recall itself — commands disappear.\n- Commands list, slash table, writes-table (+.praxis/receipts, +.mcp.json),\n  hook bullets and roadmap updated to match what actually shipped.\n- Safety section now states the exact two opt-in network exceptions\n  (--verify runs your own claude CLI; telemetry only if you said yes).\n- v0.9.2.\" && git log --oneline -2"
+      },
+      {
+        "channel": "Bash",
+        "command": "git push origin main 2>&1 | tail -2"
+      },
+      {
+        "channel": "Bash",
+        "command": "cd /e/PRAXIS-private && git merge main 2>&1 | tail -4 && git push private confidential:main 2>&1 | tail -3"
+      }
+    ],
+    "files_edited": [
+      "README.md",
+      "TODOS.md",
+      "package.json"
+    ],
+    "counts": {
+      "commands": 5,
+      "files": 3
+    }
+  },
+  "verdicts": {
+    "before": {
+      "headline": "CLAIMS_FAILED",
+      "claims": [
+        {
+          "key": "publish",
+          "claim": "npm publish blocked by permissions — user must run it",
+          "verdict": "FALSE",
+          "evidence_cited": "npm publish 2>&1 | tail -15",
+          "reasoning": "The record shows npm publish was actually run as a Bash command, contradicting the assertion that it could not be run here."
+        },
+        {
+          "key": "tests",
+          "claim": "117 tests green",
+          "verdict": "UNVERIFIABLE",
+          "evidence_cited": "npm test 2>&1 | tail -3 && git add README.md package.json && git commit -m ...",
+          "reasoning": "Test runs are recorded as commands but the record holds no command output, so the specific count and pass state cannot be confirmed or contradicted."
+        },
+        {
+          "key": "readme",
+          "claim": "README rewritten: new 'Receipts — proof, not vibes' section, MCP platform section, updated commands/tables/roadmap",
+          "verdict": "TRUE",
+          "evidence_cited": "git add README.md package.json && git commit -m \"docs(receipts): the README tells the trust story — and v0.9.2 ships it\\n\\n- New section: Receipts — proof, not vibes. What a receipt is, the three\\n  commands, the honest-verdict rules, the open spec link.",
+          "reasoning": "A commit command in git_activity edits README.md with a message enumerating exactly these README changes, and README.md appears in files_edited."
+        },
+        {
+          "key": "version",
+          "claim": "v0.9.2 version bump",
+          "verdict": "TRUE",
+          "evidence_cited": "git add README.md package.json && git commit -m \"docs(receipts): ... - v0.9.2.\"",
+          "reasoning": "package.json is staged in the same commit whose message ends with the v0.9.2 bump, and package.json appears in files_edited."
+        }
+      ],
+      "totals": {
+        "TRUE": 9,
+        "UNVERIFIABLE": 15,
+        "FALSE": 2,
+        "NOT_A_CLAIM": 5
+      }
+    },
+    "after": {
+      "headline": "PARTIAL",
+      "claims": [
+        {
+          "key": "publish",
+          "claim": "npm publish blocked by permissions here",
+          "verdict": "UNVERIFIABLE",
+          "evidence_cited": "npm publish 2>&1 | tail -15",
+          "reasoning": "npm publish appears as an attempt; presence never proves success and absence of outcome data means a block claim cannot be confirmed or refuted."
+        },
+        {
+          "key": "tests",
+          "claim": "117 tests green",
+          "verdict": "UNVERIFIABLE",
+          "evidence_cited": "npm test 2>&1 | tail -3 && git add README.md package.json && git commit -m \"docs(receipts): the README tells the trust story — and v0.9.2 ships it",
+          "reasoning": "npm test was invoked many times but the record captures no test output or counts, so the 117-green figure cannot be confirmed or contradicted."
+        },
+        {
+          "key": "readme",
+          "claim": "README updated with 'Receipts — proof, not vibes' section, MCP platform section, updated commands/tables/roadmap",
+          "verdict": "TRUE",
+          "evidence_cited": "\"E:\\\\PRAXIS\\\\README.md\"",
+          "reasoning": "README.md appears in files_edited and the commit message it was staged with describes exactly those README sections."
+        },
+        {
+          "key": "version",
+          "claim": "v0.9.2 version bump",
+          "verdict": "TRUE",
+          "evidence_cited": "\"E:\\\\PRAXIS\\\\package.json\"",
+          "reasoning": "package.json is in files_edited and was staged in the commit whose message ends '- v0.9.2.'"
+        }
+      ],
+      "totals": {
+        "UNVERIFIABLE": 16,
+        "TRUE": 11,
+        "NOT_A_CLAIM": 4
+      }
+    }
+  }
+}

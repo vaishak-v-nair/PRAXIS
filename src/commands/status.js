@@ -99,7 +99,22 @@ export function status(opts = {}) {
         grey(` · ${praxisCmd()} receipt`),
     );
   } else {
-    console.log('  ' + grey('receipts ') + grey('○ none yet — every session seals one automatically when it ends'));
+    // "Armed" is a claim, so it has to be checkable. The hook being installed
+    // is what makes receipts automatic — saying so beats promising it.
+    let armed = false;
+    try {
+      armed = fs.readFileSync(p.settingsFile, 'utf8').includes('praxis-memory capture');
+    } catch {
+      /* no settings file means no hook means not armed */
+    }
+    console.log(
+      '  ' +
+        grey('receipts ') +
+        (armed
+          ? sage('○ armed') + grey(' — none yet; the next session that ends seals one automatically')
+          : amber('○ not armed') + grey(` — run ${praxisCmd()} init here to seal receipts automatically`)),
+    );
+    console.log('  ' + grey('         ') + dim(`Want to see one now? ${praxisCmd()} demo — one minute, no setup, no network.`));
   }
 
   console.log('\n  ' + dim('Loaded into Claude Code automatically via the PRAXIS block in CLAUDE.md.'));

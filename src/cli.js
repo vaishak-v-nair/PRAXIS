@@ -29,6 +29,7 @@ import { gov } from './commands/gov.js';
 import { deck } from './commands/deck.js';
 import { mcp } from './commands/mcp.js';
 import { doctor } from './commands/doctor.js';
+import { demo } from './commands/demo.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
 import { praxisCmd } from './lib/runner.js';
@@ -52,6 +53,7 @@ function help() {
   console.log('\n  ' + miniHeader(version()) + '\n');
   console.log(`  ${bold('Start')}
   ${bold('npx praxis-memory')}${pad}     set up PRAXIS here ${grey('(or show status if already set up)')}
+  ${bold(`${c} demo`)}           see the whole thing in one minute ${grey('— no setup, no network')}
 
   ${bold('The daily four')} ${grey('— most days you need nothing else (and the hooks run these for you)')}
   ${bold(`${c} status`)}         memory, session health, latest receipt verdict
@@ -197,6 +199,9 @@ switch (cmd) {
     break;
   case 'doctor':
     process.exitCode = doctor(process.argv.slice(3));
+    break;
+  case 'demo':
+    process.exitCode = await demo(process.argv.slice(3));
     break;
   case '-v':
   case '--version':

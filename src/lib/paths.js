@@ -1,4 +1,18 @@
+import os from 'node:os';
 import path from 'node:path';
+
+/**
+ * Where the demo keeps its receipts.
+ *
+ * Deliberately NOT inside the project: receipts are cwd-rooted, the demo works
+ * in a throwaway directory, and its own cleanup would delete the one artifact
+ * the stranger is supposed to keep. This home is stable, outside any repo, and
+ * survives everything the demo tears down.
+ */
+export function demoPaths(home = os.homedir()) {
+  const root = path.join(home, '.praxis', 'demo');
+  return { root, receiptsDir: path.join(root, 'receipts') };
+}
 
 /**
  * Resolve every path PRAXIS touches, relative to a project root.

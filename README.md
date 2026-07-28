@@ -23,6 +23,18 @@ npx praxis-memory
 
 *One command — same on **Windows, macOS and Linux** (Node 18+). It sets up the hooks, the memory file, the tray companion, everything — then every session after remembers. No global install needed: the hooks (auto-capture, pre-compact snapshots, tray auto-start) run through `npx`, so they work from day one. Prefer the short `praxis` command? Optional: `npm install -g praxis-memory` — every command below then drops the `npx praxis-memory` prefix.*
 
+**Want to see it before you install anything?**
+
+```bash
+npx praxis-memory demo
+```
+
+*One minute. No agent, no account, no network. It replays a real recorded
+session — including the time our own judge got it wrong and how that produced a
+rule — then seals a genuine signed receipt onto your disk and verifies it in
+front of you. Everything you're shown is labelled: the verdicts are a recording,
+the receipt is not.*
+
 *Never used a terminal? **[Start here](docs/START-HERE.md)** — five minutes, no prior knowledge, works the same in VS Code, Cursor, or a plain terminal window.*
 
 **Two doors:** before Claude, it's the terminal — `praxis`. Inside Claude Code, it's the slash — type `/` and the `/praxis-*` commands are right there.
@@ -108,6 +120,7 @@ seconds. Turn it off any time with `"overlay": false` in `.praxis/config.json`
 
 ```bash
 npx praxis-memory     # set up here (or show status, if already set up)
+praxis demo           # see the whole thing in one minute — no setup, no network
 praxis init           # explicit setup
 praxis status         # what Praxis remembers, and session health
 praxis recap          # catch me up on this project, right in the terminal
