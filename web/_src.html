@@ -1,7 +1,7 @@
-<title>PRAXIS — Local memory for Claude Code. Your AI never forgets your project.</title>
-<meta name="description" content="Praxis is an open-source local memory for Claude Code. It captures your project's decisions, architecture and reasoning into one markdown file — read back automatically every session. No server, no account, $0 added cost.">
-<meta name="keywords" content="Claude Code memory, AI coding assistant, local-first, persistent context, developer tools, open source, CLI, markdown memory">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Praxis","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","url":"https://github.com/vaishak-v-nair/PRAXIS","description":"Open-source local memory for Claude Code. Captures project decisions and reasoning into a markdown file, read back automatically each session."}</script>
+<title>PRAXIS — Your AI says "done." PRAXIS proves it.</title>
+<meta name="description" content="Praxis is an open-source evidence layer for Claude Code: every session leaves a hash-chained, Ed25519-signed receipt of what the AI actually did — verifiable offline, on anyone's machine, free. Plus durable local memory, so it never re-asks. No server, no account.">
+<meta name="keywords" content="AI agent receipts, verify AI work, Claude Code memory, provenance, Ed25519, local-first, developer tools, open source, CLI">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Praxis","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","url":"https://github.com/vaishak-v-nair/PRAXIS","description":"Open-source evidence layer for Claude Code: signed, offline-verifiable receipts of what the AI actually did, plus durable local project memory."}</script>
 <style>
 :root{
   --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
@@ -291,17 +291,17 @@ footer .fcol a:hover{color:var(--rose)}
 </div>
 
 <!-- HERO -->
-<header class="hero" id="heroSec" data-label="local memory for claude code">
+<header class="hero" id="heroSec" data-label="proof + memory for claude code">
   <div class="wrap cols">
     <div>
-      <p class="kick rv in">Local memory for Claude Code</p>
-      <h1 class="rv in">Your AI never forgets your <em>project.</em></h1>
-      <p class="sub rv d1">Praxis gives Claude Code a durable, local memory — it opens every session already knowing your architecture, your decisions, and <i>why that one file is strange.</i></p>
+      <p class="kick rv in">Receipts + memory for Claude Code</p>
+      <h1 class="rv in">Your AI says <em>done.</em> Praxis proves it.</h1>
+      <p class="sub rv d1">Every session leaves a signed, offline-verifiable receipt of what the AI actually did — and a durable local memory of why, so it opens the next session <i>already knowing your project.</i></p>
       <div class="hero-cta rv d2">
-        <a class="cmd" href="#start" data-copy="npx praxis-memory" title="Click to copy"><b>$</b><span class="cmdtxt">npx praxis-memory</span></a>
-        <a class="ghostlink" href="#loop">How it works &rarr;</a>
+        <a class="cmd" href="#start" data-copy="npx praxis-memory demo" title="Click to copy"><b>$</b><span class="cmdtxt">npx praxis-memory demo</span></a>
+        <a class="ghostlink" href="#proof">Hold a receipt in seconds &rarr;</a>
       </div>
-      <p class="facts rv d3">0 bytes uploaded<b>&#10022;</b>$0 added cost<b>&#10022;</b>MIT open source</p>
+      <p class="facts rv d3">0 bytes uploaded<b>&#10022;</b>verify offline, free<b>&#10022;</b>MIT open source</p>
     </div>
     <div class="stage rv d1" id="stage" aria-hidden="true">
       <div class="glow"></div>
@@ -312,20 +312,36 @@ footer .fcol a:hover{color:var(--rose)}
   </div>
   <div class="wrap"><div class="stats"><div class="grid">
     <div class="stat rv"><div class="v">0 bytes</div><div class="k">leave your machine</div></div>
-    <div class="stat rv d1"><div class="v">$0</div><div class="k">added inference cost</div></div>
-    <div class="stat rv d2"><div class="v">1 file</div><div class="k">portable markdown</div></div>
+    <div class="stat rv d1"><div class="v">Ed25519</div><div class="k">every receipt signed</div></div>
+    <div class="stat rv d2"><div class="v">1 file</div><div class="k">portable markdown memory</div></div>
     <div class="stat rv d3"><div class="v">MIT</div><div class="k">open source</div></div>
   </div></div></div>
 </header>
+
+<!-- PROOF -->
+<section class="file" id="proof" data-label="not a recording">
+  <div class="wrap split">
+    <div>
+      <span class="kick rv">Not a recording</span>
+      <h2 class="h2 rv d1">A signed receipt, sealed <em>in front of you.</em></h2>
+      <p class="lead rv d2">Run <b>npx praxis-memory demo</b> and within seconds a genuine Ed25519-signed receipt exists on your own disk — hash-chained, verified offline in front of you, with the command that re-checks it. No agent, no account, no network.</p>
+      <p class="lead rv d3">Only then does it replay the real session that receipt records — including the day our own judge ruled wrong, and the rule that fixed it: <i>presence proves attempted, never succeeded.</i> Everything on screen is labelled: the verdicts are a recording, the receipt is not.</p>
+    </div>
+    <div class="term rv d2">
+      <div class="bar"><i style="background:var(--limit)"></i><i style="background:var(--warn)"></i><i style="background:var(--ok)"></i><span class="t">npx praxis-memory demo &mdash; recorded from the real command</span></div>
+      <img src="__DEMOGIF__" alt="Terminal recording: praxis demo seals a receipt on this machine and verifies it offline — chain intact, signature valid, checked with no network — then hands over the command that re-checks it." style="display:block;width:100%;height:auto" width="692" height="394" loading="lazy">
+    </div>
+  </div>
+</section>
 
 <!-- WHAT -->
 <section class="what" id="what" data-label="what praxis is">
   <div class="wrap">
     <span class="kick rv">What is Praxis?</span>
-    <h2 class="h2 rv d1">A memory layer for your AI pair-programmer.</h2>
-    <p class="lead rv d2">Claude Code is brilliant for a session, then forgets everything when it closes. Praxis fixes that. It is a small open-source tool that distills each coding session into durable project memory — the decisions, constraints and reasons — and hands it back to Claude automatically the next time you open your project.</p>
+    <h2 class="h2 rv d1">Proof of what it did. Memory of why.</h2>
+    <p class="lead rv d2">AI agents report success in prose; nobody can check prose. Praxis is a small open-source evidence layer: when a Claude Code session ends, it seals a hash-chained, signed receipt of what actually happened — and distills the session's decisions into durable project memory that loads back automatically next time.</p>
     <div class="chips">
-      <div class="chip rv d1"><div class="ct">$ the CLI</div><p>One command sets up the hooks. <b>npx praxis-memory</b> and the loop is running — nothing else to configure.</p></div>
+      <div class="chip rv d1"><div class="ct">&#10003; the receipts</div><p>Hash-chained, <b>Ed25519-signed</b> records sealed when a session ends. <b>receipt verify</b> re-checks one offline on anyone's machine — free, no model call. An independent judge can rule each claim against the evidence, strictly opt-in.</p></div>
       <div class="chip rv d2"><div class="ct">&#9998; the memory file</div><p><b>.praxis/memory.md</b> — plain markdown in your repo. Redacted, size-capped, readable by any tool or teammate. Older entries rotate to a forever-archive — nothing is ever deleted.</p></div>
       <div class="chip rv d3"><div class="ct">&#9673; the companion</div><p><b>the tray companion</b> — starts with setup, no extra command: the axolotl beside your clock, its emotion tracking session health live. Windows today; macOS &amp; Linux next.</p></div>
     </div>
@@ -472,14 +488,15 @@ footer .fcol a:hover{color:var(--rose)}
 </section>
 
 <!-- ECONOMICS -->
-<section class="why" id="economics" data-label="the meter">
+<section class="why" id="economics" data-label="the evidence">
   <div class="wrap">
-    <span class="kick rv">The meter</span>
-    <h2 class="h2 rv d1">What did it do, what did it <em>cost</em>, can you <em>trust</em> it?</h2>
+    <span class="kick rv">The evidence</span>
+    <h2 class="h2 rv d1">Did it actually do what it <em>said?</em></h2>
     <div class="rows">
-      <div class="wrow rv"><span class="n">$</span><h3>praxis cost</h3><p>Every transcript carries the real token usage of each model turn. Praxis prices it in API-equivalent dollars &mdash; per session, or the whole project. On a subscription, that number is the value you pulled out. <code>what did that just cost?</code>, answered.</p></div>
+      <div class="wrow rv"><span class="n">&#10003;</span><h3>praxis receipt</h3><p>The signed record of a session: commands run, files edited, commits made &mdash; harvested from the transcript, hash-chained, sealed with this machine's key. Recorded automatically when a session ends. <code>--html</code> renders a card you can attach to the PR.</p></div>
+      <div class="wrow rv"><span class="n">&#8809;</span><h3>praxis receipt verify &lt;file&gt;</h3><p>The offline check: recomputes every hash, verifies the signature, names the exact line where tampering broke the chain. Runs on a stranger's machine with no network, no account, no model call &mdash; the public key travels inside the receipt.</p></div>
+      <div class="wrow rv"><span class="n">&#9878;</span><h3>the judge</h3><p>Opt-in, one real model call: an independent process rules each of the AI's claims against the sealed evidence &mdash; TRUE, FALSE, or the honest UNVERIFIABLE. Certified against seven iron-rule scenarios before any release ships, with a zero false-accusation floor.</p></div>
       <div class="wrow rv"><span class="n">!</span><h3>praxis gate</h3><p>A slop-risk score for a commit from local signals &mdash; churn, tests untouched, how full the session was when it landed, whether it carries a decision trail. A five-second triage before a human spends ninety minutes reviewing. A signal, never a verdict.</p></div>
-      <div class="wrow rv"><span class="n">=</span><h3>praxis roi</h3><p>The receipt: sessions, active AI hours, commits, total and per-commit cost over the last N days. Real numbers from your transcripts and git &mdash; you decide if it was worth it. No dashboard, no account, nothing uploaded.</p></div>
     </div>
   </div>
 </section>
@@ -494,6 +511,7 @@ footer .fcol a:hover{color:var(--rose)}
       <div class="prow rv"><span class="t">11:40 &middot; mid-task</span><p>It doesn't touch <b>cache.ts</b> — the memory records it as load-bearing.</p></div>
       <div class="prow rv"><span class="t">14:15 &middot; branch switch</span><p>The memory travels with the <b>repo</b>, not with a cloud account.</p></div>
       <div class="prow rv"><span class="t">17:30 &middot; session ends</span><p>The day's decisions are <b>written back</b>, redacted and capped. Nothing uploaded.</p></div>
+      <div class="prow rv"><span class="t">17:30 &middot; same moment</span><p>A <b>signed receipt</b> seals what the session actually did &mdash; commands, files, commits. "Is it done?" now has evidence.</p></div>
       <div class="prow rv"><span class="t">tomorrow &middot; 09:00</span><p>New session. It <b>already knows</b>. The loop holds.</p></div>
     </div>
   </div>
@@ -519,7 +537,15 @@ footer .fcol a:hover{color:var(--rose)}
       </details>
       <details>
         <summary>What does it cost to run?</summary>
-        <p>Nothing beyond what you already pay. Praxis makes no API calls of its own — it rides the Claude Code session you're already running, so there is no subscription, no metered usage, and no second bill.</p>
+        <p>The whole loop — capture, memory, sealing receipts, verifying them offline — makes no API calls of its own and adds nothing to your bill. Exactly one thing ever spends tokens, and only when you ask for it: the judge (<code>receipt --verify</code>, or the live demo), which makes one real model call and says so before it starts.</p>
+      </details>
+      <details>
+        <summary>What exactly does a receipt prove?</summary>
+        <p>That the record is unaltered since it was sealed — every line hash-chains to the last, and an Ed25519 signature covers the chain, checkable offline on any machine because the public key travels inside the file. It is tamper-evident, not third-party notarised: it proves the record wasn't changed, not who sealed it. And the evidence obeys one iron rule everywhere: the presence of a command proves it was <i>attempted</i> — never that it succeeded. Demo receipts carry a sealed <code>demo</code> provenance mark, so they can never be passed off as real work.</p>
+      </details>
+      <details>
+        <summary>Can I trust the judge's verdicts?</summary>
+        <p>The judge rules only what the evidence supports — TRUE, FALSE, or the honest UNVERIFIABLE — and it runs as a separate process that gets the sealed record, not the AI's self-report. Before any release ships, it must pass seven certification scenarios against a live model, including one where the correct answer is admitting it cannot tell, with a hard floor of zero false accusations. A judge that can't rule returns no verdict; one is never invented.</p>
       </details>
       <details>
         <summary>Can my team share the memory?</summary>
@@ -552,13 +578,13 @@ footer .fcol a:hover{color:var(--rose)}
 <!-- CTA BAND -->
 <section class="band" id="start" data-label="get started">
   <div class="wrap">
-    <h2 class="rv">Give Claude a <em>memory.</em></h2>
-    <p class="sub rv d1">One command. Every session after remembers.</p>
+    <h2 class="rv">Hold the <em>proof.</em></h2>
+    <p class="sub rv d1">One command to see a receipt. One command to arm your own.</p>
     <div class="run rv d2" data-copy="npx praxis-memory" title="Click to copy" style="cursor:pointer"><b>$</b>&nbsp;<span class="cmdtxt">npx praxis-memory</span></div>
-    <p class="fineprint rv d2" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--card-dim);margin-top:12px">click to copy &middot; windows, macos &amp; linux &middot; node 18+</p>
+    <p class="fineprint rv d2" style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--card-dim);margin-top:12px">click to copy &middot; windows, macos &amp; linux &middot; node 18+ &middot; never seen it? npx praxis-memory demo first</p>
     <div class="doors rv d3">
       <span><b>1</b>&nbsp; before Claude — run it once in your terminal</span>
-      <span><b>2</b>&nbsp; inside Claude — type <em>/</em> &nbsp;&rarr;&nbsp; /praxis-recap &middot; /praxis-save &middot; /praxis-health &middot; /praxis-switch &middot; /praxis-explain &middot; thirteen more</span>
+      <span><b>2</b>&nbsp; inside Claude — type <em>/</em> &nbsp;&rarr;&nbsp; /praxis-receipt &middot; /praxis-recap &middot; /praxis-save &middot; /praxis-health &middot; sixteen more</span>
     </div>
     <div class="links rv d3"><a class="tlink" href="https://github.com/vaishak-v-nair/PRAXIS">View the source on GitHub &rarr;</a></div>
   </div>
@@ -569,15 +595,15 @@ footer .fcol a:hover{color:var(--rose)}
     <div class="fgrid">
       <div class="fcol">
         <div class="fbrand"><img src="__NAVICON__" alt="Praxis axolotl logo">praxis</div>
-        <p class="fnote">Open-source local memory for AI coding. Regenerate lost context, one session to the next.</p>
+        <p class="fnote">Open-source receipts + local memory for AI coding. Your AI says done; Praxis proves it.</p>
       </div>
-      <div class="fcol"><h5>Product</h5><a href="#what">What it is</a><a href="#product">The memory file</a><a href="#loop">How it works</a><a href="#tray">Tray app</a></div>
+      <div class="fcol"><h5>Product</h5><a href="#proof">The receipt</a><a href="#what">What it is</a><a href="#product">The memory file</a><a href="#loop">How it works</a><a href="#tray">Tray app</a></div>
       <div class="fcol"><h5>Resources</h5><a href="https://github.com/vaishak-v-nair/PRAXIS">GitHub</a><a href="https://github.com/vaishak-v-nair/PRAXIS/issues">Issues</a><a href="https://github.com/vaishak-v-nair/PRAXIS/blob/main/LICENSE">License (MIT)</a></div>
       <div class="fcol"><h5>Install</h5><a href="#start">Quick start</a><a href="#faq">FAQ</a></div>
     </div>
     <div class="fbar">
       <span>&copy; 2026 Praxis &middot; MIT licensed</span>
-      <span>regenerate lost context <b style="color:var(--rose);font-weight:400">&#10022;</b></span>
+      <span>your AI says done &mdash; praxis proves it <b style="color:var(--rose);font-weight:400">&#10022;</b></span>
     </div>
   </div>
 </footer>

@@ -1,0 +1,36 @@
+name: Pages
+
+# The website deploys from the repo, by this workflow, to GitHub Pages — the
+# host we control end to end. Two Vercel projects died under this site without
+# anyone noticing; a user finding the 404 was the bug report. The site is a
+# single self-contained file (web/index.html, built by scripts/build-web.mjs
+# and committed), so deployment is upload-and-serve: no build step to break.
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

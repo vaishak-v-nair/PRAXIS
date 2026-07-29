@@ -15,7 +15,10 @@ const root = path.join(import.meta.dirname, '..');
 const SRC = path.join(root, 'web', '_src.html');
 const OUT = path.join(root, 'web', 'index.html');
 const ASSETS = path.join(root, 'web', '_assets');
-const SITE = 'https://praxis-six-xi.vercel.app';
+// GitHub Pages — the host we control end to end. (Two Vercel projects died
+// under this site without anyone noticing until a user found the 404; the
+// canonical home now deploys from the repo itself, by the pages.yml workflow.)
+const SITE = 'https://vaishak-v-nair.github.io/PRAXIS';
 
 if (process.argv.includes('--extract')) {
   const html = fs.readFileSync(OUT, 'utf8');
@@ -50,23 +53,26 @@ const HEAD = `<!DOCTYPE html>
 <link rel="canonical" href="${SITE}/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PRAXIS">
-<meta property="og:title" content="PRAXIS — your AI never forgets your project">
-<meta property="og:description" content="Open-source local memory, session health, a decision trail, and a cost meter for Claude Code and every AI coding agent. Nothing leaves your machine.">
+<meta property="og:title" content="PRAXIS — your AI says done. PRAXIS proves it.">
+<meta property="og:description" content="Signed, offline-verifiable receipts of what your AI actually did — plus durable local memory for Claude Code. Open source, zero deps, nothing leaves your machine.">
 <meta property="og:url" content="${SITE}/">
 <meta property="og:image" content="${SITE}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="PRAXIS — local-first memory for Claude Code. The axolotl mascot beside the command: npx praxis-memory.">
+<meta property="og:image:alt" content="PRAXIS — the axolotl mascot beside the command: npx praxis-memory demo.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PRAXIS — your AI never forgets your project">
-<meta name="twitter:description" content="Local memory, session health, decision trail and cost meter for Claude Code. Nothing leaves your machine.">
+<meta name="twitter:title" content="PRAXIS — your AI says done. PRAXIS proves it.">
+<meta name="twitter:description" content="Signed, offline-verifiable receipts of what your AI actually did — plus durable local memory for Claude Code.">
 <meta name="twitter:image" content="${SITE}/og.png">
 `;
 
 let body = fs.readFileSync(SRC, 'utf8')
   .replaceAll('__NAVICON__', navicon)
   .replaceAll('__PET__', uri('pet.webp', 'image/webp'))
-  .replaceAll('__FLOW__', uri('flow.webp', 'image/webp'));
+  .replaceAll('__FLOW__', uri('flow.webp', 'image/webp'))
+  // the launch recording, cut from the real command — docs/demo.gif is the
+  // source of truth; web/_assets holds the copy the build inlines
+  .replaceAll('__DEMOGIF__', uri('demo.gif', 'image/gif'));
 
 fs.writeFileSync(OUT, HEAD + body);
 console.log('built web/index.html', (fs.statSync(OUT).size / 1024).toFixed(0) + 'KB');
