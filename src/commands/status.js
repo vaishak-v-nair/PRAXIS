@@ -106,7 +106,8 @@ export function status(opts = {}) {
   // Both are the same grid; the welcome is composition, not a second system.
   if (opts.welcome) {
     console.log('\n' + masthead(pkgVersion()) + '\n');
-    console.log(mascotBlock() + '\n');
+    const mascot = mascotBlock(); // empty on terminals that cannot draw it
+    if (mascot) console.log(mascot + '\n');
     console.log(g(rule('this project')));
   } else {
     console.log('\n  ' + miniHeader(pkgVersion(), 'status') + '\n');

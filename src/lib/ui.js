@@ -5,6 +5,15 @@ import { MASCOT_ART } from './mascot-art.js';
 
 const forceRich = process.env.PRAXIS_RICH === '1';
 const useColor = (forceRich || !!process.stdout.isTTY) && !process.env.NO_COLOR;
+// Truecolor art needs a terminal that can draw it. The grid needs nothing —
+// which is why the WELCOME no longer falls back, but the mascot still gates:
+// its pixels are pre-painted 24-bit ANSI, and on legacy conhost or a pipe
+// they land as literal escape garbage. (Removed wholesale in the box
+// retirement; a real user's "UI not looking good" put it back.)
+const richTerm =
+  forceRich ||
+  (useColor &&
+    !!(process.env.WT_SESSION || process.env.COLORTERM === 'truecolor' || process.env.TERM_PROGRAM));
 const paint = (code) => (s) => (useColor ? `\x1b[${code}m${s}\x1b[0m` : String(s));
 
 export const rose = paint('38;5;205');
@@ -151,8 +160,11 @@ export function masthead(version, tagline = 'your AI never forgets your project'
   return lines.map((l) => g(l)).join('\n');
 }
 
-/** The axolotl, on the grid. Brand, not decoration — it is the tray icon too. */
+/** The axolotl, on the grid. Brand, not decoration — it is the tray icon too.
+ *  Empty on terminals that cannot draw truecolor: a mascot rendered as escape
+ *  garbage is worse than no mascot, and the grid around it needs no gate. */
 export function mascotBlock() {
+  if (!richTerm) return '';
   return MASCOT_ART.map((l) => g(l)).join('\n');
 }
 

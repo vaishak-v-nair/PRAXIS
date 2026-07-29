@@ -14,6 +14,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-07-29
+
 ### Added
 
 - **`praxis demo`** — proof in seconds, offline. Seals a genuine signed receipt
@@ -85,6 +87,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 - **A job could report finished before its receipt was linked** — watchers of
   `praxis run` saw a done job with no proof attached. The receipt link is now
   stamped before the exit code is visible.
+- **A single unreadable job file could end a live watch early** — under load,
+  one torn read of a job's metadata was believed as a terminal state, so a
+  hung-but-alive agent was reported "nothing was sealed" instead of "timed
+  out". An unsure status must now survive consecutive polls to be believed.
+- **Tray hosts of deleted projects exit on their own.** Initialising PRAXIS in
+  a short-lived directory (a test run, a scratch clone) used to leave a tray
+  icon that outlived its project forever — ten identical axolotls in one
+  system tray, observed. A host whose project directory is gone now retires
+  itself within seconds.
+- **The mascot only draws where truecolor can draw it.** On legacy consoles
+  and pipes its pixels landed as literal escape codes; those terminals now get
+  the same screen minus the art, and nothing else changes.
 
 ## [0.9.4] — 2026-07-27
 

@@ -54,7 +54,11 @@ export function annotationsFor(failures) {
 
 function main() {
   const args = ['--test', '--test-reporter=tap', '--test-reporter-destination=stdout', 'test/*.test.js'];
-  const child = spawn(process.execPath, args, { encoding: 'utf8' });
+  // No test may spawn a tray host, whether or not it remembered the env var
+  // itself. Learned the observable way: every full-suite run left one hidden
+  // NotifyIcon host per throwaway init repo, and a day of runs left ten
+  // axolotls squatting in the developer's actual system tray.
+  const child = spawn(process.execPath, args, { encoding: 'utf8', env: { ...process.env, PRAXIS_SKIP_TRAY: '1' } });
 
   let tap = '';
   child.stdout.on('data', (d) => {

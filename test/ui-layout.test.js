@@ -145,6 +145,31 @@ test('every line the front door prints fits the grid — welcome and plain statu
   assert.ok(!/INSIDE CLAUDE CODE/.test(plain), 'plain status stays lean — the menu is the front door’s');
 });
 
+test('the mascot only draws where truecolor can draw it — the grid draws everywhere', () => {
+  // The mascot is pre-painted 24-bit ANSI. On legacy conhost or a pipe those
+  // codes land as literal escape garbage — a real user reported the result as
+  // "UI not looking good". The old welcome box gated this and the box
+  // retirement dropped the gate wholesale; this pins its return.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-ui-mascot-'));
+  fs.mkdirSync(path.join(dir, '.praxis'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.praxis', 'memory.md'), '# PRAXIS Memory\n## Project\n\n### 2026-01-01 - session\n- x\n');
+
+  const env = { ...process.env, PRAXIS_SKIP_TRAY: '1' };
+  delete env.PRAXIS_RICH;
+  delete env.WT_SESSION;
+  delete env.COLORTERM;
+  delete env.TERM_PROGRAM;
+
+  const plain = spawnSync(process.execPath, [CLI], { cwd: dir, encoding: 'utf8', timeout: 60000, env });
+  // eslint-disable-next-line no-control-regex
+  assert.ok(!/\x1b\[38;2/.test(plain.stdout), 'no truecolor bytes reach a terminal that never claimed to draw them');
+  assert.match(stripAnsi(plain.stdout), /THIS PROJECT/, 'the grid itself needs no gate and is all there');
+
+  const rich = spawnSync(process.execPath, [CLI], { cwd: dir, encoding: 'utf8', timeout: 60000, env: { ...env, PRAXIS_RICH: '1' } });
+  // eslint-disable-next-line no-control-regex
+  assert.ok(/\x1b\[38;2/.test(rich.stdout), 'and a terminal that can draw the axolotl gets the axolotl');
+});
+
 test('the state caption never restates the state word', () => {
   // "state ● near the cap — At the cap — …" shipped once. The near-cap copy is
   // pinned here so the duplication cannot come back reworded.

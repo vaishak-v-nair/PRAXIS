@@ -131,7 +131,11 @@ test('notesFor extracts one version, verbatim, and only that version', () => {
 });
 
 test('the gate refuses what it must: a missing version, an empty section', () => {
-  const missing = notesFor(CHANGELOG, '99.0.0');
+  // Synthetic changelogs, not the live file: whether [Unreleased] has content
+  // is a fact about where the repo is in its release cycle, and this test
+  // learned that the day a release emptied it.
+  const staged = '# x\n\n## [Unreleased]\n\nnew things waiting\n\n## [1.0.0] — 2026-01-01\n\ncontent\n';
+  const missing = notesFor(staged, '99.0.0');
   assert.equal(missing.ok, false);
   assert.equal(missing.reason, 'missing');
   assert.match(missing.hint, /rename it to \[99\.0\.0\]/, 'the fix is named — [Unreleased] has content waiting');

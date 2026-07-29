@@ -697,9 +697,28 @@ $ni.add_MouseUp({
 $script:lastName = ''
 $script:breath = 0
 $script:healthPopped = ''
+$script:rootGone = 0
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 2000
 $timer.add_Tick({
+  # A host whose project is gone must go with it. Anything that inits PRAXIS
+  # in a short-lived directory (a test run, a scratch clone, a CI sandbox)
+  # spawns a host that would otherwise outlive its project FOREVER - the
+  # observed failure was ten identical axolotls in one tray, one per deleted
+  # temp repo. Two consecutive misses, not one: a transient IO hiccup or an
+  # unmounted network drive must not kill a healthy tray.
+  if (-not (Test-Path -LiteralPath $ProjectRoot)) {
+    $script:rootGone++
+    if ($script:rootGone -ge 2) {
+      $timer.Stop()
+      $ni.Visible = $false
+      $ni.Dispose()
+      [System.Windows.Forms.Application]::Exit()
+      return
+    }
+  } else {
+    $script:rootGone = 0
+  }
   $s = $null
   if ($panel.Visible) { $s = Refresh-Panel } else { $s = Get-PraxisState }
   if ($s.name -ne $script:lastName) {

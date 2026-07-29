@@ -180,7 +180,8 @@ export async function init() {
 
   if (firstRun) {
     console.log('\n' + masthead(pkgVersion()) + '\n');
-    console.log(mascotBlock() + '\n');
+    const mascot = mascotBlock(); // empty on terminals that cannot draw it
+    if (mascot) console.log(mascot + '\n');
     console.log('  ' + bold('Memory is set up.') + '\n');
   } else {
     console.log('\n  ' + miniHeader(pkgVersion(), 'init') + '\n');
