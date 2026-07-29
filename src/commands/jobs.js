@@ -7,6 +7,7 @@
 
 import { projectPaths } from '../lib/paths.js';
 import { listJobs, readMeta, jobStatus, tailOutput } from '../lib/jobs/store.js';
+import { wantsJson, emitJson } from '../lib/jsonout.js';
 import { bold, grey, sage, rose, amber, dim, timeAgo } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
 
@@ -22,15 +23,26 @@ function badge(status) {
 export async function jobs(argv = []) {
   const p = projectPaths();
   const id = argv.find((a) => !a.startsWith('--'));
+  const json = wantsJson(argv);
 
   if (id) {
     const meta = readMeta(p.praxisDir, id);
     if (!meta) {
-      console.log('\n  ' + rose('No job ' + id) + '\n');
+      if (json) {
+        emitJson({ ok: false, error: 'no-such-job', id });
+      } else {
+        console.log('\n  ' + rose('No job ' + id) + '\n');
+      }
       process.exitCode = 1;
       return;
     }
     const status = jobStatus(meta);
+    if (json) {
+      // The meta file is already JSON on disk; status is derived live (a dead
+      // job must never glow green in a script any more than on the deck).
+      emitJson({ ok: true, job: { ...meta, status } });
+      return;
+    }
     console.log('\n  ' + bold('job ' + meta.id) + '   ' + badge(status));
     console.log('  ' + grey('task     ') + meta.task);
     console.log('  ' + grey('tool     ') + meta.tool + grey('  · started ' + timeAgo(new Date(meta.startedAt))));
@@ -59,6 +71,12 @@ export async function jobs(argv = []) {
   }
 
   const rows = listJobs(p.praxisDir);
+  if (json) {
+    // The whole list — the 15-row cap below is for eyes, and a machine asking
+    // for JSON is exactly the reader the cap was protecting humans from.
+    emitJson({ ok: true, jobs: rows });
+    return;
+  }
   if (!rows.length) {
     console.log('\n  ' + grey('No jobs yet. Hand one over: ') + bold(`${praxisCmd()} run "write release notes for the last 5 commits"`) + '\n');
     return;

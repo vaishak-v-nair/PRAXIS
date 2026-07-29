@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
 import { miniHeader, masthead, mascotBlock, slashBlock, rule, row, wrap, g, COL, CONTENT, sage, amber, red, rose, bold, grey, dim, timeAgo, dailyQuote } from '../lib/ui.js';
+import { emitJson } from '../lib/jsonout.js';
 import { praxisCmd } from '../lib/runner.js';
 import { healthReport } from '../lib/health.js';
 import { listReceipts } from '../lib/receipt/render.js';
@@ -20,6 +21,10 @@ function pkgVersion() {
 export function status(opts = {}) {
   const p = projectPaths();
   if (!fs.existsSync(p.memoryFile)) {
+    if (opts.json) {
+      emitJson({ ok: true, version: pkgVersion(), initialized: false });
+      return;
+    }
     console.log('\n  ' + miniHeader(pkgVersion()) + '\n');
     console.log('  PRAXIS is not set up in this directory yet.');
     console.log('  Run ' + bold('npx praxis-memory') + ' to set it up.\n');
@@ -37,6 +42,46 @@ export function status(opts = {}) {
     /* default */
   }
   const fill = bytes / cap;
+
+  if (opts.json) {
+    // The same reads the human path renders, as one document. Suggestions and
+    // pointers stay on the human path — a script wants state, not advice.
+    const hr = healthReport();
+    const receipts = listReceipts(p.receiptsDir);
+    let armed = false;
+    for (const f of [p.settingsLocalFile, p.settingsFile]) {
+      try {
+        if (fs.readFileSync(f, 'utf8').includes('praxis-memory capture')) armed = true;
+      } catch {
+        /* no settings file means no hook here */
+      }
+    }
+    emitJson({
+      ok: true,
+      version: pkgVersion(),
+      initialized: true,
+      memory: {
+        file: path.relative(p.root, p.memoryFile),
+        bytes,
+        capBytes: cap,
+        fill: Number(fill.toFixed(3)),
+        state: fill < 0.6 ? 'healthy' : fill < 0.9 ? 'filling-up' : 'near-cap',
+        entries,
+        updatedAt: stat.mtime.toISOString(),
+      },
+      claude: hr
+        ? { connected: true, live: !!hr.live, idle: !!hr.idle, pct: hr.pct, level: hr.level || null, idleMinutes: hr.idleMinutes ?? null }
+        : { connected: false },
+      receipts: {
+        count: receipts.length,
+        // armed = the capture hook is installed (either scope, D85). Reported
+        // independently of count: receipts can exist from a hook since removed.
+        armed,
+        latest: receipts[0] || null,
+      },
+    });
+    return;
+  }
   const health =
     fill < 0.6
       ? sage('●') + ' healthy'

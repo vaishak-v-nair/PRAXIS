@@ -80,6 +80,7 @@ function help() {
   ${bold('Also included')}
   ${grey(`${c} switch <tool> · ${c} checkpoint · ${c} trace · ${c} gate · ${c} vault <path> · ${c} tray · ${c} telemetry · ${c} feedback`)}
   ${grey(`${c} init · ${c} capture — setup and the (internal) Stop-hook entry`)}
+  ${grey(`--json on status · receipt · jobs · doctor — one document on stdout, stable keys, same exit codes`)}
 
   ${dim('Not our lane, and we will not pretend otherwise:')}
   ${dim('token costs → npx ccusage    ·    live session monitoring → npx cctop')}
@@ -121,7 +122,7 @@ switch (cmd) {
     await init();
     break;
   case 'status':
-    status();
+    status({ json: process.argv.slice(3).includes('--json') });
     break;
   case 'capture':
     await capture();

@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runChecks, summarize } from '../lib/doctor.js';
+import { wantsJson, emitJson } from '../lib/jsonout.js';
 import { miniHeader, sage, red, amber, bold, grey, dim } from '../lib/ui.js';
 
 function pkgVersionSafe() {
@@ -28,6 +29,13 @@ export function doctor(argv = []) {
   const quiet = argv.includes('--quiet');
   const results = runChecks(process.cwd());
   const s = summarize(results);
+
+  if (wantsJson(argv)) {
+    // The checks are already data ({id, label, ok, detail, fix}); the human
+    // path below is a rendering of exactly this, so the two cannot disagree.
+    emitJson({ ok: s.failed.length === 0, version: pkgVersionSafe(), total: s.total, passed: s.passed, checks: results });
+    return s.failed.length === 0 ? 0 : 1;
+  }
 
   if (!quiet) console.log('\n  ' + miniHeader(pkgVersionSafe(), 'doctor') + '\n');
 

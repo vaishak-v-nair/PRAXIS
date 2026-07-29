@@ -44,6 +44,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 - **Releases publish themselves** — a v-tag triggers test → pack-smoke → judge
   certification → human approval → `npm publish` with an OIDC provenance
   attestation. No long-lived npm token exists anywhere.
+- **`--json` across the CLI** — `status`, `receipt` (view, `--list`,
+  `verify <file>`, `--verify`), `jobs` and `doctor` emit one JSON document on
+  stdout with stable keys; `ok` mirrors the exit code. For scripts, CI gates,
+  and anything that reads with a parser instead of eyes.
 
 ### Changed
 

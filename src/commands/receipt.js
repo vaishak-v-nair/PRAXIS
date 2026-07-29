@@ -15,6 +15,7 @@ import { recordReceipt } from '../lib/receipt/record.js';
 import { judge as realJudge } from '../lib/receipt/judge.js';
 import { loadReceipt, listReceipts, renderTerminal, renderHtml } from '../lib/receipt/render.js';
 import { verifyFile } from '../lib/receipt/store.js';
+import { wantsJson, emitJson } from '../lib/jsonout.js';
 import { bold, grey, sage, rose, amber, dim } from '../lib/ui.js';
 
 function tag(v) {
@@ -76,6 +77,27 @@ export function explainVerifyFailure(res) {
  */
 export function verifyReceiptFile(argv = []) {
   const target = argv.find((a) => !a.startsWith('--'));
+  const json = wantsJson(argv);
+
+  if (!target && json) {
+    emitJson({ ok: false, error: 'missing-file', hint: 'receipt verify <file> checks one receipt offline — give it a path' });
+    return 2;
+  }
+
+  if (target && json) {
+    // The CI surface. verifyFile's result is already the whole story; `status`
+    // names the three outcomes so a gate can switch on one word, and the human
+    // explanation rides along for the log line a failing gate prints.
+    const res = verifyFile(path.resolve(target));
+    emitJson({
+      ok: res.ok,
+      file: path.resolve(target),
+      status: !res.ok ? 'NOT_VERIFIED' : res.finalized ? 'VERIFIED' : 'INTACT_UNSEALED',
+      ...res,
+      explanation: res.ok ? null : explainVerifyFailure(res),
+    });
+    return res.ok ? 0 : 1;
+  }
 
   // The disambiguation moment. Someone typing `receipt verify` with no file is
   // usually reaching for one of two different things — say so in two lines
@@ -136,6 +158,7 @@ export async function receipt(argv = []) {
   const p = projectPaths();
   const flags = new Set(argv.filter((a) => a.startsWith('--')));
   const positional = argv.filter((a) => !a.startsWith('--'));
+  const json = wantsJson(argv);
 
   // `receipt verify <file>` — the free, offline sibling of `--verify`
   if (positional[0] === 'verify') {
@@ -146,6 +169,11 @@ export async function receipt(argv = []) {
   // --list — every receipt in this project
   if (flags.has('--list')) {
     const rows = listReceipts(p.receiptsDir);
+    if (json) {
+      // An empty list is a normal answer, not an error — ok mirrors the exit.
+      emitJson({ ok: true, receipts: rows });
+      return;
+    }
     if (!rows.length) {
       console.log('\n  ' + grey('No receipts yet — they record automatically when a session ends.') + '\n');
       return;
@@ -160,11 +188,12 @@ export async function receipt(argv = []) {
   if (flags.has('--verify')) {
     const file = newestTranscript(transcriptDir(p.root));
     if (!file) {
-      console.log('\n  ' + grey('No active session transcript to verify.') + '\n');
+      if (json) emitJson({ ok: true, judged: false, reason: 'no-active-session', receipt: null });
+      else console.log('\n  ' + grey('No active session transcript to verify.') + '\n');
       return;
     }
     const tr = { text: fs.readFileSync(file, 'utf8'), sessionId: path.basename(file, '.jsonl') };
-    console.log('\n  ' + grey('Running the judge on this session… (up to ~4 minutes — one real model call)'));
+    if (!json) console.log('\n  ' + grey('Running the judge on this session… (up to ~4 minutes — one real model call)'));
     const r = await recordReceipt(p.receiptsDir, tr, {
       project: path.basename(p.root),
       now: new Date().toISOString(),
@@ -173,6 +202,10 @@ export async function receipt(argv = []) {
       // (Hook and tool paths keep the tighter default.)
       judge: (input) => realJudge(input, { timeoutMs: 240000 }),
     });
+    if (json) {
+      emitJson({ ok: true, judged: !!r.verified, judgeError: r.verified ? null : r.judgeError || null, receipt: loadReceipt(p.receiptsDir, r.id, r.version) });
+      return;
+    }
     console.log(renderTerminal(loadReceipt(p.receiptsDir, r.id, r.version), { suggestVerify: false }));
     if (!r.verified) console.log('  ' + grey('No verdict: ' + humanizeJudgeError(r.judgeError)) + '\n');
     // the sibling, named where someone has just paid for the other one
@@ -188,6 +221,11 @@ export async function receipt(argv = []) {
   if (!id) {
     const rows = listReceipts(p.receiptsDir);
     if (!rows.length) {
+      if (json) {
+        // "There is no newest receipt" is an answer, not a failure.
+        emitJson({ ok: true, receipt: null });
+        return;
+      }
       // only point at --verify when there is actually a session to verify —
       // a brand-new project would just hit a dead end
       const hasSession = !!newestTranscript(transcriptDir(p.root));
@@ -207,7 +245,19 @@ export async function receipt(argv = []) {
 
   const loaded = loadReceipt(p.receiptsDir, id, version);
   if (!loaded) {
-    console.log('\n  ' + rose('No receipt ') + id + '.\n');
+    // Asking for a receipt BY NAME and not finding it is a failure, and the
+    // exit code says so now — a script checking $? deserves the same signal
+    // a human gets from the colour rose.
+    if (json) emitJson({ ok: false, error: 'no-such-receipt', id });
+    else console.log('\n  ' + rose('No receipt ') + id + '.\n');
+    process.exitCode = 1;
+    return;
+  }
+
+  if (json && !flags.has('--html') && !flags.has('--open')) {
+    // loadReceipt already carries the chain check; a reader gets the receipt
+    // AND whether to believe it in one document.
+    emitJson({ ok: true, receipt: loaded });
     return;
   }
 
@@ -217,6 +267,10 @@ export async function receipt(argv = []) {
   if (flags.has('--html') || flags.has('--open')) {
     const out = positional[1] || path.join(p.root, `praxis-receipt-${loaded.id}${loaded.version > 1 ? '.v' + loaded.version : ''}.html`);
     fs.writeFileSync(out, renderHtml(loaded));
+    if (json) {
+      emitJson({ ok: true, wrote: out, receipt: { id: loaded.id, version: loaded.version } });
+      return;
+    }
     console.log('\n  ' + sage('✓') + ' receipt card written  ' + grey(out));
     console.log('  ' + grey('Self-contained file — attach it to the PR, or send it to whoever asked "is it done?"') + '\n');
     return;
