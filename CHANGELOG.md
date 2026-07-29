@@ -59,6 +59,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 - **The CLI got a design system** — one grid, one type scale, shared components
   (chips, rules, aligned rows) across demo, status and receipts. Terminal
   output is typography now, not printf.
+- **An unknown command answers in two lines** — the nearest real command as a
+  "did you mean", and the help pointer — instead of dumping the entire help
+  screen at someone who mistyped one word. Gibberish gets no guess; a wrong
+  suggestion is worse than none.
 - **Scope honesty.** An overlap audit against what actually exists today found
   cost tracking, live session monitoring and generic memory each served better
   by dedicated tools — so PRAXIS stops competing there and says so. The work

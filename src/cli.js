@@ -31,6 +31,7 @@ import { mcp } from './commands/mcp.js';
 import { doctor } from './commands/doctor.js';
 import { demo } from './commands/demo.js';
 import { warnDeprecated } from './lib/deprecate.js';
+import { didYouMean } from './lib/suggest.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
 import { praxisCmd } from './lib/runner.js';
@@ -137,6 +138,14 @@ try {
 void flush(version());
 
 async function dispatch(cmd) {
+// Every name the switch below answers to, kept adjacent so a new case lands
+// here in the same diff. A stale list only costs a suggestion, never a command.
+const COMMANDS = [
+  'init', 'status', 'capture', 'feedback', 'tray', 'hud', 'switch', 'health',
+  'telemetry', 'trace', 'vault', 'cost', 'checkpoint', 'remember', 'recap',
+  'forget', 'save', 'explain', 'gate', 'roi', 'receipt', 'run', 'jobs',
+  'approve', 'gov', 'deck', 'mcp', 'doctor', 'demo', 'help',
+];
 switch (cmd) {
   case 'init':
     await init();
@@ -261,9 +270,18 @@ switch (cmd) {
   case '-h':
     help();
     break;
-  default:
-    console.log(`Unknown command: ${cmd}\n`);
-    help();
+  default: {
+    // An answer sized to the mistake: one typo gets one suggestion, not the
+    // entire help screen at scroll-destroying length. The full help stays one
+    // named command away, and the miss still exits non-zero for scripts.
+    const c = praxisCmd();
+    const guess = didYouMean(cmd, COMMANDS);
+    console.log(
+      '\n  ' + bold(`Unknown command: ${cmd}`) +
+        (guess ? grey(' — did you mean ') + bold(`${c} ${guess}`) + grey('?') : ''),
+    );
+    console.log('  ' + grey(`All commands: ${c} help`) + '\n');
     process.exitCode = 1;
+  }
 }
 }
