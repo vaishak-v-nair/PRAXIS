@@ -2,10 +2,16 @@ name: Release
 
 # A trust product whose own releases are hand-rolled from a laptop is
 # self-refuting. Provenance can only be minted from CI, so this workflow IS the
-# release ritual: push a v-tag, approve the environment, npm publishes with a
-# provenance attestation. No long-lived npm token exists anywhere.
+# release ritual: write the changelog entry, push a v-tag, approve the
+# environment, npm publishes with a provenance attestation. No long-lived npm
+# token exists anywhere.
 #
-#   git tag v0.10.0 && git push origin v0.10.0
+#   1. CHANGELOG.md: rename [Unreleased] to [0.10.0] — YYYY-MM-DD, commit
+#   2. git tag v0.10.0 && git push origin v0.10.0
+#
+# Step 1 is not optional: the changelog job refuses a tag the file does not
+# name, before the approval gate — the fleet auto-upgrades, and this file is
+# the only notice it gets.
 #
 # One-time setup on npmjs.com (trusted publisher). All four values must match
 # this file EXACTLY or publish fails with a bare 404:
@@ -26,6 +32,21 @@ permissions:
   contents: read
 
 jobs:
+  # Fails in seconds if CHANGELOG.md does not name the tagged version, so a
+  # human is never asked to approve a release that cannot finish. The file is
+  # the source of truth: the GitHub Release body is extracted from it below,
+  # which is what keeps the repo file and the release page from drifting apart.
+  changelog:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    name: the changelog names this release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/ci/changelog.mjs notes "$GITHUB_REF_NAME"
+
   test:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: test · ${{ matrix.os }} · node ${{ matrix.node }}
@@ -73,7 +94,7 @@ jobs:
   publish:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: publish to npm (provenance)
-    needs: [certify]
+    needs: [certify, changelog]
     runs-on: ubuntu-latest
     # The human control point. Everything above is machine-verified; this is
     # the one place a person says "ship it."
@@ -109,11 +130,15 @@ jobs:
       - name: npm publish
         run: npm publish
 
-      # Where the changelog lives. Auto-generated notes plus a hand-written
-      # highlights block (added by editing the release) — this is the page the
-      # README points at as "What's new", and where support changes and any
-      # deprecation reasons are explained to a fleet that auto-upgrades.
-      - name: create the GitHub Release
+      # The release body is CHANGELOG.md's entry for this version — written by
+      # a person, gated above, never typed into a web form after the fact. The
+      # auto-generated commit list is appended underneath as the paper trail.
+      # This page is where support changes and deprecation reasons reach a
+      # fleet that auto-upgrades.
+      - name: create the GitHub Release from CHANGELOG.md
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
+        run: |
+          node scripts/ci/changelog.mjs notes "$GITHUB_REF_NAME" > .release-notes.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
+            --notes-file .release-notes.md --generate-notes

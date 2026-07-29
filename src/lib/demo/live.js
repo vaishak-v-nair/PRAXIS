@@ -157,10 +157,30 @@ export async function waitForJob(
   } = {},
 ) {
   const started = clock();
+  // Blindness is not death. meta.json is a plain write (atomic rename was
+  // tried and reverted — see writeMetaAtomic), so a reader under load can
+  // catch it torn and read null, and a pid check can race a process that is
+  // mid-start. Both read as "not running" for ONE poll. Ending the wait on a
+  // single such read is how a hung-but-alive agent got reported as
+  // "nothing was sealed" — a false statement about work still happening.
+  // So an unsure status must survive consecutive polls before it is believed;
+  // a job that is genuinely dead stays dead, so confirmation costs one extra
+  // poll, while a torn read costs nothing because the next poll sees the job
+  // running again. Trustworthy terminal states (done/draft/failed) come from
+  // a successfully parsed exitCode and return immediately — a torn file
+  // cannot fabricate those.
+  const UNSURE_POLLS = 3;
+  let unsure = 0;
   for (;;) {
     const meta = read(praxisDir, id);
     const s = meta ? status(meta) : 'unknown';
-    if (s !== 'running') return { status: s, meta, elapsedMs: clock() - started };
+    if (s === 'unknown' || s === 'gone') {
+      if (++unsure >= UNSURE_POLLS) return { status: s, meta, elapsedMs: clock() - started };
+    } else if (s !== 'running') {
+      return { status: s, meta, elapsedMs: clock() - started };
+    } else {
+      unsure = 0;
+    }
     // Ctrl-C must stop the agent, not just stop watching it. A detached job the
     // user thinks they cancelled, quietly spending their tokens in a temp
     // directory, is exactly the behavior this product exists to argue against.

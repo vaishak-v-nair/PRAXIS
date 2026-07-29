@@ -299,6 +299,37 @@ test('waitForJob returns on a terminal status, on timeout, and on abort', async 
   assert.equal(aborted.status, 'abort', 'Ctrl-C must stop the agent, not just stop watching it');
 });
 
+test('one torn meta read does not end the watch on a job that is still working', async () => {
+  // meta.json is a plain write; under load a reader can catch it mid-write and
+  // get null for one poll. That single blind read used to be believed as a
+  // terminal state, and the demo then said "nothing was sealed" about an agent
+  // still mid-task. Caught by the full suite failing under load: the hang
+  // fixture, which never exits on its own, was reported as nothing-sealed
+  // instead of timed-out.
+  const running = { pid: process.pid, exitCode: null };
+  const finished = { pid: 999999, exitCode: 0 };
+
+  const reads = [running, null, running, null, null, running, finished];
+  const r = await waitForJob('p', 'j', {
+    read: () => reads.shift() ?? finished,
+    wait: async () => {},
+    pollMs: 0,
+  });
+  assert.equal(r.status, 'done', 'the torn reads were outlived, and the real ending was reported');
+});
+
+test('a job that is genuinely gone is still reported gone — patience is not denial', async () => {
+  const running = { pid: process.pid, exitCode: null };
+  let polls = 0;
+  const r = await waitForJob('p', 'j', {
+    read: () => (polls++ === 0 ? running : null),
+    wait: async () => {},
+    pollMs: 0,
+  });
+  assert.equal(r.status, 'unknown', 'a state that survives consecutive polls is believed');
+  assert.ok(polls >= 3, `it was confirmed (${polls} polls), not concluded from one glance`);
+});
+
 test('preserveReceipt copies rather than re-seals', () => {
   const src = path.join(tmp('src'), 'r-x.v1.jsonl');
   fs.writeFileSync(src, '{"t":"open"}\n');
