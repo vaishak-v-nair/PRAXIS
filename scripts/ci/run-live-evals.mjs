@@ -54,6 +54,19 @@ export function summarize(results) {
 }
 
 async function main() {
+  // Fail fast with the ACTUAL problem. Without this, a missing secret runs
+  // all seven scenarios against nothing and reports seven "judge unavailable"
+  // misses — which reads as a broken judge and cost a release cycle to
+  // diagnose. A judge with no key is not a judge that failed; it is a judge
+  // that was never hired. CI-only: a local `claude` login needs no env key,
+  // and this guard must never block a run that would have worked.
+  if (process.env.CI && !process.env.PRAXIS_JUDGE_CMD && !process.env.ANTHROPIC_API_KEY) {
+    console.error(
+      '::error title=certification cannot run::ANTHROPIC_API_KEY is empty — add the repository secret ' +
+        '(Settings → Secrets and variables → Actions) or set PRAXIS_JUDGE_CMD. No scenario was attempted.',
+    );
+    process.exit(1);
+  }
   const ci = process.argv.indexOf('--concurrency');
   const limit = ci > -1 ? Number(process.argv[ci + 1]) || DEFAULT_CONCURRENCY : DEFAULT_CONCURRENCY;
 
