@@ -28,6 +28,12 @@ export function projectPaths(cwd = process.cwd()) {
     mcpFile: path.join(cwd, '.mcp.json'),
     claudeDir: path.join(cwd, '.claude'),
     settingsFile: path.join(cwd, '.claude', 'settings.json'),
+    // The personal, gitignored twin. Hooks land HERE by default: the shared
+    // file is committed, and a hook in a committed file means every teammate
+    // silently runs `npx -y praxis-memory` at the end of every session without
+    // ever having agreed to it. Opting the whole project in is a choice
+    // somebody makes on purpose, not a side effect of typing one command.
+    settingsLocalFile: path.join(cwd, '.claude', 'settings.local.json'),
     commandsDir: path.join(cwd, '.claude', 'commands'),
     claudeMd: path.join(cwd, 'CLAUDE.md'),
   };

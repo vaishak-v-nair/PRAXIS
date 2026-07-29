@@ -54,6 +54,14 @@ before it starts.*
 
 *Never used a terminal? **[Start here](docs/START-HERE.md)** — five minutes, no prior knowledge, works the same in VS Code, Cursor, or a plain terminal window.*
 
+**What setup writes, and who it affects.** PRAXIS captures each session with a
+Claude Code hook that runs `npx -y praxis-memory`. By default that hook goes in
+`.claude/settings.local.json` — **your** file, gitignored, nobody else touched.
+If your repo has other contributors, setup asks once whether you'd rather arm the
+whole project; choosing that writes the committed `.claude/settings.json`, and
+your teammates then get memory and receipts automatically — which also means
+their sessions run `npx` too. `praxis doctor` always tells you which one you're on.
+
 **Two doors:** before Claude, it's the terminal — `praxis`. Inside Claude Code, it's the slash — type `/` and the `/praxis-*` commands are right there.
 
 </div>

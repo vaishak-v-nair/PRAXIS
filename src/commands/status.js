@@ -101,11 +101,14 @@ export function status(opts = {}) {
   } else {
     // "Armed" is a claim, so it has to be checkable. The hook being installed
     // is what makes receipts automatic — saying so beats promising it.
+    // Either file arms it (D85): personal by default, shared by choice.
     let armed = false;
-    try {
-      armed = fs.readFileSync(p.settingsFile, 'utf8').includes('praxis-memory capture');
-    } catch {
-      /* no settings file means no hook means not armed */
+    for (const f of [p.settingsLocalFile, p.settingsFile]) {
+      try {
+        if (fs.readFileSync(f, 'utf8').includes('praxis-memory capture')) armed = true;
+      } catch {
+        /* no settings file means no hook here */
+      }
     }
     console.log(
       '  ' +

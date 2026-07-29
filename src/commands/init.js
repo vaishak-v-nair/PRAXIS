@@ -7,7 +7,7 @@ import { TELEMETRY_ENDPOINT, telemetryState, setTelemetry } from '../lib/telemet
 import { projectPaths } from '../lib/paths.js';
 import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
-import { patchSettings } from '../lib/settings.js';
+import { patchSettings, resolveHookScope, contributorCount, ignoreLocalSettings } from '../lib/settings.js';
 import { patchMcpConfig } from '../lib/mcp/config.js';
 import { bigBanner, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
@@ -64,13 +64,62 @@ export async function init() {
   const cmd = patchClaudeMd(p.claudeMd);
   done.push(cmd.existed ? 'CLAUDE.md (PRAXIS block refreshed)' : 'CLAUDE.md (created)');
 
-  // .claude/settings.json Stop hook
+  // ── the hooks, and WHOSE machine they run on ────────────────────────────
+  // These hooks run `npx -y praxis-memory` at the end of every session. Written
+  // into the committed settings file, that means every teammate fetches and
+  // executes a package from the network without ever having agreed to it. So
+  // the private file is the default and the shared one is a deliberate answer
+  // to a question (D85). Existing installs keep whichever file they already use.
   fs.mkdirSync(p.claudeDir, { recursive: true });
-  const set = patchSettings(p.settingsFile);
+  const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  let scope = resolveHookScope(p.root, { interactive });
+
+  if (scope.ask) {
+    const n = contributorCount(p.root);
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ans = await new Promise((resolve) =>
+      rl.question(
+        '\n  ' +
+          bold('This repo has ' + n + ' contributors. Who are these hooks for?') +
+          '\n' +
+          grey('  PRAXIS captures each session by running `npx -y praxis-memory` when it ends.') +
+          '\n\n' +
+          '  ' +
+          rose('[1] Just me') +
+          grey('  (default) — .claude/settings.local.json, gitignored. Nobody else is affected.') +
+          '\n' +
+          '  ' +
+          rose('[2] Whole project') +
+          grey(' — .claude/settings.json, committed. Teammates then get memory and') +
+          '\n' +
+          grey('                       receipts automatically, and their sessions will run npx too.') +
+          '\n\n  Choose [1/2]: ',
+        resolve,
+      ),
+    );
+    rl.close();
+    if (String(ans).trim() === '2') {
+      scope = { file: p.settingsFile, scope: 'project', ask: false, reason: 'you chose the whole project' };
+    }
+  }
+
+  const set = patchSettings(scope.file);
+  const where = scope.scope === 'local' ? '.claude/settings.local.json' : '.claude/settings.json';
+  if (scope.scope === 'local') {
+    // The ignore rule is part of choosing "just me" — a personal settings file
+    // that gets committed is precisely the thing this split prevents.
+    try {
+      ignoreLocalSettings(p.root);
+    } catch {
+      /* no git, or an unwritable .gitignore — the hooks still work */
+    }
+  }
   done.push(
     set.already
-      ? '.claude/settings.json (hooks already present)'
-      : '.claude/settings.json — capture on Stop · snapshot before compact · tray on SessionStart',
+      ? `${where} (hooks already present)`
+      : scope.scope === 'local'
+        ? `${where} — capture on Stop · snapshot before compact · tray on SessionStart ${grey('(just you — gitignored)')}`
+        : `${where} — capture on Stop · snapshot before compact · tray on SessionStart ${grey('(whole project — teammates included)')}`,
   );
 
   // .mcp.json — the platform surface. With this, Claude Code hands the model the

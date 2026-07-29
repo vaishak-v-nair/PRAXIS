@@ -82,21 +82,33 @@ export function checkAgentCli(probe = (bin) => onPath(bin)) {
 /** The Stop / PreCompact / SessionStart hooks that make capture automatic. */
 export function checkHooks(cwd = process.cwd()) {
   const p = projectPaths(cwd);
-  let raw = '';
-  try {
-    raw = fs.readFileSync(p.settingsFile, 'utf8');
-  } catch {
+  // Hooks live in the personal file by default and the shared one by choice
+  // (D85). A doctor that only knew about one would call a perfectly good
+  // install broken — and this is the command people run precisely when they
+  // are already unsure whether anything is working.
+  const read = (f) => {
+    try {
+      return fs.readFileSync(f, 'utf8');
+    } catch {
+      return '';
+    }
+  };
+  const local = read(p.settingsLocalFile);
+  const shared = read(p.settingsFile);
+  if (!local && !shared) {
     return check(
       'hooks',
       'Capture hooks',
       false,
-      'no .claude/settings.json in this project',
+      'no .claude/settings.json or settings.local.json in this project',
       `Run ${praxisCmd()} init here.`,
     );
   }
+  const raw = local + shared;
   const wired = raw.includes('praxis-memory capture');
   const legacy = /"command"\s*:\s*"praxis\s/.test(raw);
-  if (wired && !legacy) return check('hooks', 'Capture hooks', true, 'Stop + PreCompact wired through npx');
+  const scope = local.includes('praxis-memory capture') ? 'just you' : 'whole project';
+  if (wired && !legacy) return check('hooks', 'Capture hooks', true, `Stop + PreCompact wired through npx (${scope})`);
   return check(
     'hooks',
     'Capture hooks',

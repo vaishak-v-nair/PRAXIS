@@ -218,8 +218,12 @@ switch (cmd) {
       try {
         const p = projectPaths();
         mkdirSync(p.claudeDir, { recursive: true });
-        const res = patchSettings(p.settingsFile);
-        if (res.repaired) {
+        // repairOnly, and BOTH files: the front door fixes what is broken and
+        // installs nothing. Creating hooks here would silently re-scope an
+        // install somebody already made a decision about.
+        const res = patchSettings(p.settingsFile, { repairOnly: true });
+        const resLocal = patchSettings(p.settingsLocalFile, { repairOnly: true });
+        if (res.repaired || resLocal.repaired) {
           console.log('\n  ' + sage('✓') + ' repaired the Claude Code hooks — they now run through npx' + grey(' (no global install needed)'));
         }
       } catch {
