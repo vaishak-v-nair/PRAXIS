@@ -15,10 +15,12 @@ import { fileURLToPath } from 'node:url';
 import { demoPaths } from '../lib/paths.js';
 import { preflight } from '../lib/doctor.js';
 import { loadCorpus } from '../lib/demo/corpus.js';
-import { playBeats, sealAndVerify, speedFactor } from '../lib/demo/replay.js';
+import { playBeats, sealAndVerify, speedFactor, renderClaim, summariseTotals } from '../lib/demo/replay.js';
 import { armedState, epilogueLines, degradeMessage, classifyFsError, prettyPath } from '../lib/demo/epilogue.js';
+import { runLive, boundaryLines, hasUnverifiable, LIVE_TASK_SUMMARY, liveTimeoutMs } from '../lib/demo/live.js';
+import { startJob } from './run.js';
 import { praxisCmd } from '../lib/runner.js';
-import { miniHeader, bold, grey, sage, rose, amber, dim } from '../lib/ui.js';
+import { miniHeader, bold, grey, sage, rose, amber, blue, dim } from '../lib/ui.js';
 
 function line(s = '') {
   process.stdout.write(s + '\n');
@@ -40,6 +42,183 @@ function floorExit(cls, detail, cmd) {
   line('  ' + degradeMessage(cls, detail, cmd));
   line('');
   return 1;
+}
+
+function mmss(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/**
+ * The last three lines, shared by both modes — one ending, written once.
+ *
+ * `offline` is not decoration. The replay genuinely makes zero network calls
+ * and that is its strongest claim; live calls a model twice. The same sentence
+ * would be a lie in one of the two modes, so it is a parameter.
+ */
+function closing({ receiptPath, displayPath, elapsedMs, agentDetected, suggestLive, cmd, offline = false }) {
+  line('');
+  line(
+    '  ' +
+      sage(`Sealed and verified in ${(elapsedMs / 1000).toFixed(1)}s.`) +
+      (offline ? grey('  Nothing left your machine — zero network calls.') : ''),
+  );
+  line('');
+  for (const l of epilogueLines({
+    receiptPath,
+    displayPath,
+    state: armedState(process.cwd()),
+    agentDetected,
+    suggestLive,
+    cmd,
+  })) {
+    line('  ' + l);
+  }
+  line('');
+  line('  ' + dim('Your AI says "done." PRAXIS proves it.'));
+  line('');
+}
+
+/**
+ * Live mode's screen.
+ *
+ * Everything here is stated BEFORE it happens — where the work will go, that it
+ * costs real tokens, and that the agent cannot reach the reader's project. A
+ * demo that spends someone's money to prove it is trustworthy should at minimum
+ * say so first.
+ *
+ * Returns `{exit}` when live carried the whole show, or `{reason, detail}` when
+ * the caller should announce the degrade and fall back to the replay.
+ */
+async function playLive(cmd, pre, startedAt) {
+  // Once a SIGINT listener exists Node stops exiting on Ctrl-C by itself, so
+  // this handler owns the behavior: stop watching AND kill the agent.
+  let aborted = false;
+  const onSigint = () => {
+    aborted = true;
+  };
+  process.on('SIGINT', onSigint);
+
+  const tty = Boolean(process.stdout.isTTY);
+  let ticking = false;
+  let lastHeartbeat = 0;
+  const clearTick = () => {
+    if (tty && ticking) process.stdout.write('\r' + ' '.repeat(52) + '\r');
+    ticking = false;
+  };
+
+  let res;
+  try {
+    res = await runLive({
+      startJob,
+      onEvent: (e) => {
+        if (e.kind === 'start') {
+          line('  ' + bold('LIVE') + grey('  — a real agent, real work, and a verdict nobody has seen yet.'));
+          line('');
+          line('  ' + grey('sandbox  ') + e.sandbox);
+          line('  ' + grey('task     ') + LIVE_TASK_SUMMARY);
+          line('  ' + grey('safety   ') + 'the agent may write files in that folder ONLY — your project is not touched');
+          line('  ' + grey('cost     ') + 'real tokens: one agent run, one judge call' + grey(`  · gives up after ${mmss(liveTimeoutMs())}, Ctrl-C stops it`));
+          line('');
+        } else if (e.kind === 'tick') {
+          if (tty) {
+            process.stdout.write('\r  ' + amber('·') + ' ' + grey('agent working  ') + mmss(e.elapsedMs));
+            ticking = true;
+          } else if (e.elapsedMs - lastHeartbeat >= 20000) {
+            // Piped or logged: the rewriting ticker is invisible, and four
+            // silent minutes reads as a hang. Say something occasionally.
+            lastHeartbeat = e.elapsedMs;
+            line('  ' + amber('·') + ' ' + grey('agent working  ') + mmss(e.elapsedMs));
+          }
+        } else if (e.kind === 'sealed') {
+          clearTick();
+          line('  ' + sage('◆') + ' ' + grey('agent finished — receipt sealed from its transcript, free, zero model calls'));
+        } else if (e.kind === 'judging') {
+          line('  ' + amber('·') + ' ' + grey('asking the judge to rule its claims against that record…'));
+        }
+      },
+      waitOpts: { shouldAbort: () => aborted },
+    });
+  } catch (e) {
+    // Live is the optional half. Whatever it hits, the reader gets a sentence
+    // and the replay — never a stack trace, which is the one thing a stranger
+    // reads as "this product is broken".
+    return { reason: 'live-error', detail: (e && (e.code || e.message)) || null };
+  } finally {
+    clearTick();
+    process.off('SIGINT', onSigint);
+  }
+
+  if (!res.ok) {
+    // Ctrl-C means stop, not "play me a recording instead".
+    if (res.reason === 'user-abort') {
+      line('');
+      line('  ' + grey('Stopped. The agent was killed; nothing outside ') + res.sandbox + grey(' was touched.'));
+      line('');
+      return { exit: 130 };
+    }
+    // The sandbox stays. It holds the job's own logs, which are the only
+    // diagnostic a person has when live fails — deleting it to be tidy would
+    // throw away the answer to "why?". It lives in temp; the OS sweeps it.
+    return {
+      reason: res.reason,
+      detail: res.detail,
+      note: grey('what live left behind, if you want to look: ') + path.join(res.sandbox, '.praxis', 'jobs'),
+    };
+  }
+
+  const r = res.receipt;
+  const shown = prettyPath(r.file, os.homedir());
+  const v = r.verification;
+
+  line('');
+  line('  ' + bold('None of this was a recording.'));
+  line('');
+  line('  ' + sage('◆') + ' ' + bold('Receipt sealed on this machine') + '  ' + grey(shown));
+  if (v.ok) {
+    line('  ' + sage('✓') + ' chain intact · signature valid   ' + grey(`${v.entries} entries, verified offline just now`));
+  } else {
+    line('  ' + rose('✗') + ' verification failed   ' + grey(v.reason || 'unknown reason'));
+  }
+  line('  ' + amber('·') + ` provenance: ${r.provenance}   ` + grey('sealed in — this was the demo’s work, never counted as yours'));
+
+  if (res.judged) {
+    const s = r.summary || {};
+    const totals = {};
+    if (s.true) totals.TRUE = s.true;
+    if (s.false) totals.FALSE = s.false;
+    if (s.unverifiable) totals.UNVERIFIABLE = s.unverifiable;
+    line('');
+    line('     ' + bold('JUDGED') + '  ' + sage('· ruled just now, on this machine'));
+    line('     ' + grey('headline:') + ' ' + bold(r.verdict) + '   ' + grey(summariseTotals(totals)));
+    line('');
+    for (const c of r.verdicts) line(renderClaim({ claim: c.claim, verdict: c.verdict, reasoning: c.reasoning }));
+
+    line('');
+    line('  ' + bold('What that verdict is, exactly:'));
+    for (const l of boundaryLines({ hadUnverifiable: hasUnverifiable(r.verdicts) })) {
+      line('  ' + blue('·') + ' ' + grey(l));
+    }
+  } else {
+    // The agent worked and the receipt is real; only the ruling is missing.
+    // Falling back to a recording here would trade proof for theatre.
+    line('');
+    line('  ' + amber('·') + ' ' + grey('No verdict: ') + (res.judgeError || 'the judge could not be reached') + grey(' — and none was invented.'));
+    line('  ' + grey('  The receipt above is still real, still sealed, still verifiable. Evidence does not need the judge.'));
+  }
+
+  line('');
+  line('  ' + grey('the agent’s work is still there if you want to read it: ') + res.sandbox);
+
+  closing({
+    receiptPath: r.file,
+    displayPath: shown,
+    elapsedMs: Date.now() - startedAt,
+    agentDetected: pre.canLive,
+    suggestLive: false, // they just watched it
+    cmd,
+  });
+  return { exit: v.ok ? 0 : 1 };
 }
 
 export async function demo(argv = []) {
@@ -72,10 +251,14 @@ export async function demo(argv = []) {
   }
 
   if (mode === 'live') {
-    // Live mode routes through the existing job engine rather than growing a
-    // second way to spawn an agent. It is not wired yet, and saying so is
-    // better than pretending: replay is the guaranteed path and always was.
-    line('  ' + amber('· ') + 'Live mode is not available in this build yet. Running the recorded replay instead.');
+    // Live routes through the same job engine `praxis run` uses (D33) — no
+    // second way to spawn an agent, so the demo cannot show a path the product
+    // does not have. When it cannot finish, it names why and the replay takes
+    // over in the open.
+    const r = await playLive(cmd, pre, started);
+    if (r.exit !== undefined) return r.exit;
+    line('  ' + amber('· ') + degradeMessage(r.reason, r.detail, cmd));
+    if (r.note) line('  ' + dim(r.note));
     line('');
   }
 
@@ -120,22 +303,14 @@ export async function demo(argv = []) {
   line('       ' + dim('The rulings above came from the original run. This receipt is evidence only.'));
 
   // ── the bridge ───────────────────────────────────────────────────────────
-  const elapsed = ((Date.now() - started) / 1000).toFixed(1);
-  const lines = epilogueLines({
+  closing({
     receiptPath: sealed.file, // absolute — this one gets pasted
     displayPath: shown,
-    state: armedState(process.cwd()),
+    elapsedMs: Date.now() - started,
     agentDetected: pre.canLive,
     cmd,
+    offline: true,
   });
-
-  line('');
-  line('  ' + sage(`Sealed and verified in ${elapsed}s.`) + grey('  Nothing left your machine — zero network calls.'));
-  line('');
-  for (const l of lines) line('  ' + l);
-  line('');
-  line('  ' + dim('Your AI says "done." PRAXIS proves it.'));
-  line('');
 
   return v.ok ? 0 : 1;
 }

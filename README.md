@@ -35,6 +35,12 @@ rule — then seals a genuine signed receipt onto your disk and verifies it in
 front of you. Everything you're shown is labelled: the verdicts are a recording,
 the receipt is not.*
 
+*Have an agent CLI installed? `npx praxis-memory demo --live` runs the same loop
+on work that hasn't happened yet: a real agent does a real task in a throwaway
+folder — never your project — and the judge rules its claims minutes later, with
+nobody knowing the verdict in advance. That one spends tokens, and it says so
+before it starts.*
+
 *Never used a terminal? **[Start here](docs/START-HERE.md)** — five minutes, no prior knowledge, works the same in VS Code, Cursor, or a plain terminal window.*
 
 **Two doors:** before Claude, it's the terminal — `praxis`. Inside Claude Code, it's the slash — type `/` and the `/praxis-*` commands are right there.
@@ -121,6 +127,7 @@ seconds. Turn it off any time with `"overlay": false` in `.praxis/config.json`
 ```bash
 npx praxis-memory     # set up here (or show status, if already set up)
 praxis demo           # see the whole thing in one minute — no setup, no network
+praxis demo --live    # same loop on real work: a sandbox agent, judged live (spends tokens)
 praxis init           # explicit setup
 praxis status         # what Praxis remembers, and session health
 praxis recap          # catch me up on this project, right in the terminal

@@ -129,6 +129,26 @@ function headHash(entries) {
 }
 
 /**
+ * Provenance inherited from the environment.
+ *
+ * The demo's LIVE mode seals through the SAME job engine every real run uses
+ * (D33). Marking those receipts by argument would mean threading a demo-only
+ * concern through the shared engine — run → meta → runner → receipt-link — for
+ * one caller's benefit. An inherited variable does it in one line, and the
+ * runner already inherits the demo's environment.
+ *
+ * Safe by direction: this can only mark work as LESS real than it is. The
+ * pattern accepts nothing but `demo…`, so the dangerous direction — something
+ * fabricated posing as real — is not reachable from here. It stays closed by
+ * the absence rule, which the demo can never exploit because the demo always
+ * sets the field.
+ */
+export function envProvenance(env = process.env) {
+  const v = String(env.PRAXIS_RECEIPT_PROVENANCE || '').trim();
+  return /^demo(-[a-z]+)?$/.test(v) ? v : null;
+}
+
+/**
  * Open (or resume) the receipt for a session. Idempotent: if an unfinalized
  * receipt for this session already exists, its head is returned and nothing is
  * written. If the latest version is finalized, a new version is started so a
@@ -162,7 +182,7 @@ export function open(receiptsDir, { sessionId, project, baseRef = null, parent =
     baseRef,
     parent: parent || (version > 1 ? `${id}.v${version - 1}` : null),
     openedAt: now || null,
-    provenance: provenance || null,
+    provenance: provenance || envProvenance(),
   });
   return { id, version, file, created: true };
 }

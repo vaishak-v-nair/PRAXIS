@@ -46,7 +46,11 @@ export function armedLine(state, cmd = 'npx praxis-memory') {
  * real and on disk, the verdict on screen was a recording, and the offline
  * check costs nothing.
  */
-export function epilogueLines({ receiptPath, displayPath, state, agentDetected, cmd = 'npx praxis-memory' }) {
+export function epilogueLines({ receiptPath, displayPath, state, agentDetected, suggestLive, cmd = 'npx praxis-memory' }) {
+  // Live mode ends here too, and inviting someone to try the thing they just
+  // watched reads as a tool that wasn't paying attention. `suggestLive` lets
+  // the caller say "they already have it"; it defaults to the detection.
+  const offerLive = suggestLive === undefined ? agentDetected : suggestLive;
   // The command must be PASTEABLE. A `~` reads nicely and then fails on
   // Windows, where nothing expands it — so the pretty path is for prose and
   // the absolute path is for anything the reader is invited to run.
@@ -55,7 +59,7 @@ export function epilogueLines({ receiptPath, displayPath, state, agentDetected, 
     `  ${cmd} receipt verify ${receiptPath}`,
     armedLine(state, cmd),
   ];
-  if (agentDetected) {
+  if (offerLive) {
     lines.push(`An agent CLI is installed here, so \`${cmd} demo --live\` can run the same loop on real work.`);
   }
   return lines;
@@ -97,6 +101,13 @@ export const DEGRADE = {
   'user-abort': {
     degrades: true,
     line: 'Stopped at your request.',
+  },
+  // The catch-all for live. It degrades rather than floors because live IS the
+  // optional half — whatever went wrong there, the replay still owes the reader
+  // a demo, and the raw code travels in the detail so nothing is hidden.
+  'live-error': {
+    degrades: true,
+    line: 'Live mode hit an unexpected problem.',
   },
   'corpus-missing': {
     floor: true,

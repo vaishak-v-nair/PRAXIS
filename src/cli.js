@@ -55,6 +55,7 @@ function help() {
   console.log(`  ${bold('Start')}
   ${bold('npx praxis-memory')}${pad}     set up PRAXIS here ${grey('(or show status if already set up)')}
   ${bold(`${c} demo`)}           see the whole thing in one minute ${grey('— no setup, no network')}
+  ${grey(`${c} demo --live`)}      ${grey('the same loop on real work: a sandbox agent, judged live (spends tokens)')}
 
   ${bold('The daily four')} ${grey('— most days you need nothing else (and the hooks run these for you)')}
   ${bold(`${c} status`)}         memory, session health, latest receipt verdict

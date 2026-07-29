@@ -79,13 +79,18 @@ child.on('close', async (code) => {
   patchMeta({ exitCode: code == null ? -1 : code, endedAt: new Date().toISOString(), exitSource: 'runner' });
   // the fusion: a finished job seals its own receipt (evidence-only, free).
   // Dynamic import + catch-all: a broken receipt layer must never break jobs.
+  let linked = {};
   try {
     const { sealJobReceipt } = await import(new URL('./receipt-link.js', import.meta.url));
-    const linked = await sealJobReceipt(path.join(dir, '..', '..'), { id: path.basename(dir), cwd: meta.cwd });
-    if (linked && Object.keys(linked).length) patchMeta(linked);
+    linked = (await sealJobReceipt(path.join(dir, '..', '..'), { id: path.basename(dir), cwd: meta.cwd })) || {};
   } catch {
     /* deck shows the job without a receipt — honest either way */
   }
+  // Stamped unconditionally, even when nothing could be linked. Exit code lands
+  // BEFORE this work, so anything watching for the job to finish sees "done" a
+  // beat before the receipt exists — and concludes there is no receipt. This
+  // field is the difference between "no receipt" and "not yet".
+  patchMeta({ ...linked, receiptLinkedAt: new Date().toISOString() });
   process.exit(0);
 });
 
