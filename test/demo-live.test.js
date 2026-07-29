@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 
 import {
   LIVE_TASK,
+  LIVE_ALLOWED_TOOLS,
   liveTimeoutMs,
   makeSandbox,
   classifyLiveFailure,
@@ -23,7 +24,7 @@ import {
   hasUnverifiable,
   runLive,
 } from '../src/lib/demo/live.js';
-import { startJob } from '../src/commands/run.js';
+import { startJob, buildAgentArgv } from '../src/commands/run.js';
 import { judge } from '../src/lib/receipt/judge.js';
 import { verifyFile, readEntries, provenanceOf, isDemo, envProvenance } from '../src/lib/receipt/store.js';
 import { DEGRADE, degradeMessage } from '../src/lib/demo/epilogue.js';
@@ -225,6 +226,24 @@ test('the live task is written so the record can answer some claims and not othe
   assert.match(LIVE_TASK, /sum\.js/);
   assert.match(LIVE_TASK, /node --test/, 'running the tests is what makes iron rule 5 visible live');
   assert.match(LIVE_TASK, /do not touch any other directory/i, 'the sandbox is stated to the agent too');
+});
+
+test('live grants the agent one command by name, never a blanket bypass', () => {
+  // The first real run watched the agent get DENIED `node --test` four times:
+  // acceptEdits pre-approves edits and nothing else. The tempting fix was
+  // bypassPermissions, which would have contradicted the demo's own safety line
+  // on screen. This asserts the narrow grant stays narrow.
+  const argv = buildAgentArgv(['claude', '-p'], { mode: 'acceptEdits', extraArgs: LIVE_ALLOWED_TOOLS });
+  assert.deepEqual(argv, ['claude', '-p', '--allowedTools', 'Write', 'Edit', 'Read', 'Bash(node --test*)', '--permission-mode', 'acceptEdits']);
+  assert.ok(!argv.includes('bypassPermissions'), 'live must never hand over the whole machine to make a demo work');
+
+  const bash = LIVE_ALLOWED_TOOLS.filter((t) => t.startsWith('Bash('));
+  assert.equal(bash.length, 1, 'exactly one command is allowed');
+  assert.match(bash[0], /^Bash\(node --test/, 'and it is the one the task actually needs');
+
+  // An injected command is a fixture or another tool: it never gets claude's
+  // vocabulary bolted onto it.
+  assert.deepEqual(buildAgentArgv(['node', 'fake.mjs'], { mode: 'acceptEdits', extraArgs: LIVE_ALLOWED_TOOLS, injected: true }), ['node', 'fake.mjs']);
 });
 
 test('liveTimeoutMs is overridable and never zero', () => {

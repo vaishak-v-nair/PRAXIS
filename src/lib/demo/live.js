@@ -58,6 +58,17 @@ export const LIVE_TASK = [
 /** A short label for the task, for the header — the full prompt is not the point. */
 export const LIVE_TASK_SUMMARY = 'write sum.js + a test for it, run the test, report back';
 
+/**
+ * Exactly what the agent is allowed to do, by name. Writing files and running
+ * one command — nothing else, on a machine that is not ours.
+ *
+ * This is the whole reason live does not use bypassPermissions. The screen
+ * promises the agent can only write files in the sandbox; a mode that lets it
+ * run arbitrary commands anywhere would make that sentence false, and a demo
+ * whose safety copy is false is worse than no demo.
+ */
+export const LIVE_ALLOWED_TOOLS = ['--allowedTools', 'Write', 'Edit', 'Read', 'Bash(node --test*)'];
+
 /** How long live waits before it stops waiting. Real work is unpredictable; a demo is not. */
 export function liveTimeoutMs(env = process.env) {
   const n = Number(env.PRAXIS_DEMO_LIVE_TIMEOUT_MS);
@@ -276,11 +287,16 @@ export async function runLive({
     onEvent({ kind: 'start', sandbox });
 
     // acceptEdits, not the usual safe draft: the agent has to actually write
-    // the files for there to be anything to verify. Safe because the only
-    // directory it can reach is one we made two lines ago and can throw away.
+    // the files for there to be anything to verify.
+    //
+    // acceptEdits alone is not enough — it pre-approves file edits and nothing
+    // else, so the first real run watched the agent get denied `node --test`
+    // four times. The fix is NOT bypassPermissions: that would let the agent run
+    // anything anywhere and make the demo's own promise ("files in that folder
+    // ONLY") a lie on screen. So exactly one command is allowed by name.
     let job;
     try {
-      job = await startJob({ task: LIVE_TASK, tool: 'claude', mode: 'acceptEdits', cwd: sandbox });
+      job = await startJob({ task: LIVE_TASK, tool: 'claude', mode: 'acceptEdits', cwd: sandbox, extraArgs: LIVE_ALLOWED_TOOLS });
     } catch (e) {
       return done({ ok: false, reason: 'spawn-failed', detail: e && e.message });
     }

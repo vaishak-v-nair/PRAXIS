@@ -37,6 +37,19 @@ export function resolveRunCmd(tool = 'claude') {
 }
 
 /**
+ * Build the agent's argv.
+ *
+ * Pure, and separated out because this line is a safety boundary: it decides
+ * what the spawned agent is permitted to do. An injected command (tests, other
+ * tools) gets exactly the argv it asked for and no permission flags invented
+ * for it — otherwise a fixture would be handed claude's vocabulary.
+ */
+export function buildAgentArgv(base, { mode = 'plan', extraArgs = [], injected = false } = {}) {
+  if (injected) return [...base];
+  return [...base, ...extraArgs, '--permission-mode', mode];
+}
+
+/**
  * Start a detached agent job. The engine behind `praxis run` AND `praxis
  * approve` (which starts the execution twin of an approved draft).
  *
@@ -45,15 +58,18 @@ export function resolveRunCmd(tool = 'claude') {
  *                   produce a plan, NOTHING on disk is touched.
  *   'acceptEdits' — execute: file edits pre-approved (the approve flow).
  *   'bypassPermissions' — full auto, everything allowed (--full-auto, loud).
+ *
+ * `extraArgs` is how a caller grants LESS than a mode would. The demo's live
+ * run needs one specific command allowed and nothing else; the alternative was
+ * bypassPermissions, which would have made the demo's own on-screen promise
+ * ("the agent may write files in that folder ONLY") untrue.
  */
-export async function startJob({ task, tool = 'claude', mode = 'plan', approvedFrom = null, goal = null, cwd }) {
+export async function startJob({ task, tool = 'claude', mode = 'plan', approvedFrom = null, goal = null, cwd, extraArgs = [] }) {
   const p = projectPaths(cwd);
   const base = resolveRunCmd(tool);
   if (!base) return { error: 'no-adapter' };
 
-  // permission flags only apply to the real claude adapter — an injected
-  // test/other-tool command gets exactly the argv it asked for
-  const argvFull = process.env.PRAXIS_RUN_CMD ? base : [...base, '--permission-mode', mode];
+  const argvFull = buildAgentArgv(base, { mode, extraArgs, injected: Boolean(process.env.PRAXIS_RUN_CMD) });
 
   const id = newJobId();
   const { dir } = createJob(p.praxisDir, { id, task, tool, argv: argvFull, cwd: p.root });
