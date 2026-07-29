@@ -256,7 +256,10 @@ test('liveTimeoutMs is overridable and never zero', () => {
 test('the sandbox is a throwaway outside the project, and survives git being absent', () => {
   const root = tmp('sbx');
   const dir = makeSandbox({ root, git: false });
-  assert.ok(dir.startsWith(root), 'never the user’s project');
+  // Compared against the RESOLVED root: on macOS the temp tree is a symlink,
+  // and the sandbox deliberately returns the real path (see makeSandbox).
+  assert.ok(dir.startsWith(fs.realpathSync(root)), 'never the user’s project');
+  assert.equal(dir, fs.realpathSync(dir), 'the cwd handed to an agent IS the path the agent will report — no alias, no macOS transcript miss');
   assert.ok(fs.existsSync(path.join(dir, 'README.md')), 'and it says what it is');
   assert.match(fs.readFileSync(path.join(dir, 'README.md'), 'utf8'), /throwaway/i);
 });

@@ -81,7 +81,14 @@ export function liveTimeoutMs(env = process.env) {
  * optional everywhere else in PRAXIS and must be optional here too.
  */
 export function makeSandbox({ root = os.tmpdir(), git = true } = {}) {
-  const dir = fs.mkdtempSync(path.join(root, 'praxis-live-'));
+  // realpath, not the string mkdtemp returned: on macOS the temp root is a
+  // symlink (/var/folders → /private/var/folders), so the agent spawned with
+  // this cwd reports the RESOLVED path while we kept the alias. Every lookup
+  // derived from the cwd — the transcript directory above all — then computes
+  // two different names for one place, and live mode ends "nothing-sealed"
+  // with the agent's work sitting right there. Broke on every Mac, found the
+  // first time CI's macOS lane ever ran these tests.
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(root, 'praxis-live-')));
   fs.writeFileSync(
     path.join(dir, 'README.md'),
     [

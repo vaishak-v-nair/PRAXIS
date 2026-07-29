@@ -99,6 +99,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 - **The mascot only draws where truecolor can draw it.** On legacy consoles
   and pipes its pixels landed as literal escape codes; those terminals now get
   the same screen minus the art, and nothing else changes.
+- **`demo --live` works on macOS.** The sandbox lived under a symlinked temp
+  path, so the agent reported one cwd and PRAXIS derived the transcript
+  location from another — live mode always ended "nothing was sealed" with
+  the agent's work sitting right there. The sandbox path is resolved at
+  creation now.
 
 ## [0.9.4] — 2026-07-27
 
