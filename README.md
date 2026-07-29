@@ -17,6 +17,8 @@ file, handed back automatically next time, so you never re-explain your project.
 [![node](https://img.shields.io/badge/node-%E2%89%A522-4e8fd0)](https://nodejs.org)
 [![local-first](https://img.shields.io/badge/data-never%20leaves%20your%20machine-dfa03a)](#safety)
 
+**[Website](https://vaishak-v-nair.github.io/PRAXIS/)** · **[Changelog](CHANGELOG.md)** · **[Receipt spec](RECEIPT-SPEC.md)** · **[Start here (no terminal experience)](docs/START-HERE.md)**
+
 ```bash
 npx praxis-memory
 ```

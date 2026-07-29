@@ -2,7 +2,7 @@
 
 Deferred work with context. Added by /plan-ceo-review 2026-07-23 (receipts plan);
 tracked publicly since v0.9.2 — receipts shipped and the direction is announced
-in the README. The website stays frozen until the 1.0 loud launch.
+in the README. The website relaunched 2026-07-29 (proof-first, GitHub Pages).
 
 ## P2 — macOS/Linux tray port
 
