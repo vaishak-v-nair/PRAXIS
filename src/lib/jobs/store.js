@@ -25,6 +25,24 @@ export function jobDir(praxisDir, id) {
   return path.join(jobsDir(praxisDir), id);
 }
 
+/**
+ * Write meta.json.
+ *
+ * Two processes own this file: the CLI that starts a job, and the detached
+ * runner it spawns. The obvious hardening — write a temp file and rename over
+ * the target — was tried and REVERTED, and the reason is worth keeping: on
+ * Windows a rename onto a path another process holds open throws EPERM, so it
+ * converted a rare read race into a frequent write failure. Measured: the suite
+ * went from failing about one run in three to failing every run.
+ *
+ * A single small writeFileSync is the lesser evil here, paired with a tolerant
+ * reader below. If this ever needs to be truly atomic it needs a lock, not a
+ * rename.
+ */
+export function writeMetaAtomic(file, meta) {
+  fs.writeFileSync(file, JSON.stringify(meta, null, 2));
+}
+
 /** Create the job's folder + meta before spawn. Returns paths the runner uses. */
 export function createJob(praxisDir, { id, task, tool, argv, cwd, now }) {
   const dir = jobDir(praxisDir, id);
@@ -40,23 +58,29 @@ export function createJob(praxisDir, { id, task, tool, argv, cwd, now }) {
     endedAt: null,
     exitCode: null,
   };
-  fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2));
+  writeMetaAtomic(path.join(dir, 'meta.json'), meta);
   return { dir, metaFile: path.join(dir, 'meta.json'), outFile: path.join(dir, 'out.log'), errFile: path.join(dir, 'err.log') };
 }
 
 export function readMeta(praxisDir, id) {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(jobDir(praxisDir, id), 'meta.json'), 'utf8'));
-  } catch {
-    return null;
+  const file = path.join(jobDir(praxisDir, id), 'meta.json');
+  // One retry: on Windows a rename can briefly deny the reader (EPERM/EBUSY),
+  // and a null meta reads to the deck as a job that never existed.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      if (attempt) return null;
+    }
   }
+  return null;
 }
 
 export function updateMeta(praxisDir, id, patch) {
   const meta = readMeta(praxisDir, id);
   if (!meta) return null;
   const next = { ...meta, ...patch };
-  fs.writeFileSync(path.join(jobDir(praxisDir, id), 'meta.json'), JSON.stringify(next, null, 2));
+  writeMetaAtomic(path.join(jobDir(praxisDir, id), 'meta.json'), next);
   return next;
 }
 

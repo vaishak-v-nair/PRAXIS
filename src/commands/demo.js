@@ -11,6 +11,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { demoPaths } from '../lib/paths.js';
 import { preflight } from '../lib/doctor.js';
@@ -52,13 +53,30 @@ function mmss(ms) {
 }
 
 /**
+ * A pause, scaled by the same speed control the replay uses.
+ *
+ * The ending used to arrive as one instantaneous dump: the seal, the labels,
+ * the elapsed time and the closing command all landed in the same frame. That
+ * undersells the one moment the whole demo exists to deliver, and it is the
+ * moment the launch recording is built around — a beat nobody can see is a beat
+ * that cannot be recorded either.
+ *
+ * PRAXIS_DEMO_SPEED=0 makes every one of these zero, so tests and the CI timing
+ * meter still measure the work rather than the pacing.
+ */
+function beat(ms) {
+  const d = Math.round(ms * speedFactor());
+  return d > 0 ? new Promise((r) => setTimeout(r, d)) : Promise.resolve();
+}
+
+/**
  * The last three lines, shared by both modes — one ending, written once.
  *
  * `offline` is not decoration. The replay genuinely makes zero network calls
  * and that is its strongest claim; live calls a model twice. The same sentence
  * would be a lie in one of the two modes, so it is a parameter.
  */
-function closing({ receiptPath, displayPath, elapsedMs, agentDetected, suggestLive, cmd, offline = false }) {
+async function closing({ receiptPath, displayPath, elapsedMs, agentDetected, suggestLive, cmd, offline = false }) {
   const b = epilogueBlock({
     receiptPath,
     displayPath,
@@ -78,8 +96,10 @@ function closing({ receiptPath, displayPath, elapsedMs, agentDetected, suggestLi
   line(g(rule('verify it yourself')));
   line(g(grey('offline · free · no account · no model call')));
   line('');
+  await beat(700);
   line(g(pad(2) + bold(b.command)));
   line('');
+  await beat(900);
   for (const l of wrap(b.state, CONTENT)) line(g(grey(l)));
   if (b.live) for (const l of wrap(b.live, CONTENT)) line(g(dim(l)));
   line('');
@@ -187,7 +207,10 @@ async function playLive(cmd, pre, startedAt) {
   line(g(chip('sealed', 'sage', CHIP_W) + '  ' + bold('on this machine') + '  ' + grey(shown)));
   if (v.ok) {
     line(g(chip('verified', 'sage', CHIP_W) + '  ' + bold('chain intact · signature valid')));
-    for (const l of wrap(`${v.entries} entries, checked offline just now — no network, no model call`, CONTENT - COL)) {
+    // Fits one line at this measure on purpose: the previous wording left the
+    // word "call" alone on a line directly under the proof, which is the first
+    // thing anyone sees in the looping README asset.
+    for (const l of wrap(`${v.entries} entries · checked offline just now, no network`, CONTENT - COL)) {
       line(g(pad(COL) + dim(l)));
     }
   } else {
@@ -232,7 +255,7 @@ async function playLive(cmd, pre, startedAt) {
   line(g(row('the work', grey(res.sandbox))));
   line(g(pad(COL) + dim('still there if you want to read what the agent actually wrote')));
 
-  closing({
+  await closing({
     receiptPath: r.file,
     displayPath: shown,
     elapsedMs: Date.now() - startedAt,
@@ -301,7 +324,12 @@ export async function demo(argv = []) {
   let sealed;
   try {
     sealed = sealAndVerify(receiptsDir, corpus, {
-      sessionId: `demo-${Date.now()}`,
+      // Random, not just timestamped. Two demos started in the same millisecond
+      // used to derive the same session id, therefore the same receipt id —
+      // and since open() RESUMES an unsealed receipt rather than clobbering it,
+      // both processes appended to one chain and both ended up reading
+      // chain-broken. Reproduced at 2 failures in 8 concurrent runs.
+      sessionId: `demo-${Date.now()}-${randomBytes(4).toString('hex')}`,
       now: new Date().toISOString(),
     });
   } catch (e) {
@@ -318,15 +346,21 @@ export async function demo(argv = []) {
   // and never as a footnote, then elapsed, then the command to check it.
   line('');
   line(g(rule('none of this part is a recording')));
+  await beat(900);
   line('');
   // Every chip padded to one width, so the text beside them lands on the same
   // column as the labelled rows below — one edge down the whole block.
   line(g(chip('sealed', 'sage', CHIP_W) + '  ' + bold('on this machine') + '  ' + grey(shown)));
+  await beat(1100);
   if (v.ok) {
     line(g(chip('verified', 'sage', CHIP_W) + '  ' + bold('chain intact · signature valid')));
-    for (const l of wrap(`${v.entries} entries, checked offline just now — no network, no model call`, CONTENT - COL)) {
+    // Fits one line at this measure on purpose: the previous wording left the
+    // word "call" alone on a line directly under the proof, which is the first
+    // thing anyone sees in the looping README asset.
+    for (const l of wrap(`${v.entries} entries · checked offline just now, no network`, CONTENT - COL)) {
       line(g(pad(COL) + dim(l)));
     }
+    await beat(1300);
   } else {
     // Sealing succeeded but verification did not: say so rather than claim it.
     line(g(chip('unverified', 'rose', CHIP_W) + '  ' + bold(v.reason || 'verification failed')));
@@ -335,9 +369,10 @@ export async function demo(argv = []) {
   line(g(amber('recorded'.padEnd(COL)) + grey('the verdicts above are a replay of a real run')));
   line(g(row('provenance', grey('demo-replay — sealed in, never counts as real work'))));
   line(g(row('no verdict', grey('no judge ran here, and a verdict is never invented'))));
+  await beat(1400);
 
   // ── the bridge ───────────────────────────────────────────────────────────
-  closing({
+  await closing({
     receiptPath: sealed.file, // absolute — this one gets pasted
     displayPath: shown,
     elapsedMs: Date.now() - started,

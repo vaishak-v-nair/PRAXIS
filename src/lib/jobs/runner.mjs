@@ -17,6 +17,8 @@ const metaFile = path.join(dir, 'meta.json');
 function patchMeta(patch) {
   try {
     const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+    // Deliberately a plain write, matching the store — see writeMetaAtomic
+    // there for why the temp-file-and-rename version was reverted.
     fs.writeFileSync(metaFile, JSON.stringify({ ...meta, ...patch }, null, 2));
   } catch {
     /* the deck degrades to pid-liveness if meta is unreadable */

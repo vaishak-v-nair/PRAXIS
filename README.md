@@ -29,6 +29,17 @@ npx praxis-memory
 npx praxis-memory demo
 ```
 
+<!--
+  Recorded from the real command by scripts/record-demo.mjs — it spawns the CLI
+  and renders the bytes it actually wrote. The loop starts on the seal frame so
+  a scroller meets the proof first, not the build-up.
+  Alt text is deliberately NOT "shows a verified verdict": this receipt carries
+  no verdict at all, because no judge ran. Alt text describes what is on screen.
+-->
+<img src="docs/demo.gif" width="692" alt="Terminal recording: praxis demo seals a receipt on your own machine and verifies it offline — chain intact, signature valid, checked with no network. The screen labels the verdicts above it as a replay of a real run, and the receipt itself as carrying no verdict." />
+
+*[Full recording as MP4](docs/demo.mp4) — same run, sharper type.*
+
 *One minute. No agent, no account, no network. It replays a real recorded
 session — including the time our own judge got it wrong and how that produced a
 rule — then seals a genuine signed receipt onto your disk and verifies it in

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 
 import { loadCorpus, validateCorpus, corpusPath } from '../src/lib/demo/corpus.js';
 import { sealDemoReceipt, sealAndVerify, renderClaim, summariseTotals, speedFactor } from '../src/lib/demo/replay.js';
@@ -188,6 +188,34 @@ test('speed is tunable so CI measures the real thing and tests do not sleep', ()
   assert.equal(speedFactor({ PRAXIS_DEMO_SPEED: '1' }), 1);
   assert.equal(speedFactor({}), 0.55, 'default pacing is brisk enough to stay well inside the promise');
   assert.equal(speedFactor({ PRAXIS_DEMO_SPEED: 'nonsense' }), 0.55, 'garbage falls back rather than freezing the demo');
+});
+
+test('two demos started at the same instant do not break each other’s chain', async () => {
+  // A real bug, reproduced before it was fixed: the session id was derived from
+  // Date.now() alone, so concurrent demos produced the SAME receipt id — and
+  // open() resumes an unsealed receipt rather than clobbering it, so both
+  // processes appended to one chain and both then read chain-broken. It failed
+  // 2 runs in 8. Anything sharing a receipts home can hit this: a CI matrix, a
+  // tmux pane, someone showing two colleagues at once.
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-demo-race-'));
+  const env = { PRAXIS_DEMO_SPEED: '0', HOME: home, USERPROFILE: home, PRAXIS_KEY_DIR: path.join(home, 'keys') };
+
+  const runs = await Promise.all(
+    Array.from({ length: 6 }, () =>
+      new Promise((resolve) => {
+        const c = spawn(process.execPath, [CLI, 'demo'], { env: { ...process.env, ...env } });
+        let out = '';
+        c.stdout.on('data', (d) => (out += d));
+        c.on('close', (code) => resolve({ code, out }));
+      }),
+    ),
+  );
+
+  const failed = runs.filter((r) => r.code !== 0);
+  assert.equal(failed.length, 0, 'every concurrent demo seals a receipt that verifies');
+
+  const ids = runs.map((r) => (r.out.match(/receipt verify \S*[\\/](\S+\.jsonl)/) || [])[1]);
+  assert.equal(new Set(ids).size, ids.length, 'and each one gets a receipt of its own');
 });
 
 test('rendering: verdict words carry the meaning, not just the colour', () => {
