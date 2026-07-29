@@ -199,10 +199,10 @@ test('`demo --live` renders the live screen and exits clean', { skip: !hasAgentC
   });
   const out = r.stdout || '';
   assert.equal(r.status, 0, out.slice(-800));
-  assert.match(out, /None of this was a recording/);
+  assert.match(out, /NONE OF THIS WAS A RECORDING/);
   assert.match(out, /chain intact · signature valid/);
-  assert.match(out, /provenance: demo-live/);
-  assert.match(out, /ruled just now, on this machine/);
+  assert.match(out, /provenance\s+demo-live/);
+  assert.match(out, /ruled just now/);
   assert.match(out, /not a review of the code/i, 'the boundary is never dropped from the real screen');
   assert.doesNotMatch(out, /Nothing left your machine/, 'live calls a model twice — that line belongs to the replay alone');
   assert.doesNotMatch(out, /demo --live` can run the same loop/, 'do not invite someone to the thing they just watched');

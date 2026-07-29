@@ -12,7 +12,7 @@
   "beats": [
     {
       "kind": "narration",
-      "text": "Replaying a real session from this project — 2026-07-25.",
+      "text": "An agent finished a session and reported what it had done.",
       "holdMs": 1400
     },
     {

@@ -15,7 +15,7 @@
 
 import fs from 'node:fs';
 import { open, append, finalize, verifyFile, receiptFile } from '../receipt/store.js';
-import { sage, rose, amber, blue, grey, bold, dim } from '../ui.js';
+import { sage, rose, amber, blue, grey, bold, dim, chip, rule, wrap, claimRow, g, CONTENT, COL, CHIP_W } from '../ui.js';
 
 /** Pacing. 1 = as recorded; 0 = instant (tests, CI). */
 export function speedFactor(env = process.env) {
@@ -34,29 +34,58 @@ function verdictColor(v) {
   return grey;
 }
 
-/** One claim, rendered as the judge ruled it — verdict word first, colour second. */
-export function renderClaim(c, indent = '     ') {
-  const paint = verdictColor(c.verdict);
-  const lines = [`${indent}${paint(c.verdict.padEnd(13))} ${c.claim}`];
-  if (c.reasoning) lines.push(`${indent}              ${dim(c.reasoning)}`);
-  return lines.join('\n');
+/**
+ * One claim, on the grid: state word in its own fixed column, the claim wrapped
+ * beside it, the judge's reasoning as a caption underneath.
+ *
+ * The state word is never shortened and never moves. Someone scanning only that
+ * column sees the shape of the judging — how much held, how much the record
+ * simply could not answer — before reading a word of the claims.
+ */
+export function renderClaim(c) {
+  return claimRow(c.verdict, c.claim, c.reasoning, verdictColor(c.verdict))
+    .map((l) => g(l))
+    .join('\n');
+}
+
+/** Headlines share one width so the two judgings are the same shape on screen
+ *  and the eye compares the COLOUR, which is the arc. CLAIMS_FAILED is longest. */
+export const HEADLINE_W = 13;
+
+/** Outcome colour for a headline. The two judgings must be comparable at a
+ *  glance — rose then amber is the whole arc, visible before any reading. */
+export function headlineTone(headline) {
+  if (headline === 'CLAIMS_FAILED') return 'rose';
+  if (headline === 'VERIFIED') return 'sage';
+  if (headline === 'PARTIAL') return 'amber';
+  return 'grey';
 }
 
 /** A recorded judging, always labelled as recorded — never mistakable for now. */
 export function renderVerdictBlock(v, label) {
   const out = [];
+  out.push(g(rule(label)));
+  out.push(g(amber('recorded verdict') + grey(' · from the original run, on another machine')));
   out.push('');
-  out.push(`     ${bold(label)}  ${amber('· recorded verdict, from the original run')}`);
-  out.push(`     ${grey('headline:')} ${bold(v.headline)}   ${grey(summariseTotals(v.totals))}`);
+  out.push(g(chip(v.headline, headlineTone(v.headline), HEADLINE_W) + '  ' + grey(summariseTotals(v.totals))));
   out.push('');
-  for (const c of v.claims) out.push(renderClaim(c));
+  // One blank line between entries. Without it a four-claim block is a wall,
+  // and the state column — the thing a reader is meant to scan first — stops
+  // reading as a column at all.
+  for (const c of v.claims) {
+    out.push(renderClaim(c));
+    out.push('');
+  }
+  out.pop();
   return out.join('\n');
 }
 
+/** "15 unverifiable · 9 true · 2 false" — biggest bucket first, lowercase so the
+ *  state words in the column below stay the loudest thing on the screen. */
 export function summariseTotals(totals = {}) {
   return Object.entries(totals)
     .sort((a, b) => b[1] - a[1])
-    .map(([k, n]) => `${n} ${k}`)
+    .map(([k, n]) => `${n} ${k.toLowerCase().replace(/_/g, ' ')}`)
     .join(' · ');
 }
 
@@ -66,30 +95,47 @@ export function summariseTotals(totals = {}) {
  */
 export async function playBeats(corpus, { speed = 0.55, write = (s) => process.stdout.write(s + '\n') } = {}) {
   const claimsByKey = new Map((corpus.verdicts.before.claims || []).map((c) => [c.key, c]));
+  const AGENT_INDENT = COL;
+  let prevKind = null;
 
   for (const beat of corpus.beats) {
+    // Vertical rhythm, derived rather than authored. Blank lines used to be
+    // sprinkled by feel inside each case, which is how prose ends up welded to
+    // the data block above it. One rule instead: a change of element type is a
+    // change of thought, and gets air.
+    if (prevKind && prevKind !== beat.kind) write('');
+    prevKind = beat.kind;
+
     switch (beat.kind) {
       case 'narration':
-        write('  ' + grey(beat.text));
+        // Prose wraps. Before this it ran to whatever length the sentence
+        // happened to be, which is unreadable at phone width — and the launch
+        // asset is a GIF people scroll past on phones.
+        for (const l of wrap(beat.text, CONTENT)) write(g(grey(l)));
         break;
       case 'agent': {
         // Verbatim from the sealed receipt — the demo never writes the agent's lines.
         const claim = claimsByKey.get(beat.claimRef);
-        write('  ' + blue('agent') + '  ' + (claim ? claim.claim : beat.text));
+        const text = claim ? claim.claim : beat.text;
+        const lines = wrap(text, CONTENT - AGENT_INDENT);
+        write(g(blue('agent'.padEnd(AGENT_INDENT)) + lines[0]));
+        for (const l of lines.slice(1)) write(g(' '.repeat(AGENT_INDENT) + l));
         break;
       }
       case 'seal':
-        write('  ' + sage('◆ sealed') + '  ' + grey(beat.text));
+        write(g(chip('sealed', 'sage', CHIP_W) + '  ' + grey(beat.text)));
         break;
       case 'rule':
-        write('');
-        write('  ' + bold(amber(beat.text)));
+        // The turn of the story. It gets the loudest treatment in the replay
+        // because it is the thing the replay exists to teach.
+        write(g(rule('iron rule 5')));
+        for (const l of wrap(beat.text.replace(/^Iron rule 5:\s*/i, ''), CONTENT)) write(g(bold(amber(l))));
         break;
       case 'verdict':
-        write(renderVerdictBlock(corpus.verdicts[beat.which], beat.which === 'before' ? 'JUDGED' : 'RE-JUDGED'));
+        write(renderVerdictBlock(corpus.verdicts[beat.which], beat.which === 'before' ? 'judged' : 're-judged'));
         break;
       default:
-        write('  ' + beat.text);
+        for (const l of wrap(beat.text, CONTENT)) write(g(l));
     }
     await sleep(Math.round((beat.holdMs || 900) * speed));
   }

@@ -47,22 +47,34 @@ export function armedLine(state, cmd = 'npx praxis-memory') {
  * check costs nothing.
  */
 export function epilogueLines({ receiptPath, displayPath, state, agentDetected, suggestLive, cmd = 'npx praxis-memory' }) {
+  const b = epilogueBlock({ receiptPath, displayPath, state, agentDetected, suggestLive, cmd });
+  const lines = [b.lead, `  ${b.command}`, b.state];
+  if (b.live) lines.push(b.live);
+  return lines;
+}
+
+/**
+ * The same ending, as PARTS rather than a paragraph.
+ *
+ * A renderer that receives one flat list of strings can only lay them out one
+ * way, so the pasteable command ends up wrapped in with the prose — and a
+ * wrapped command is a broken command. Naming the parts lets the screen give
+ * each one the treatment it needs, and keeps the words in one place either way.
+ */
+export function epilogueBlock({ receiptPath, displayPath, state, agentDetected, suggestLive, cmd = 'npx praxis-memory' }) {
   // Live mode ends here too, and inviting someone to try the thing they just
   // watched reads as a tool that wasn't paying attention. `suggestLive` lets
   // the caller say "they already have it"; it defaults to the detection.
   const offerLive = suggestLive === undefined ? agentDetected : suggestLive;
-  // The command must be PASTEABLE. A `~` reads nicely and then fails on
-  // Windows, where nothing expands it — so the pretty path is for prose and
-  // the absolute path is for anything the reader is invited to run.
-  const lines = [
-    `This receipt is on your disk${displayPath && displayPath !== receiptPath ? ` (${displayPath})` : ''} — proves it offline, free:`,
-    `  ${cmd} receipt verify ${receiptPath}`,
-    armedLine(state, cmd),
-  ];
-  if (offerLive) {
-    lines.push(`An agent CLI is installed here, so \`${cmd} demo --live\` can run the same loop on real work.`);
-  }
-  return lines;
+  return {
+    lead: `This receipt is on your disk${displayPath && displayPath !== receiptPath ? ` (${displayPath})` : ''} — proves it offline, free:`,
+    // PASTEABLE. A `~` reads nicely and then fails on Windows, where nothing
+    // expands it — so the pretty path is for prose and the absolute path is for
+    // anything the reader is invited to run.
+    command: `${cmd} receipt verify ${receiptPath}`,
+    state: armedLine(state, cmd),
+    live: offerLive ? `An agent CLI is installed here, so \`${cmd} demo --live\` can run the same loop on real work.` : null,
+  };
 }
 
 /**

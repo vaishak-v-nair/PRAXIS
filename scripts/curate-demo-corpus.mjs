@@ -200,7 +200,10 @@ function main() {
     // The story, in the order the replay tells it. Text is narration; anything
     // quoted as a claim or verdict is verbatim from the receipts above.
     beats: [
-      { kind: 'narration', text: 'Replaying a real session from this project — 2026-07-25.', holdMs: 1400 },
+      // No "replaying a real session" line here: the screen's own REPLAY header
+      // already states the project and the date. Saying it twice is the kind of
+      // duplication that reads as a tool talking to itself.
+      { kind: 'narration', text: 'An agent finished a session and reported what it had done.', holdMs: 1400 },
       // Anything attributed to the agent is a VERBATIM claim from the sealed
       // receipt (claimRef), never a paraphrase written for pacing. If the demo
       // puts words in the agent's mouth, the demo is the thing lying.

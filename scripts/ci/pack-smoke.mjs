@@ -114,7 +114,7 @@ function main() {
       // The recording must always be labelled as one. If this ever stops
       // appearing, the demo has started presenting a replay as live work.
       if (!/recorded verdict/i.test(r.out)) throw new Error('demo showed verdicts without labelling them as recorded');
-      if (!/provenance: demo-replay/i.test(r.out)) throw new Error('demo receipt was not marked as a demo');
+      if (!/provenance\s+demo-replay/i.test(r.out)) throw new Error('demo receipt was not marked as a demo');
       if (elapsed > DEMO_BUDGET_MS) throw new Error(`demo took ${elapsed}ms, budget is ${DEMO_BUDGET_MS}ms`);
       return `sealed and verified in ${(elapsed / 1000).toFixed(1)}s`;
     });

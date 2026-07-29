@@ -15,12 +15,14 @@ import { fileURLToPath } from 'node:url';
 import { demoPaths } from '../lib/paths.js';
 import { preflight } from '../lib/doctor.js';
 import { loadCorpus } from '../lib/demo/corpus.js';
-import { playBeats, sealAndVerify, speedFactor, renderClaim, summariseTotals } from '../lib/demo/replay.js';
-import { armedState, epilogueLines, degradeMessage, classifyFsError, prettyPath } from '../lib/demo/epilogue.js';
+import { playBeats, sealAndVerify, speedFactor, renderClaim, summariseTotals, headlineTone, HEADLINE_W } from '../lib/demo/replay.js';
+import { armedState, epilogueBlock, degradeMessage, classifyFsError, prettyPath } from '../lib/demo/epilogue.js';
 import { runLive, boundaryLines, hasUnverifiable, LIVE_TASK_SUMMARY, liveTimeoutMs } from '../lib/demo/live.js';
 import { startJob } from './run.js';
 import { praxisCmd } from '../lib/runner.js';
-import { miniHeader, bold, grey, sage, rose, amber, blue, dim } from '../lib/ui.js';
+import { miniHeader, bold, grey, sage, rose, amber, blue, dim, chip, rule, row, wrap, g, CONTENT, COL, CHIP_W } from '../lib/ui.js';
+
+const pad = (n) => ' '.repeat(Math.max(0, n));
 
 function line(s = '') {
   process.stdout.write(s + '\n');
@@ -57,25 +59,31 @@ function mmss(ms) {
  * would be a lie in one of the two modes, so it is a parameter.
  */
 function closing({ receiptPath, displayPath, elapsedMs, agentDetected, suggestLive, cmd, offline = false }) {
-  line('');
-  line(
-    '  ' +
-      sage(`Sealed and verified in ${(elapsedMs / 1000).toFixed(1)}s.`) +
-      (offline ? grey('  Nothing left your machine — zero network calls.') : ''),
-  );
-  line('');
-  for (const l of epilogueLines({
+  const b = epilogueBlock({
     receiptPath,
     displayPath,
     state: armedState(process.cwd()),
     agentDetected,
     suggestLive,
     cmd,
-  })) {
-    line('  ' + l);
-  }
+  });
+
   line('');
-  line('  ' + dim('Your AI says "done." PRAXIS proves it.'));
+  line(g(row('elapsed', bold(`${(elapsedMs / 1000).toFixed(1)}s`) + (offline ? grey('   ·  nothing left your machine, zero network calls') : ''))));
+
+  // The last thing on screen is the thing we want typed. It gets a section of
+  // its own, and the command sits alone on its line at its own indent — never
+  // wrapped, never sharing a line with prose it could be confused for.
+  line('');
+  line(g(rule('verify it yourself')));
+  line(g(grey('offline · free · no account · no model call')));
+  line('');
+  line(g(pad(2) + bold(b.command)));
+  line('');
+  for (const l of wrap(b.state, CONTENT)) line(g(grey(l)));
+  if (b.live) for (const l of wrap(b.live, CONTENT)) line(g(dim(l)));
+  line('');
+  line(g(dim('Your AI says "done." PRAXIS proves it.')));
   line('');
 }
 
@@ -113,28 +121,30 @@ async function playLive(cmd, pre, startedAt) {
       startJob,
       onEvent: (e) => {
         if (e.kind === 'start') {
-          line('  ' + bold('LIVE') + grey('  — a real agent, real work, and a verdict nobody has seen yet.'));
+          line(g(rule('live')));
+          line(g(grey('a real agent · real work · a verdict nobody has seen yet')));
           line('');
-          line('  ' + grey('sandbox  ') + e.sandbox);
-          line('  ' + grey('task     ') + LIVE_TASK_SUMMARY);
-          line('  ' + grey('safety   ') + 'the agent may write files in that folder ONLY — your project is not touched');
-          line('  ' + grey('cost     ') + 'real tokens: one agent run, one judge call' + grey(`  · gives up after ${mmss(liveTimeoutMs())}, Ctrl-C stops it`));
+          line(g(row('sandbox', e.sandbox)));
+          line(g(row('task', LIVE_TASK_SUMMARY)));
+          line(g(row('safety', 'writes files in that folder ONLY — your project is not touched')));
+          line(g(row('cost', 'real tokens: one agent run, one judge call')));
+          line(g(row('', dim(`gives up after ${mmss(liveTimeoutMs())} · Ctrl-C stops it`))));
           line('');
         } else if (e.kind === 'tick') {
           if (tty) {
-            process.stdout.write('\r  ' + amber('·') + ' ' + grey('agent working  ') + mmss(e.elapsedMs));
+            process.stdout.write('\r' + g(grey('working'.padEnd(COL)) + amber(mmss(e.elapsedMs))));
             ticking = true;
           } else if (e.elapsedMs - lastHeartbeat >= 20000) {
             // Piped or logged: the rewriting ticker is invisible, and four
             // silent minutes reads as a hang. Say something occasionally.
             lastHeartbeat = e.elapsedMs;
-            line('  ' + amber('·') + ' ' + grey('agent working  ') + mmss(e.elapsedMs));
+            line(g(row('working', amber(mmss(e.elapsedMs)))));
           }
         } else if (e.kind === 'sealed') {
           clearTick();
-          line('  ' + sage('◆') + ' ' + grey('agent finished — receipt sealed from its transcript, free, zero model calls'));
+          line(g(chip('sealed', 'sage', CHIP_W) + '  ' + grey('from the agent’s own transcript — free, zero model calls')));
         } else if (e.kind === 'judging') {
-          line('  ' + amber('·') + ' ' + grey('asking the judge to rule its claims against that record…'));
+          line(g(row('judging', grey('ruling its claims against that record…'))));
         }
       },
       waitOpts: { shouldAbort: () => aborted },
@@ -172,15 +182,19 @@ async function playLive(cmd, pre, startedAt) {
   const v = r.verification;
 
   line('');
-  line('  ' + bold('None of this was a recording.'));
+  line(g(rule('none of this was a recording')));
   line('');
-  line('  ' + sage('◆') + ' ' + bold('Receipt sealed on this machine') + '  ' + grey(shown));
+  line(g(chip('sealed', 'sage', CHIP_W) + '  ' + bold('on this machine') + '  ' + grey(shown)));
   if (v.ok) {
-    line('  ' + sage('✓') + ' chain intact · signature valid   ' + grey(`${v.entries} entries, verified offline just now`));
+    line(g(chip('verified', 'sage', CHIP_W) + '  ' + bold('chain intact · signature valid')));
+    for (const l of wrap(`${v.entries} entries, checked offline just now — no network, no model call`, CONTENT - COL)) {
+      line(g(pad(COL) + dim(l)));
+    }
   } else {
-    line('  ' + rose('✗') + ' verification failed   ' + grey(v.reason || 'unknown reason'));
+    line(g(chip('unverified', 'rose', CHIP_W) + '  ' + bold(v.reason || 'verification failed')));
   }
-  line('  ' + amber('·') + ` provenance: ${r.provenance}   ` + grey('sealed in — this was the demo’s work, never counted as yours'));
+  line('');
+  line(g(row('provenance', grey(`${r.provenance} — sealed in, the demo’s work, never yours`))));
 
   if (res.judged) {
     const s = r.summary || {};
@@ -189,26 +203,34 @@ async function playLive(cmd, pre, startedAt) {
     if (s.false) totals.FALSE = s.false;
     if (s.unverifiable) totals.UNVERIFIABLE = s.unverifiable;
     line('');
-    line('     ' + bold('JUDGED') + '  ' + sage('· ruled just now, on this machine'));
-    line('     ' + grey('headline:') + ' ' + bold(r.verdict) + '   ' + grey(summariseTotals(totals)));
+    line(g(rule('judged')));
+    line(g(sage('ruled just now') + grey(' · on this machine, minutes old')));
     line('');
-    for (const c of r.verdicts) line(renderClaim({ claim: c.claim, verdict: c.verdict, reasoning: c.reasoning }));
-
+    line(g(chip(r.verdict, headlineTone(r.verdict), HEADLINE_W) + '  ' + grey(summariseTotals(totals))));
     line('');
-    line('  ' + bold('What that verdict is, exactly:'));
+    for (const c of r.verdicts) {
+      line(renderClaim({ claim: c.claim, verdict: c.verdict, reasoning: c.reasoning }));
+      line('');
+    }
+    line(g(rule('what that verdict is, exactly')));
     for (const l of boundaryLines({ hadUnverifiable: hasUnverifiable(r.verdicts) })) {
-      line('  ' + blue('·') + ' ' + grey(l));
+      const w = wrap(l, CONTENT - 2);
+      line(g(blue('·') + ' ' + grey(w[0])));
+      for (const rest of w.slice(1)) line(g('  ' + grey(rest)));
     }
   } else {
     // The agent worked and the receipt is real; only the ruling is missing.
     // Falling back to a recording here would trade proof for theatre.
     line('');
-    line('  ' + amber('·') + ' ' + grey('No verdict: ') + (res.judgeError || 'the judge could not be reached') + grey(' — and none was invented.'));
-    line('  ' + grey('  The receipt above is still real, still sealed, still verifiable. Evidence does not need the judge.'));
+    line(g(row('no verdict', amber(res.judgeError || 'the judge could not be reached'))));
+    for (const l of wrap('None was invented. The receipt above is still real, still sealed, still verifiable — evidence does not need the judge.', CONTENT - COL)) {
+      line(g(pad(COL) + grey(l)));
+    }
   }
 
   line('');
-  line('  ' + grey('the agent’s work is still there if you want to read it: ') + res.sandbox);
+  line(g(row('the work', grey(res.sandbox))));
+  line(g(pad(COL) + dim('still there if you want to read what the agent actually wrote')));
 
   closing({
     receiptPath: r.file,
@@ -267,8 +289,9 @@ export async function demo(argv = []) {
   if (!loaded.ok) return floorExit(loaded.reason, loaded.detail, cmd);
   const corpus = loaded.corpus;
 
-  line('  ' + dim(`Replay of a real run — ${corpus.source.project}, ${String(corpus.recordedAt).slice(0, 10)}.`));
-  line('  ' + dim('Nothing here reaches the network.'));
+  line(g(rule('replay')));
+  line(g(grey(`a real session · ${corpus.source.project} · ${String(corpus.recordedAt).slice(0, 10)}`)));
+  line(g(dim('nothing here reaches the network')));
   line('');
 
   await playBeats(corpus, { speed: speedFactor() });
@@ -288,19 +311,30 @@ export async function demo(argv = []) {
   const v = sealed.verification;
   const shown = prettyPath(sealed.file, os.homedir());
 
+  // ── the seal moment ──────────────────────────────────────────────────────
+  // The visual peak, and the frame the README GIF loops from — so a scroller
+  // meets proof first. The order is fixed by the launch spec (D96): seal block,
+  // then the verification state, then the recorded-verdict label ADJACENT to it
+  // and never as a footnote, then elapsed, then the command to check it.
   line('');
-  line('  ' + bold('And now the part that is not a recording.'));
+  line(g(rule('none of this part is a recording')));
   line('');
-  line('  ' + sage('◆') + ' ' + bold('Receipt sealed on this machine') + '  ' + grey(shown));
+  // Every chip padded to one width, so the text beside them lands on the same
+  // column as the labelled rows below — one edge down the whole block.
+  line(g(chip('sealed', 'sage', CHIP_W) + '  ' + bold('on this machine') + '  ' + grey(shown)));
   if (v.ok) {
-    line('  ' + sage('✓') + ' chain intact · signature valid   ' + grey(`${v.entries} entries, verified offline just now`));
+    line(g(chip('verified', 'sage', CHIP_W) + '  ' + bold('chain intact · signature valid')));
+    for (const l of wrap(`${v.entries} entries, checked offline just now — no network, no model call`, CONTENT - COL)) {
+      line(g(pad(COL) + dim(l)));
+    }
   } else {
     // Sealing succeeded but verification did not: say so rather than claim it.
-    line('  ' + rose('✗') + ' verification failed   ' + grey(v.reason || 'unknown reason'));
+    line(g(chip('unverified', 'rose', CHIP_W) + '  ' + bold(v.reason || 'verification failed')));
   }
-  line('  ' + amber('·') + ' provenance: demo-replay   ' + grey('sealed into the record, so this can never count as real work'));
-  line('  ' + grey('  no verdict — no judge ran here, and a verdict is never invented.'));
-  line('       ' + dim('The rulings above came from the original run. This receipt is evidence only.'));
+  line('');
+  line(g(amber('recorded'.padEnd(COL)) + grey('the verdicts above are a replay of a real run')));
+  line(g(row('provenance', grey('demo-replay — sealed in, never counts as real work'))));
+  line(g(row('no verdict', grey('no judge ran here, and a verdict is never invented'))));
 
   // ── the bridge ───────────────────────────────────────────────────────────
   closing({

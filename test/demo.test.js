@@ -145,19 +145,20 @@ test('end to end: the demo runs offline, seals, verifies, and says all three tru
   assert.equal(r.status, 0, r.stdout + r.stderr);
 
   // the recording is labelled as a recording, every time it is shown
-  assert.match(r.stdout, /Replay of a real run/);
-  assert.equal((r.stdout.match(/recorded verdict, from the original run/g) || []).length, 2);
+  assert.match(r.stdout, /REPLAY/);
+  assert.equal((r.stdout.match(/recorded verdict/g) || []).length, 2, 'both judgings carry the label adjacent to them — never a footnote');
 
   // the receipt is NOT labelled as a recording, because it is not one
-  assert.match(r.stdout, /Receipt sealed on this machine/);
+  assert.match(r.stdout, /NONE OF THIS PART IS A RECORDING/);
+  assert.match(r.stdout, /SEALED\s+on this machine/);
   assert.match(r.stdout, /chain intact/);
-  assert.match(r.stdout, /provenance: demo-replay/);
-  assert.match(r.stdout, /no verdict — no judge ran here/);
+  assert.match(r.stdout, /provenance\s+demo-replay/);
+  assert.match(r.stdout, /no verdict\s+no judge ran here/);
 
   // the three bridge lines, and the free-ness said out loud
   assert.match(r.stdout, /receipt verify /);
   assert.match(r.stdout, /zero network calls/i);
-  assert.match(r.stdout, /Sealed and verified in \d/);
+  assert.match(r.stdout, /elapsed\s+\d/, 'the timing claim polices itself, and is on screen');
 
   assert.ok(!/at .*\.js:\d+/.test(r.stdout + r.stderr), 'no stack traces anywhere in the happy path');
 });
@@ -192,5 +193,8 @@ test('speed is tunable so CI measures the real thing and tests do not sleep', ()
 test('rendering: verdict words carry the meaning, not just the colour', () => {
   const line = renderClaim({ verdict: 'FALSE', claim: 'x', reasoning: 'y' });
   assert.match(line.replace(/\[[0-9;]*m/g, ''), /FALSE\s+x/, 'readable with colour stripped (NO_COLOR, light terminals)');
-  assert.equal(summariseTotals({ TRUE: 2, FALSE: 1 }), '2 TRUE · 1 FALSE');
+  // lowercase in the summary so the STATE COLUMN below stays the loudest thing
+  // on screen; the words are still the words.
+  assert.equal(summariseTotals({ TRUE: 2, FALSE: 1 }), '2 true · 1 false');
+  assert.equal(summariseTotals({ NOT_A_CLAIM: 3 }), '3 not a claim');
 });

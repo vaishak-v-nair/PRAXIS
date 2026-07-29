@@ -29,7 +29,111 @@ export function miniHeader(version, note = '') {
 
 export function stripAnsi(s) {
   // eslint-disable-next-line no-control-regex
-  return s.replace(/\x1b\[[0-9;]*m/g, '');
+  return String(s).replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+// ─── the layout system ───────────────────────────────────────────────────────
+//
+// Terminal output is typography. It gets the same three things any designed page
+// gets — a grid, a type scale, and components — because the alternative is what
+// this file used to produce: ragged indentation, 150-character lines, and blank
+// lines dropped by feel.
+//
+// The numbers are not taste. GUTTER + CONTENT keeps every line inside 80 columns
+// so nothing wraps by accident in a narrow terminal, and keeps the recorded GIF
+// legible at 360px phone width, which the launch asset is required to be.
+// LABEL_W is the widest state word we print (UNVERIFIABLE), so the data column
+// never moves between rows.
+
+export const GUTTER = 2;
+export const CONTENT = 72;
+export const LABEL_W = 12;
+/** The single data column. Every label, chip and state word ends here, so one
+ *  edge runs down the whole screen instead of one per block. */
+export const COL = LABEL_W + 2;
+
+const pad = (n) => ' '.repeat(Math.max(0, n));
+
+/** The left margin every line shares. One gutter, applied in one place. */
+export function g(s = '') {
+  return pad(GUTTER) + s;
+}
+
+/**
+ * Wrap plain text to a column. Operates on unpainted strings by design — paint
+ * after wrapping, never before, or the escape codes get counted as characters
+ * and the measurement lies.
+ */
+export function wrap(text, width = CONTENT) {
+  const words = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ');
+  if (!words[0]) return [];
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    if (!cur) cur = w;
+    else if (cur.length + 1 + w.length <= width) cur += ' ' + w;
+    else {
+      lines.push(cur);
+      cur = w;
+    }
+  }
+  lines.push(cur);
+  return lines;
+}
+
+/**
+ * A solid badge — dark text on a filled colour. The one deliberately loud
+ * element in the system, reserved for state that is the point of the screen
+ * (SEALED, VERIFIED). Without colour it degrades to the word itself, which is
+ * why the word always carries the meaning and the colour only reinforces it.
+ */
+export function chip(text, tone = 'sage', width = 0) {
+  const BG = { sage: 114, rose: 205, amber: 179, blue: 110, gold: 220, grey: 245 };
+  // `width` makes a STACK of chips share one edge. Two chips of different
+  // lengths sitting above each other push their text to different columns, and
+  // a column that moves between adjacent rows is the single most obvious tell
+  // that output was printed rather than laid out.
+  const body = ` ${String(text).toUpperCase().padEnd(width)} `;
+  if (!useColor) return body;
+  return `\x1b[48;5;${BG[tone] ?? BG.grey}m\x1b[38;5;232m\x1b[1m${body}\x1b[0m`;
+}
+
+/** The chip width that puts chip text on the same column as a `row()` label. */
+export const CHIP_W = COL - 4;
+
+/** A divider. With a label it becomes a section marker; without, a quiet break. */
+export function rule(label = '', width = CONTENT) {
+  if (!label) return dim('─'.repeat(width));
+  const head = bold(String(label).toUpperCase());
+  const used = stripAnsi(head).length + 2;
+  return head + '  ' + dim('─'.repeat(Math.max(0, width - used)));
+}
+
+/** An aligned label/value row — the same left edge on every line of a block. */
+export function row(label, value, labelW = COL) {
+  return grey(String(label).padEnd(labelW)) + value;
+}
+
+/**
+ * One judged claim: state word in a fixed column, claim wrapped beside it, the
+ * judge's reasoning indented under the claim as a caption.
+ *
+ * The alignment is the argument. A reader scanning the state column sees the
+ * shape of a judging — how much was TRUE, how much the record simply could not
+ * answer — before reading a single claim.
+ */
+export function claimRow(verdictWord, claim, reasoning, paintFn = (s) => s) {
+  const indent = COL;
+  const w = CONTENT - indent;
+  const out = [];
+  const head = wrap(claim, w);
+  out.push(paintFn(String(verdictWord).padEnd(indent)) + bold(head[0] || ''));
+  for (const l of head.slice(1)) out.push(pad(indent) + bold(l));
+  for (const l of wrap(reasoning, w)) out.push(pad(indent) + dim(l));
+  return out;
 }
 
 export function box(lines, pad = 2) {
