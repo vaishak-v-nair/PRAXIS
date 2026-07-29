@@ -24,7 +24,24 @@ export const PAD_Y = 16;
 // scale filter, so the GIF and the mp4 are the same pixels.
 const even = (n) => (Math.round(n) % 2 ? Math.round(n) + 1 : Math.round(n));
 export const W = even(COLS * CHAR_W + PAD_X * 2);
-export const H = even(ROWS * LINE_H + PAD_Y * 2);
+
+/** A frame's pixel height for a given number of rows. */
+export const rowsHeight = (rows) => even(rows * LINE_H + PAD_Y * 2);
+export const H = rowsHeight(ROWS);
+
+/**
+ * The tallest frame in a segment, in rows.
+ *
+ * The mp4 is a fixed 25-row terminal because it plays a scrolling session. The
+ * GIF is not: since the demo leads with proof, its segment is a short block at
+ * the top of an empty screen, and rendering it at 25 rows makes two thirds of
+ * the asset black void. Sized to its own content, the same frames read as a
+ * designed card instead of a mostly-empty terminal.
+ */
+export function segmentRows(frames, { pad = 1 } = {}) {
+  const used = Math.max(1, ...frames.map((f) => f.lines.length));
+  return Math.min(ROWS, used + pad);
+}
 
 // The receipt-card palette (D96) and the shipped ui.js tokens (D99). Nothing new.
 export const BG = '#0e0f12';
@@ -89,9 +106,10 @@ const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, 
  * happens to find. Trusting a font's advance width is how a recorded grid ends
  * up half a character out of true by the right-hand edge.
  */
-export function frameSvg(lines) {
-  const parts = [`<rect width="${W}" height="${H}" fill="${BG}"/>`];
-  lines.slice(0, ROWS).forEach((line, r) => {
+export function frameSvg(lines, rows = ROWS) {
+  const h = rowsHeight(rows);
+  const parts = [`<rect width="${W}" height="${h}" fill="${BG}"/>`];
+  lines.slice(0, rows).forEach((line, r) => {
     const y = PAD_Y + r * LINE_H + FONT;
     let col = 0;
     for (const run of parseLine(line)) {
@@ -120,7 +138,7 @@ export function frameSvg(lines) {
     }
   });
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${h}" viewBox="0 0 ${W} ${h}">` +
     `<style>text{font-family:'DejaVu Sans Mono','Consolas','Menlo','Liberation Mono',monospace;font-size:${FONT}px;}</style>` +
     parts.join('') +
     `</svg>`
@@ -156,11 +174,54 @@ export function snapTop(lines) {
   return out;
 }
 
+/**
+ * Soft-wrap one line at the window width, the way a terminal does.
+ *
+ * The CLI keeps every line inside the grid except one: the pasteable verify
+ * command, which is exempt because an absolute receipt path can be any length
+ * and a command with a newline in it is a broken command. A real terminal soft-
+ * wraps that line and it still pastes as one; a fixed-width recorder CLIPPED
+ * it, so the launch asset ended on a truncated path — the single line a viewer
+ * is most likely to read character by character.
+ *
+ * Escape sequences are zero-width and are carried across the fold, so a wrapped
+ * line keeps its colour instead of losing it halfway through.
+ */
+export function foldLine(line, cols = COLS) {
+  const s = String(line);
+  if (plain(s).length <= cols) return [s];
+  const out = [];
+  let buf = '';
+  let vis = 0;
+  let style = '';
+  // eslint-disable-next-line no-control-regex
+  const re = /\x1b\[[0-9;]*m/g;
+  let i = 0;
+  while (i < s.length) {
+    re.lastIndex = i;
+    const m = re.exec(s);
+    if (m && m.index === i) {
+      buf += m[0];
+      style = m[0] === '\x1b[0m' ? '' : style + m[0];
+      i = re.lastIndex;
+      continue;
+    }
+    buf += s[i++];
+    if (++vis === cols) {
+      out.push(buf + (style ? '\x1b[0m' : ''));
+      buf = style;
+      vis = 0;
+    }
+  }
+  if (plain(buf).length) out.push(buf);
+  return out;
+}
+
 /** The last ROWS lines — what a terminal actually shows as output scrolls past. */
 export function screenWindow(text) {
   const lines = String(text).split('\n');
   while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
-  return snapTop(lines.slice(-ROWS));
+  return snapTop(lines.flatMap((l) => foldLine(l, COLS)).slice(-ROWS));
 }
 
 /** 0-4s: the command being typed. A recording of a command starts with the command. */
@@ -220,14 +281,44 @@ export function frameWith(frames, re) {
  * The anchor is the SEALED line: the receipt exists at frame zero, so the
  * promise is kept, and VERIFIED still lands inside the loop where it can be
  * watched happening.
+ *
+ * Note the "on this machine" qualifier. The replay contains a second, RECORDED
+ * seal, and an anchor that matched it would loop the asset from a beat inside
+ * the recording — a launch GIF opening on the one frame that is not proof.
  */
 export function sealIndex(frames) {
   const sealed = frameWith(frames, /SEALED\s+on this machine/);
   if (sealed !== -1) return sealed;
   const verified = frameWith(frames, /VERIFIED\s+chain intact/);
   if (verified !== -1) return verified;
-  // Never silently pick frame 0 — a GIF that loops from the top of the replay
+  // Never silently pick frame 0 — a GIF that loops from the typed command
   // buries the thing it is for.
-  const header = frameWith(frames, /IS A RECORDING/);
+  const header = frameWith(frames, /NOT A RECORDING/);
   return header !== -1 ? header : Math.max(0, frames.length - 12);
+}
+
+/** The first frame of the recorded story — where the REPLAY section opens. */
+export function storyIndex(frames) {
+  return frameWith(frames, /^\s*REPLAY\s+─/);
+}
+
+/**
+ * The GIF's slice: the seal, and everything the seal needs to stand alone.
+ *
+ * Since the demo was inverted to lead with proof (D3), "from the seal to the
+ * end" is no longer a segment — it is the entire recording, story included,
+ * which is a forty-second GIF and roughly ten times the 3MB budget.
+ *
+ * So the GIF takes the part that IS proof: the receipt arriving, checking out,
+ * and the command that checks it, ending the instant the recorded story begins.
+ * That slice is self-contained — a stranger who watches only the loop has seen
+ * a real file appear, verify, and be handed to them. The story is the mp4's job.
+ *
+ * If the story header is ever missing the segment runs to the end rather than
+ * guessing, and the caller is expected to notice the size.
+ */
+export function proofSegment(frames) {
+  const start = sealIndex(frames);
+  const story = storyIndex(frames);
+  return { start, end: story > start ? story : frames.length };
 }

@@ -15,8 +15,13 @@ import {
   castFrames,
   typingFrames,
   screenWindow,
+  segmentRows,
+  foldLine,
+  rowsHeight,
   snapTop,
   sealIndex,
+  storyIndex,
+  proofSegment,
   frameWith,
   CONT_INDENT,
   plain,
@@ -26,29 +31,63 @@ import {
   XTERM,
 } from '../scripts/lib/termframe.mjs';
 
+// A stand-in for the inverted demo: command typed, receipt sealed and checked,
+// the pasteable command, then the recorded story.
+const REEL = [
+  { lines: ['$ npx praxis-memory demo'] },
+  { lines: ['  NOT A RECORDING  ────'] },
+  { lines: ['  NOT A RECORDING  ────', '   SEALED       on this machine'] },
+  { lines: ['   SEALED       on this machine', '   VERIFIED     chain intact · signature valid'] },
+  { lines: ['   VERIFIED     chain intact · signature valid', '    praxis receipt verify /tmp/r-a.jsonl'] },
+  { lines: ['  REPLAY  ────'] },
+  { lines: ['  JUDGED', '  FALSE   something'] },
+  { lines: ['   sealed        chain intact · signature valid'] },
+  { lines: ['  VERIFY IT YOURSELF'] },
+];
+
 test('the loop opens on proof ARRIVING, not on proof already complete', () => {
-  const frames = [
-    { lines: ['  JUDGED', '  FALSE   something'] },
-    { lines: ['  NONE OF THIS PART IS A RECORDING  ────'] },
-    { lines: ['  NONE OF THIS PART IS A RECORDING  ────', '   SEALED       on this machine'] },
-    { lines: ['   SEALED       on this machine', '   VERIFIED     chain intact · signature valid'] },
-    { lines: ['  VERIFY IT YOURSELF'] },
-  ];
-  // Not 1 — that frame is a wall of verdicts with no proof on it yet.
+  // Not 1 — that frame is the header, with no proof on it yet.
   // Not 3 — the receipt is already sealed AND checked, so the most satisfying
   // moment in the demo happens off-camera and the loop opens on a fait accompli.
-  assert.equal(sealIndex(frames), 2, 'the receipt exists at frame zero, and VERIFIED still lands inside the loop');
+  assert.equal(sealIndex(REEL), 2, 'the receipt exists at frame zero, and VERIFIED still lands inside the loop');
+});
+
+test('the loop never anchors on the RECORDED seal further down the replay', () => {
+  // Both say "sealed". Only one happened on this machine, and an anchor that
+  // matched the other would open the launch asset on a frame inside a recording.
+  assert.equal(sealIndex(REEL), 2);
+  assert.ok(sealIndex(REEL) < storyIndex(REEL), 'the anchor is on the real seal, above the story');
 });
 
 test('sealIndex degrades through named anchors — never silently to zero', () => {
   const verifiedOnly = [{ lines: ['x'] }, { lines: ['   VERIFIED     chain intact · signature valid'] }];
   assert.equal(sealIndex(verifiedOnly), 1);
 
-  const headerOnly = [{ lines: ['x'] }, { lines: ['  NONE OF THIS PART IS A RECORDING'] }];
+  const headerOnly = [{ lines: ['x'] }, { lines: ['  NOT A RECORDING'] }];
   assert.equal(sealIndex(headerOnly), 1);
 
   const nothing = Array.from({ length: 30 }, (_, i) => ({ lines: ['line ' + i] }));
   assert.equal(sealIndex(nothing), 18, 'falls back to the tail, so the GIF never loops from the top of the replay');
+});
+
+test('the GIF is the proof segment — it ends where the recorded story begins', () => {
+  // Since the demo leads with proof, "seal to the end" is the whole recording:
+  // a forty-second GIF, roughly ten times the 3MB budget. The asset takes the
+  // part that IS proof and stops.
+  const { start, end } = proofSegment(REEL);
+  assert.equal(start, 2, 'opens on the receipt arriving');
+  assert.equal(end, 5, 'and closes the frame before REPLAY');
+
+  const seg = REEL.slice(start, end);
+  assert.ok(seg.some((f) => f.lines.some((l) => /VERIFIED/.test(l))), 'the check is inside the loop');
+  assert.ok(seg.some((f) => f.lines.some((l) => /receipt verify/.test(l))), 'so is the command to run');
+  assert.ok(!seg.some((f) => f.lines.some((l) => /FALSE/.test(l))), 'and none of the recorded story is');
+});
+
+test('a recording with no story header runs to the end rather than guessing', () => {
+  const noStory = REEL.slice(0, 5);
+  assert.equal(storyIndex(noStory), -1);
+  assert.deepEqual(proofSegment(noStory), { start: 2, end: 5 }, 'end of frames, so nothing is silently dropped');
 });
 
 test('a frame never opens on the tail of a sentence it cut in half', () => {
@@ -114,6 +153,47 @@ test('the frame obeys the launch spec it was built for', () => {
 test('escaping: terminal text that looks like markup stays text', () => {
   const svg = frameSvg(['a < b && c > d']);
   assert.ok(svg.includes('a &lt; b &amp;&amp; c &gt; d'));
+});
+
+test('the one line allowed to overflow the grid wraps instead of being cut off', () => {
+  // The pasteable verify command carries an absolute path and is exempt from
+  // the CLI's measure on purpose. A fixed-width recorder used to clip it, so
+  // the asset ended on a truncated path — the one line a viewer reads letter
+  // by letter. A terminal soft-wraps it; so does the recorder now.
+  const long = '    npx praxis-memory receipt verify ' + 'C:\\Users\\someone\\.praxis\\demo\\receipts\\r-abcdef12.jsonl';
+  const folded = foldLine(long, 40);
+  assert.ok(folded.length > 1, 'it wraps');
+  assert.ok(folded.every((l) => plain(l).length <= 40), 'and every piece fits the window');
+  assert.equal(folded.join(''), long, 'nothing is lost or invented — it is the same characters');
+
+  const win = screenWindow(long);
+  assert.ok(win.length > 1, 'the window folds it too');
+  assert.ok(win.every((l) => plain(l).length <= 78), 'nothing runs past the frame edge');
+});
+
+test('a wrapped line keeps its colour across the fold', () => {
+  const painted = '\x1b[1m' + 'x'.repeat(30) + '\x1b[0m';
+  const folded = foldLine(painted, 10);
+  assert.equal(folded.length, 3);
+  assert.ok(folded.every((l) => l.startsWith('\x1b[1m')), 'the style is carried, not dropped at the seam');
+  assert.equal(folded.map(plain).join(''), 'x'.repeat(30));
+  assert.deepEqual(foldLine('short', 10), ['short'], 'and a line that fits is returned untouched');
+});
+
+test('the GIF is sized to its own content, not to a scrolling terminal', () => {
+  // The mp4 is a fixed 25-row terminal because it plays a scrolling session.
+  // The GIF is a short block at the top of an empty screen — rendered at 25
+  // rows, two thirds of the asset is black void.
+  const seg = [{ lines: ['a', 'b'] }, { lines: ['a', 'b', 'c', 'd'] }];
+  assert.equal(segmentRows(seg), 5, 'the tallest frame, plus one row to breathe');
+  assert.ok(rowsHeight(5) < H, 'and that is shorter than the full window');
+  assert.equal(rowsHeight(5) % 2, 0, 'still even — the mp4 path shares this helper');
+
+  const tall = [{ lines: Array.from({ length: 40 }, (_, i) => 'l' + i) }];
+  assert.equal(segmentRows(tall), ROWS, 'never taller than the terminal it is recording');
+
+  const svg = frameSvg(['one', 'two'], 4);
+  assert.match(svg, new RegExp(`height="${rowsHeight(4)}"`), 'the row count reaches the pixels');
 });
 
 test('the window shows what a terminal shows: the last rows, no trailing void', () => {

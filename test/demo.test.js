@@ -10,6 +10,7 @@ import { sealDemoReceipt, sealAndVerify, renderClaim, summariseTotals, speedFact
 import { armedState, armedLine, epilogueLines, degradeMessage, classifyFsError, DEGRADE } from '../src/lib/demo/epilogue.js';
 import { readEntries, isDemo, provenanceOf, verifyFile } from '../src/lib/receipt/store.js';
 import { demoPaths } from '../src/lib/paths.js';
+import { stripAnsi } from '../src/lib/ui.js';
 
 const CLI = path.resolve('src', 'cli.js');
 const tmp = (n) => fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-demo-' + n + '-'));
@@ -149,7 +150,7 @@ test('end to end: the demo runs offline, seals, verifies, and says all three tru
   assert.equal((r.stdout.match(/recorded verdict/g) || []).length, 2, 'both judgings carry the label adjacent to them — never a footnote');
 
   // the receipt is NOT labelled as a recording, because it is not one
-  assert.match(r.stdout, /NONE OF THIS PART IS A RECORDING/);
+  assert.match(r.stdout, /NOT A RECORDING/);
   assert.match(r.stdout, /SEALED\s+on this machine/);
   assert.match(r.stdout, /chain intact/);
   assert.match(r.stdout, /provenance\s+demo-replay/);
@@ -161,6 +162,39 @@ test('end to end: the demo runs offline, seals, verifies, and says all three tru
   assert.match(r.stdout, /elapsed\s+\d/, 'the timing claim polices itself, and is on screen');
 
   assert.ok(!/at .*\.js:\d+/.test(r.stdout + r.stderr), 'no stack traces anywhere in the happy path');
+});
+
+test('PROOF FIRST: the receipt exists before the argument for it does', () => {
+  // The demo used to spend forty seconds on a story and seal at the end, which
+  // asks a stranger to sit through a claim before seeing anything back it. The
+  // order is the feature now, so the order is asserted rather than assumed.
+  const out = stripAnsi(runDemo().stdout);
+  const sealed = out.indexOf('SEALED       on this machine');
+  const verified = out.indexOf('VERIFIED');
+  const paste = out.indexOf('receipt verify ');
+  const story = out.indexOf('REPLAY');
+  const firstVerdict = out.indexOf('recorded verdict');
+
+  assert.ok(sealed > -1 && story > -1 && firstVerdict > -1, 'all three beats are on screen');
+  assert.ok(sealed < story, 'the receipt is sealed before the recording starts');
+  assert.ok(verified > sealed && verified < story, 'and checked before it too');
+  assert.ok(paste < story, 'the command that proves it is offered while the receipt is still on screen');
+  assert.ok(sealed < firstVerdict, 'no recorded verdict reaches the reader before real proof does');
+
+  // The seal must be reachable in seconds, not scrollback. Everything above it
+  // is a header and two lines of framing.
+  assert.ok(out.slice(0, sealed).split('\n').length <= 8, 'proof is at the top of the screen, not down a page');
+});
+
+test('the recorded seal inside the replay never wears the badge the real one does', () => {
+  // Both are "SEALED". Only one happened on the reader's machine. Since the
+  // real seal now leads, a second filled chip further down would be the demo
+  // presenting a recording with the same authority as the proof — the exact
+  // confusion the whole replay/receipt split exists to prevent.
+  const raw = runDemo([], { PRAXIS_RICH: '1' }).stdout;
+  const chips = raw.match(/\x1b\[48;5;114m\x1b\[38;5;232m\x1b\[1m SEALED/g) || [];
+  assert.equal(chips.length, 1, 'exactly one filled SEALED chip, and it is the one on this machine');
+  assert.match(stripAnsi(raw), /sealed\s+chain intact/, 'the recorded one still says what happened, quietly');
 });
 
 test('the receipt the demo promises is really there afterwards, and verifies from outside', () => {

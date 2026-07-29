@@ -1,7 +1,7 @@
-// `praxis demo` — ninety seconds from "never heard of it" to holding proof.
+// `praxis demo` — a few seconds from "never heard of it" to holding proof.
 //
 // Two modes. Replay is the guarantee: it needs no agent, no account, no
-// network, and it ends with a signed receipt on the stranger's own disk. Live
+// network, and it OPENS with a signed receipt on the stranger's own disk. Live
 // is the upgrade, offered only when the machine can actually do it.
 //
 // The command is thin on purpose — the recording, the sealing and the copy all
@@ -67,6 +67,37 @@ function mmss(ms) {
 function beat(ms) {
   const d = Math.round(ms * speedFactor());
   return d > 0 ? new Promise((r) => setTimeout(r, d)) : Promise.resolve();
+}
+
+/**
+ * The seal, on screen — the one block both modes are built around.
+ *
+ * Written once because it is the moment the product is: a chip that says the
+ * file exists, a chip that says it checks out, and the path, in that order. It
+ * was duplicated in live and replay, which is how two copies of the most
+ * load-bearing eight lines in the CLI drift apart.
+ *
+ * `paced` adds the beats. Live has already made the reader wait minutes for
+ * real work, so it lands its seal immediately; replay is the opening move and
+ * earns the pauses.
+ */
+async function sealBlock(shown, v, { paced = false } = {}) {
+  const hold = (ms) => (paced ? beat(ms) : Promise.resolve());
+  line(g(chip('sealed', 'sage', CHIP_W) + '  ' + bold('on this machine') + '  ' + grey(shown)));
+  await hold(1000);
+  if (v.ok) {
+    line(g(chip('verified', 'sage', CHIP_W) + '  ' + bold('chain intact · signature valid')));
+    // Fits one line at this measure on purpose: the previous wording left the
+    // word "call" alone on a line directly under the proof, which is the first
+    // thing anyone sees in the looping README asset.
+    for (const l of wrap(`${v.entries} entries · checked offline just now, no network`, CONTENT - COL)) {
+      line(g(pad(COL) + dim(l)));
+    }
+    await hold(1200);
+  } else {
+    // Sealing succeeded but verification did not: say so rather than claim it.
+    line(g(chip('unverified', 'rose', CHIP_W) + '  ' + bold(v.reason || 'verification failed')));
+  }
 }
 
 /**
@@ -204,18 +235,7 @@ async function playLive(cmd, pre, startedAt) {
   line('');
   line(g(rule('none of this was a recording')));
   line('');
-  line(g(chip('sealed', 'sage', CHIP_W) + '  ' + bold('on this machine') + '  ' + grey(shown)));
-  if (v.ok) {
-    line(g(chip('verified', 'sage', CHIP_W) + '  ' + bold('chain intact · signature valid')));
-    // Fits one line at this measure on purpose: the previous wording left the
-    // word "call" alone on a line directly under the proof, which is the first
-    // thing anyone sees in the looping README asset.
-    for (const l of wrap(`${v.entries} entries · checked offline just now, no network`, CONTENT - COL)) {
-      line(g(pad(COL) + dim(l)));
-    }
-  } else {
-    line(g(chip('unverified', 'rose', CHIP_W) + '  ' + bold(v.reason || 'verification failed')));
-  }
+  await sealBlock(shown, v);
   line('');
   line(g(row('provenance', grey(`${r.provenance} — sealed in, the demo’s work, never yours`))));
 
@@ -307,19 +327,31 @@ export async function demo(argv = []) {
     line('');
   }
 
-  // ── the recording ────────────────────────────────────────────────────────
+  // "sealed in" is a claim about how fast a receipt appears, so it is measured
+  // from the moment the replay starts. Reaching here after live spent four
+  // minutes on a real agent and then gave up would otherwise attribute those
+  // four minutes to the seal, which is not what the number says.
+  const replayFrom = mode === 'live' ? Date.now() : started;
+
+  // ── the corpus ───────────────────────────────────────────────────────────
+  // Loaded before anything is sealed, for two reasons: the receipt is sealed
+  // FROM this recording's evidence, and a floor error has to arrive before the
+  // demo has claimed anything, not halfway through a sentence about proof.
   const loaded = loadCorpus();
   if (!loaded.ok) return floorExit(loaded.reason, loaded.detail, cmd);
   const corpus = loaded.corpus;
 
-  line(g(rule('replay')));
-  line(g(grey(`a real session · ${corpus.source.project} · ${String(corpus.recordedAt).slice(0, 10)}`)));
-  line(g(dim('nothing here reaches the network')));
-  line('');
-
-  await playBeats(corpus, { speed: speedFactor() });
-
-  // ── the part that is not a recording ─────────────────────────────────────
+  // ── proof, before the pitch ──────────────────────────────────────────────
+  // The order used to be story-then-seal: forty seconds of an argument about a
+  // false accusation, and only at the end a real receipt. That asks a stranger
+  // to sit through a claim before being shown that anything backs it, and the
+  // one person it loses is the sceptic — who is exactly who this is for.
+  //
+  // Inverted (D3): the first thing on screen is a signed file on their own disk
+  // and the command that checks it. The story is then told to somebody who
+  // already knows it is not a mockup. The receipt is sealed from that same
+  // session's evidence, so "what this is a receipt OF" is a real link and not
+  // a segue.
   const { receiptsDir } = demoPaths();
   let sealed;
   try {
@@ -335,41 +367,45 @@ export async function demo(argv = []) {
   } catch (e) {
     return floorExit(classifyFsError(e), e && e.code ? e.code : null, cmd);
   }
+  // Stamped the instant the receipt exists — before the pauses that present it.
+  // This number is a claim about the product, not about the pacing, and the
+  // pacing is the one thing on this screen that was chosen rather than measured.
+  const sealMs = Date.now() - replayFrom;
 
   const v = sealed.verification;
   const shown = prettyPath(sealed.file, os.homedir());
 
-  // ── the seal moment ──────────────────────────────────────────────────────
-  // The visual peak, and the frame the README GIF loops from — so a scroller
-  // meets proof first. The order is fixed by the launch spec (D96): seal block,
-  // then the verification state, then the recorded-verdict label ADJACENT to it
-  // and never as a footnote, then elapsed, then the command to check it.
-  line('');
-  line(g(rule('none of this part is a recording')));
+  line(g(rule('not a recording')));
+  line(g(grey('before anything is explained: a real receipt, sealed on this machine')));
   await beat(900);
   line('');
   // Every chip padded to one width, so the text beside them lands on the same
   // column as the labelled rows below — one edge down the whole block.
-  line(g(chip('sealed', 'sage', CHIP_W) + '  ' + bold('on this machine') + '  ' + grey(shown)));
-  await beat(1100);
-  if (v.ok) {
-    line(g(chip('verified', 'sage', CHIP_W) + '  ' + bold('chain intact · signature valid')));
-    // Fits one line at this measure on purpose: the previous wording left the
-    // word "call" alone on a line directly under the proof, which is the first
-    // thing anyone sees in the looping README asset.
-    for (const l of wrap(`${v.entries} entries · checked offline just now, no network`, CONTENT - COL)) {
-      line(g(pad(COL) + dim(l)));
-    }
-    await beat(1300);
-  } else {
-    // Sealing succeeded but verification did not: say so rather than claim it.
-    line(g(chip('unverified', 'rose', CHIP_W) + '  ' + bold(v.reason || 'verification failed')));
-  }
+  await sealBlock(shown, v, { paced: true });
   line('');
-  line(g(amber('recorded'.padEnd(COL)) + grey('the verdicts above are a replay of a real run')));
+  line(g(row('sealed in', bold(`${(sealMs / 1000).toFixed(1)}s`) + grey('   ·  nothing left your machine, zero network calls'))));
   line(g(row('provenance', grey('demo-replay — sealed in, never counts as real work'))));
   line(g(row('no verdict', grey('no judge ran here, and a verdict is never invented'))));
-  await beat(1400);
+  await beat(1200);
+
+  // The check, offered while the receipt is still the thing on screen — which
+  // is the moment the question actually occurs to somebody. It is offered again
+  // at the end, in full: by then the story has scrolled this line away, and a
+  // path a reader cannot see is a path they cannot paste.
+  line('');
+  line(g(grey('check it yourself — offline, free, no account:')));
+  line('');
+  line(g(pad(2) + bold(`${cmd} receipt verify ${sealed.file}`)));
+  await beat(1600);
+
+  // ── the recording ────────────────────────────────────────────────────────
+  line('');
+  line(g(rule('replay')));
+  line(g(grey(`what that receipt is a receipt OF · ${corpus.source.project} · ${String(corpus.recordedAt).slice(0, 10)}`)));
+  line(g(dim('a real session. this part IS a recording, and it reaches no network.')));
+  line('');
+
+  await playBeats(corpus, { speed: speedFactor() });
 
   // ── the bridge ───────────────────────────────────────────────────────────
   await closing({

@@ -31,20 +31,23 @@ npx praxis-memory demo
 
 <!--
   Recorded from the real command by scripts/record-demo.mjs — it spawns the CLI
-  and renders the bytes it actually wrote. The loop starts on the seal frame so
-  a scroller meets the proof first, not the build-up.
+  and renders the bytes it actually wrote. The GIF is the PROOF segment only: it
+  opens on the receipt being sealed and stops where the recorded story starts,
+  so a scroller meets proof at frame zero and the loop stays self-contained.
+  The full run, story included, is the MP4.
   Alt text is deliberately NOT "shows a verified verdict": this receipt carries
   no verdict at all, because no judge ran. Alt text describes what is on screen.
 -->
-<img src="docs/demo.gif" width="692" alt="Terminal recording: praxis demo seals a receipt on your own machine and verifies it offline — chain intact, signature valid, checked with no network. The screen labels the verdicts above it as a replay of a real run, and the receipt itself as carrying no verdict." />
+<img src="docs/demo.gif" width="692" alt="Terminal recording: praxis demo seals a receipt on your own machine and verifies it offline — chain intact, signature valid, three entries, checked with no network. The screen states that no judge ran and so the receipt carries no verdict, and hands you the command that proves it yourself." />
 
-*[Full recording as MP4](docs/demo.mp4) — same run, sharper type.*
+*[Full recording as MP4](docs/demo.mp4) — the whole run, including the story the GIF stops before.*
 
-*One minute. No agent, no account, no network. It replays a real recorded
-session — including the time our own judge got it wrong and how that produced a
-rule — then seals a genuine signed receipt onto your disk and verifies it in
-front of you. Everything you're shown is labelled: the verdicts are a recording,
-the receipt is not.*
+*Proof first: within a few seconds you have a genuine signed receipt on your own
+disk, verified in front of you, and the command that re-checks it. Only then
+does it replay the real session that receipt is a receipt of — including the
+time our own judge got it wrong and how that produced a rule. Everything you're
+shown is labelled: the verdicts are a recording, the receipt is not. No agent,
+no account, no network.*
 
 *Have an agent CLI installed? `npx praxis-memory demo --live` runs the same loop
 on work that hasn't happened yet: a real agent does a real task in a throwaway

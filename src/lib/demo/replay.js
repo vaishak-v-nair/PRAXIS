@@ -123,7 +123,12 @@ export async function playBeats(corpus, { speed = 0.55, write = (s) => process.s
         break;
       }
       case 'seal':
-        write(g(chip('sealed', 'sage', CHIP_W) + '  ' + grey(beat.text)));
+        // Deliberately NOT the filled chip. Since the demo leads with a real
+        // seal on the reader's own machine, a second loud SEALED badge fifteen
+        // lines later — for a seal that happened on another machine in July —
+        // is the exact blur this whole file exists to prevent. Same word, muted
+        // treatment: it reads as part of the recording, which is what it is.
+        write(g(amber('sealed'.padEnd(COL)) + grey(beat.text)));
         break;
       case 'rule':
         // The turn of the story. It gets the loudest treatment in the replay

@@ -8,16 +8,18 @@
 // regresses, the recording regresses with it, which is the only property that
 // makes a launch asset worth trusting.
 //
-// The storyboard is fixed by the launch spec (D96):
-//   0-4s    one command typed
-//   4-18s   the replay plays, real output, condensed pacing
-//   18-26s  the seal + verdict beat — the visual peak, brief hold
-//   26-30s  "verify it yourself" and the tagline
+// The storyboard, since the demo was inverted to lead with proof (D3):
+//   0-3s    one command typed
+//   3-11s   the receipt is sealed, verified, and handed over — the visual peak
+//   11-45s  the replay plays: what that receipt is a receipt OF
+//   45-50s  "verify it yourself" again, and the tagline
 //
 // Two artifacts, per D96/D100:
-//   docs/demo.gif  the 18-30s segment, LOOPING FROM THE SEAL FRAME so a
-//                  scroller meets proof first. <=720px wide, <=3MB.
-//   docs/demo.mp4  the whole thing, for when compression would cost legibility.
+//   docs/demo.gif  the PROOF segment only — seal to the start of the story,
+//                  looping from the seal frame so a scroller meets proof at
+//                  frame zero. Self-contained. <=720px wide, <=3MB.
+//   docs/demo.mp4  the whole thing, story included, for when compression would
+//                  cost legibility.
 //
 // Design constraints it enforces rather than assumes: the terminal palette is
 // the SHIPPED ui.js palette (D99), the frame is sized so the type is legible at
@@ -30,7 +32,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import ffmpeg from 'ffmpeg-static';
-import { frameSvg, castFrames, typingFrames, sealIndex, frameWith, W, H } from './lib/termframe.mjs';
+import { frameSvg, castFrames, typingFrames, proofSegment, segmentRows, rowsHeight, frameWith, W } from './lib/termframe.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'docs');
@@ -46,7 +48,16 @@ function capture({ speed = '0.62' } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(ROOT, 'src', 'cli.js'), 'demo'], {
       cwd: ROOT,
-      env: { ...process.env, PRAXIS_RICH: '1', PRAXIS_DEMO_SPEED: speed, NO_COLOR: '' },
+      env: {
+        ...process.env,
+        PRAXIS_RICH: '1',
+        PRAXIS_DEMO_SPEED: speed,
+        NO_COLOR: '',
+        // The recording opens with `npx praxis-memory demo` being typed, so the
+        // command it then tells the viewer to run has to be in the same form.
+        // This machine has a global `praxis` shim; most viewers do not.
+        PRAXIS_CMD: 'npx praxis-memory',
+      },
     });
     const t0 = Date.now();
     const events = [];
@@ -67,17 +78,18 @@ function capture({ speed = '0.62' } = {}) {
 
 // ── render ───────────────────────────────────────────────────────────────────
 
-async function raster(frames) {
+async function raster(frames, rows) {
   const out = [];
   for (const f of frames) {
-    out.push(await sharp(Buffer.from(frameSvg(f.lines))).ensureAlpha().raw().toBuffer());
+    out.push(await sharp(Buffer.from(frameSvg(f.lines, rows))).ensureAlpha().raw().toBuffer());
   }
   return out;
 }
 
-async function writeGif(frames, file) {
-  const bufs = await raster(frames);
-  await sharp(Buffer.concat(bufs), { raw: { width: W, height: H * bufs.length, channels: 4, pageHeight: H } })
+async function writeGif(frames, file, rows) {
+  const h = rowsHeight(rows);
+  const bufs = await raster(frames, rows);
+  await sharp(Buffer.concat(bufs), { raw: { width: W, height: h * bufs.length, channels: 4, pageHeight: h } })
     .gif({ loop: 0, effort: 10, delay: frames.map((f) => f.delay), colours: 64, dither: 0 })
     .toFile(file);
   return fs.statSync(file).size;
@@ -119,29 +131,34 @@ async function main() {
 
   const cast = castFrames(events);
   const all = [...typingFrames('npx praxis-memory demo'), ...cast];
-  const seal = sealIndex(all);
+  const { start: seal, end: storyAt } = proofSegment(all);
+  if (storyAt >= all.length) {
+    console.warn('  ⚠ no REPLAY header found — the GIF will run to the end of the recording');
+  }
 
-  // Holds, placed on the three beats a viewer actually needs time for. The
-  // loop was 5.5s on its first cut — true to the content but well short of the
-  // ~12s segment the spec asks for, and short enough that the eye never settles
-  // on the resting frame. These are the only invented timings in the file, and
-  // they lengthen pauses rather than reordering anything.
+  // Holds, placed on the three beats a viewer actually needs time for. These are
+  // the only invented timings in the file, and they lengthen pauses rather than
+  // reordering anything.
   const verified = frameWith(all, /VERIFIED\s+chain intact/);
   const command = frameWith(all, /receipt verify /);
   all[seal].delay = Math.max(all[seal].delay, 1500); // the receipt exists
   if (verified !== -1) all[verified].delay = Math.max(all[verified].delay, 2000); // …and it checks out
   if (command !== -1) all[command].delay = Math.max(all[command].delay, 1800); // the thing to type
-  all[all.length - 1].delay = 3200; // rest on the whole story before looping
+  // The loop's resting frame: the completed proof block, held before it cuts
+  // back to the seal. In the mp4 this same hold is the pause before the story.
+  all[storyAt - 1].delay = Math.max(all[storyAt - 1].delay, 2600);
+  all[all.length - 1].delay = 3200; // rest on the ending before the mp4 stops
 
   const total = all.reduce((a, f) => a + f.delay, 0);
   console.log(`  ${all.length} frames · ${(total / 1000).toFixed(1)}s · seal at frame ${seal} (${(all.slice(0, seal).reduce((a, f) => a + f.delay, 0) / 1000).toFixed(1)}s)`);
 
-  const gifFrames = all.slice(seal);
+  const gifFrames = all.slice(seal, storyAt);
+  const gifRows = segmentRows(gifFrames);
   const gifMs = gifFrames.reduce((a, f) => a + f.delay, 0);
   const gifPath = path.join(OUT, 'demo.gif');
-  const gifSize = await writeGif(gifFrames, gifPath);
+  const gifSize = await writeGif(gifFrames, gifPath, gifRows);
   console.log(
-    `  docs/demo.gif   ${gifFrames.length} frames · ${(gifMs / 1000).toFixed(1)}s loop · ${W}x${H} · ${mb(gifSize)}` +
+    `  docs/demo.gif   ${gifFrames.length} frames · ${(gifMs / 1000).toFixed(1)}s loop · ${W}x${rowsHeight(gifRows)} · ${mb(gifSize)}` +
       (gifSize > 3 * 1024 * 1024 ? '  ⚠ OVER the 3MB budget' : '  (budget 3MB)'),
   );
 

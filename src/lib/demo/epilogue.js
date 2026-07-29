@@ -67,7 +67,7 @@ export function epilogueBlock({ receiptPath, displayPath, state, agentDetected, 
   // the caller say "they already have it"; it defaults to the detection.
   const offerLive = suggestLive === undefined ? agentDetected : suggestLive;
   return {
-    lead: `This receipt is on your disk${displayPath && displayPath !== receiptPath ? ` (${displayPath})` : ''} — proves it offline, free:`,
+    lead: `This receipt is on your disk${displayPath && displayPath !== receiptPath ? ` (${displayPath})` : ''} — prove it offline, free:`,
     // PASTEABLE. A `~` reads nicely and then fails on Windows, where nothing
     // expands it — so the pretty path is for prose and the absolute path is for
     // anything the reader is invited to run.
