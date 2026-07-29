@@ -30,7 +30,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import ffmpeg from 'ffmpeg-static';
-import { frameSvg, castFrames, typingFrames, sealIndex, W, H } from './lib/termframe.mjs';
+import { frameSvg, castFrames, typingFrames, sealIndex, frameWith, W, H } from './lib/termframe.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'docs');
@@ -121,10 +121,17 @@ async function main() {
   const all = [...typingFrames('npx praxis-memory demo'), ...cast];
   const seal = sealIndex(all);
 
-  // The seal frame holds. D96 asks for a brief one — long enough to read the
-  // two chips, short enough that a loop does not feel stalled.
-  all[seal].delay = Math.max(all[seal].delay, 1400);
-  all[all.length - 1].delay = 2200;
+  // Holds, placed on the three beats a viewer actually needs time for. The
+  // loop was 5.5s on its first cut — true to the content but well short of the
+  // ~12s segment the spec asks for, and short enough that the eye never settles
+  // on the resting frame. These are the only invented timings in the file, and
+  // they lengthen pauses rather than reordering anything.
+  const verified = frameWith(all, /VERIFIED\s+chain intact/);
+  const command = frameWith(all, /receipt verify /);
+  all[seal].delay = Math.max(all[seal].delay, 1500); // the receipt exists
+  if (verified !== -1) all[verified].delay = Math.max(all[verified].delay, 2000); // …and it checks out
+  if (command !== -1) all[command].delay = Math.max(all[command].delay, 1800); // the thing to type
+  all[all.length - 1].delay = 3200; // rest on the whole story before looping
 
   const total = all.reduce((a, f) => a + f.delay, 0);
   console.log(`  ${all.length} frames · ${(total / 1000).toFixed(1)}s · seal at frame ${seal} (${(all.slice(0, seal).reduce((a, f) => a + f.delay, 0) / 1000).toFixed(1)}s)`);

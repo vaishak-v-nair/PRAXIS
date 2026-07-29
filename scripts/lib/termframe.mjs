@@ -127,11 +127,40 @@ export function frameSvg(lines) {
   );
 }
 
+// The CLI's hanging-indent column: gutter (2) + data column (14). A line
+// starting here is the CONTINUATION of something whose first line is above it.
+export const CONT_INDENT = 16;
+
+/**
+ * Blank any orphaned continuations at the top of a frame.
+ *
+ * A scrolling window cuts wherever it lands, so a frame could open on the tail
+ * of a sentence whose beginning had already scrolled away — "…cannot be
+ * confirmed or refuted." with nothing to attach it to. The eye starts on a
+ * half-thought, which is the cheapest way to make a designed screen look
+ * accidental.
+ *
+ * They are BLANKED, not trimmed. Trimming would shift every remaining line up
+ * and make the whole frame jitter between beats; blanking keeps each line
+ * exactly where it was and simply lets the top breathe.
+ */
+export function snapTop(lines) {
+  const out = [...lines];
+  for (let i = 0; i < out.length; i++) {
+    const l = out[i];
+    if (!l.trim()) break; // already a clean edge
+    const indent = plain(l).length - plain(l).trimStart().length;
+    if (indent < CONT_INDENT) break; // a real beginning — leave it alone
+    out[i] = '';
+  }
+  return out;
+}
+
 /** The last ROWS lines — what a terminal actually shows as output scrolls past. */
 export function screenWindow(text) {
   const lines = String(text).split('\n');
   while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
-  return lines.slice(-ROWS);
+  return snapTop(lines.slice(-ROWS));
 }
 
 /** 0-4s: the command being typed. A recording of a command starts with the command. */
@@ -170,20 +199,35 @@ export function castFrames(events, { min = 90, cap = 1600, tail = 1200 } = {}) {
   return frames;
 }
 
+/** First frame carrying a line — used to anchor the loop and to time the holds. */
+export function frameWith(frames, re) {
+  return frames.findIndex((f) => f.lines.some((l) => re.test(plain(l))));
+}
+
 /**
  * Where the GIF loops from (D96: "so scrollers meet proof first").
  *
- * Deliberately NOT the section header. The first attempt anchored on "none of
- * this part is a recording", which is the frame BEFORE the proof exists — a
- * scroller met a wall of verdicts and had to wait for the point. The anchor is
- * the verification line itself: the first frame in which the receipt is sealed
- * and checked on screen.
+ * Two anchors were tried and rejected before this one, and both failures are
+ * worth keeping:
+ *
+ *   the section header — the frame BEFORE any proof exists. A scroller met a
+ *   wall of verdicts and had to wait for the point.
+ *
+ *   the VERIFIED line — proof already complete at frame zero. Correct, but it
+ *   put the single most satisfying moment in the demo, proof ARRIVING, just
+ *   off-camera. The loop opened on a fait accompli.
+ *
+ * The anchor is the SEALED line: the receipt exists at frame zero, so the
+ * promise is kept, and VERIFIED still lands inside the loop where it can be
+ * watched happening.
  */
 export function sealIndex(frames) {
-  const i = frames.findIndex((f) => f.lines.some((l) => /VERIFIED\s+chain intact/.test(plain(l))));
-  if (i !== -1) return i;
-  // Fallback: the section header, then the tail. Never silently pick frame 0 —
-  // a GIF that loops from the top of the replay buries the thing it is for.
-  const j = frames.findIndex((f) => f.lines.some((l) => /IS A RECORDING/.test(plain(l))));
-  return j !== -1 ? j : Math.max(0, frames.length - 12);
+  const sealed = frameWith(frames, /SEALED\s+on this machine/);
+  if (sealed !== -1) return sealed;
+  const verified = frameWith(frames, /VERIFIED\s+chain intact/);
+  if (verified !== -1) return verified;
+  // Never silently pick frame 0 — a GIF that loops from the top of the replay
+  // buries the thing it is for.
+  const header = frameWith(frames, /IS A RECORDING/);
+  return header !== -1 ? header : Math.max(0, frames.length - 12);
 }

@@ -15,7 +15,10 @@ import {
   castFrames,
   typingFrames,
   screenWindow,
+  snapTop,
   sealIndex,
+  frameWith,
+  CONT_INDENT,
   plain,
   W,
   H,
@@ -23,28 +26,51 @@ import {
   XTERM,
 } from '../scripts/lib/termframe.mjs';
 
-const sealFrame = (extra = []) => ({
-  lines: ['  NONE OF THIS PART IS A RECORDING  ────', '   SEALED       on this machine', '   VERIFIED     chain intact · signature valid', ...extra],
-});
-
-test('the loop starts on proof, not on the run-up to it', () => {
+test('the loop opens on proof ARRIVING, not on proof already complete', () => {
   const frames = [
     { lines: ['  JUDGED', '  FALSE   something'] },
     { lines: ['  NONE OF THIS PART IS A RECORDING  ────'] },
-    sealFrame(),
+    { lines: ['  NONE OF THIS PART IS A RECORDING  ────', '   SEALED       on this machine'] },
+    { lines: ['   SEALED       on this machine', '   VERIFIED     chain intact · signature valid'] },
     { lines: ['  VERIFY IT YOURSELF'] },
   ];
-  // Not index 1: that frame carries the header but the receipt is not yet
-  // sealed on screen, so a scroller meeting it sees verdicts and has to wait.
-  assert.equal(sealIndex(frames), 2, 'anchors on the verification line itself');
+  // Not 1 — that frame is a wall of verdicts with no proof on it yet.
+  // Not 3 — the receipt is already sealed AND checked, so the most satisfying
+  // moment in the demo happens off-camera and the loop opens on a fait accompli.
+  assert.equal(sealIndex(frames), 2, 'the receipt exists at frame zero, and VERIFIED still lands inside the loop');
 });
 
-test('sealIndex degrades to the header, then to the tail — never silently to zero', () => {
+test('sealIndex degrades through named anchors — never silently to zero', () => {
+  const verifiedOnly = [{ lines: ['x'] }, { lines: ['   VERIFIED     chain intact · signature valid'] }];
+  assert.equal(sealIndex(verifiedOnly), 1);
+
   const headerOnly = [{ lines: ['x'] }, { lines: ['  NONE OF THIS PART IS A RECORDING'] }];
   assert.equal(sealIndex(headerOnly), 1);
 
   const nothing = Array.from({ length: 30 }, (_, i) => ({ lines: ['line ' + i] }));
   assert.equal(sealIndex(nothing), 18, 'falls back to the tail, so the GIF never loops from the top of the replay');
+});
+
+test('a frame never opens on the tail of a sentence it cut in half', () => {
+  // The window cuts wherever it lands. Continuation lines hang at the CLI's
+  // data column, so a frame starting on one shows a fragment whose beginning
+  // has already scrolled away.
+  const cut = snapTop([
+    ' '.repeat(CONT_INDENT) + 'cannot be confirmed or refuted.',
+    ' '.repeat(CONT_INDENT) + 'still the same orphan',
+    '  TRUE          a real beginning',
+    ' '.repeat(CONT_INDENT) + 'its own reasoning, which belongs to it',
+  ]);
+  assert.equal(cut[0], '', 'the orphan is blanked');
+  assert.equal(cut[1], '');
+  assert.match(cut[2], /TRUE/, 'and a real beginning is left alone');
+  assert.match(cut[3], /its own reasoning/, 'as is everything under it');
+  assert.equal(cut.length, 4, 'blanked, never trimmed — trimming would shift every line and make the frame jitter');
+});
+
+test('snapTop stops at the first clean edge and touches nothing else', () => {
+  assert.deepEqual(snapTop(['', '  anything']), ['', '  anything'], 'a blank top is already clean');
+  assert.deepEqual(snapTop(['  NONE OF THIS PART IS A RECORDING']), ['  NONE OF THIS PART IS A RECORDING']);
 });
 
 test('ANSI becomes the shipped palette, and only the shipped palette', () => {
@@ -95,6 +121,12 @@ test('the window shows what a terminal shows: the last rows, no trailing void', 
   const win = screenWindow(text);
   assert.equal(win.length, ROWS);
   assert.equal(win[win.length - 1], 'line 59', 'trailing blank lines are not a frame of nothing');
+});
+
+test('frameWith names the beat, so holds land on content rather than an index', () => {
+  const frames = [{ lines: ['a'] }, { lines: ['   VERIFIED     chain intact'] }];
+  assert.equal(frameWith(frames, /VERIFIED\s+chain intact/), 1);
+  assert.equal(frameWith(frames, /nothing like this/), -1, 'and says so rather than guessing');
 });
 
 test('frames carry the real gaps, coalesced and capped', () => {
