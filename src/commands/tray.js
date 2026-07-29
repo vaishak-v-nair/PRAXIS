@@ -20,6 +20,11 @@ function pidAlive(pid) {
 }
 
 export async function tray(args = []) {
+  // Tests and CI set this expecting it to mean something — and until it did,
+  // every `init` test on a Windows runner quietly spawned a real NotifyIcon
+  // host into the CI session. An escape hatch that is documented but ignored
+  // is worse than none.
+  if (process.env.PRAXIS_SKIP_TRAY === '1') return;
   const ensure = args.includes('--ensure'); // quiet: start if absent, silent if present
   if (process.platform !== 'win32') {
     if (ensure) return;

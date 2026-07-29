@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
-import { miniHeader, bigBanner, sage, amber, red, rose, bold, grey, dim, timeAgo, dailyQuote } from '../lib/ui.js';
+import { miniHeader, masthead, mascotBlock, slashBlock, rule, row, wrap, g, COL, CONTENT, sage, amber, red, rose, bold, grey, dim, timeAgo, dailyQuote } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
 import { healthReport } from '../lib/health.js';
 import { listReceipts } from '../lib/receipt/render.js';
@@ -43,40 +43,47 @@ export function status(opts = {}) {
       : fill < 0.9
         ? amber('●') + ' filling up'
         : red('●') + ' near the cap';
+  // The caption never restates the state word — the row above already said it.
+  // ("state ● near the cap — At the cap — …" shipped once. Once.)
   const healthPlain =
     fill < 0.6
-      ? 'Plenty of room. Nothing to do.'
+      ? 'plenty of room — nothing to do'
       : fill < 0.9
-        ? 'Getting full — the oldest session notes will be trimmed automatically. Nothing to do.'
-        : 'At the cap — oldest notes are trimmed as new ones arrive. Put anything precious in the Project section; it is never trimmed.';
+        ? 'oldest session notes will be trimmed automatically — nothing to do'
+        : 'oldest notes are trimmed as new ones arrive — put anything precious in the Project section, it is never trimmed';
 
-  // the front door (`npx praxis-memory`, bare `praxis`) keeps the full
-  // welcome — mascot, box, slash menu. Plain `praxis status` stays clean.
+  const caption = (text) => {
+    for (const l of wrap(text, CONTENT - COL)) console.log(g(' '.repeat(COL) + dim(l)));
+  };
+
+  // The front door (`npx praxis-memory`, bare `praxis`) gets the full welcome —
+  // masthead, mascot, slash menu. Plain `praxis status` keeps only the body.
+  // Both are the same grid; the welcome is composition, not a second system.
   if (opts.welcome) {
-    console.log('\n' + bigBanner(pkgVersion(), [grey((bytes / 1024).toFixed(1) + ' KB · ' + health)]) + '\n');
+    console.log('\n' + masthead(pkgVersion()) + '\n');
+    console.log(mascotBlock() + '\n');
+    console.log(g(rule('this project')));
   } else {
     console.log('\n  ' + miniHeader(pkgVersion(), 'status') + '\n');
   }
-  console.log('  ' + grey('memory   ') + path.relative(p.root, p.memoryFile));
-  console.log(
-    '  ' +
-      grey('size     ') +
-      `${(bytes / 1024).toFixed(1)} KB · ${entries} session entr${entries === 1 ? 'y' : 'ies'}`,
-  );
-  console.log('  ' + grey('updated  ') + timeAgo(stat.mtime));
-  console.log('  ' + grey('state    ') + health + grey(' — ' + healthPlain));
+  console.log(g(row('memory', path.relative(p.root, p.memoryFile))));
+  console.log(g(row('size', `${(bytes / 1024).toFixed(1)} KB · ${entries} session entr${entries === 1 ? 'y' : 'ies'}`)));
+  console.log(g(row('updated', timeAgo(stat.mtime))));
+  console.log(g(row('state', health)));
+  caption(healthPlain);
 
   // is Claude actually here right now? say so in one honest line
   const hr = healthReport();
   if (!hr) {
-    console.log('  ' + grey('claude   ') + grey('○ not connected — start ') + bold('claude') + grey(' here and PRAXIS comes alive'));
+    console.log(g(row('claude', grey('○ not connected — start ') + bold('claude') + grey(' here'))));
   } else if (hr.live) {
     const dot = hr.level === 'critical' ? red('●') : hr.level === 'fresh' ? sage('●') : amber('●');
-    console.log('  ' + grey('claude   ') + dot + ` active now — ${hr.pct}% full` + grey(` · ${praxisCmd()} health for detail`));
+    console.log(g(row('claude', dot + ` active now — ${hr.pct}% full`)));
+    caption(`${praxisCmd()} health for detail`);
   } else if (hr.idle) {
-    console.log('  ' + grey('claude   ') + amber('◐') + ` idle ${hr.pct}% full` + grey(` — open but paused, ${hr.idleMinutes}m since the last message`));
+    console.log(g(row('claude', amber('◐') + ` idle at ${hr.pct}% — paused, ${hr.idleMinutes}m since the last message`)));
   } else {
-    console.log('  ' + grey('claude   ') + grey(`○ no recent session — last one reached ${hr.pct}% full`));
+    console.log(g(row('claude', grey(`○ no recent session — last one reached ${hr.pct}% full`))));
   }
 
   // proof-of-work: the receipts this project's sessions have left behind
@@ -91,13 +98,8 @@ export function status(opts = {}) {
           : latest.verdict === 'PARTIAL'
             ? amber('~ PARTIAL')
             : grey('· ' + latest.verdict);
-    console.log(
-      '  ' +
-        grey('receipts ') +
-        `${receipts.length} sealed · latest ${latest.label} ` +
-        badge +
-        grey(` · ${praxisCmd()} receipt`),
-    );
+    console.log(g(row('receipts', `${receipts.length} sealed · latest ${latest.label} ` + badge)));
+    caption(`${praxisCmd()} receipt — the proof itself`);
   } else {
     // "Armed" is a claim, so it has to be checkable. The hook being installed
     // is what makes receipts automatic — saying so beats promising it.
@@ -110,19 +112,21 @@ export function status(opts = {}) {
         /* no settings file means no hook here */
       }
     }
-    console.log(
-      '  ' +
-        grey('receipts ') +
-        (armed
-          ? sage('○ armed') + grey(' — none yet; the next session that ends seals one automatically')
-          : amber('○ not armed') + grey(` — run ${praxisCmd()} init here to seal receipts automatically`)),
-    );
-    console.log('  ' + grey('         ') + dim(`Want to see one now? ${praxisCmd()} demo — one minute, no setup, no network.`));
+    if (armed) {
+      console.log(g(row('receipts', sage('○ armed'))));
+      caption('none yet — the next session that ends seals one automatically');
+    } else {
+      console.log(g(row('receipts', amber('○ not armed'))));
+      caption(`run ${praxisCmd()} init here to seal receipts automatically`);
+    }
+    caption(`want to see one now? ${praxisCmd()} demo — one minute, no setup, no network`);
   }
 
+  if (opts.welcome) {
+    console.log('');
+    console.log(slashBlock());
+  }
   console.log('\n  ' + dim('Loaded into Claude Code automatically via the PRAXIS block in CLAUDE.md.'));
-  console.log('  ' + dim('Inside a session, type ') + rose('/praxis-status') + dim(' or ') + rose('/praxis-save') + dim('.'));
-  console.log('  ' + dim('Watching a live session? ') + rose(`${praxisCmd()} hud`) + dim(' in a second terminal shows it in plain English.'));
   console.log('  ' + dim('All commands: ') + rose(`${praxisCmd()} help`) + '\n');
   if (opts.welcome) console.log('  ' + dim('“' + dailyQuote() + '”') + '\n');
 }

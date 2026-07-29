@@ -7,10 +7,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { wrap, chip, rule, row, claimRow, stripAnsi, g, GUTTER, CONTENT, COL, LABEL_W, CHIP_W } from '../src/lib/ui.js';
+import { wrap, chip, rule, row, claimRow, masthead, mascotBlock, slashBlock, stripAnsi, g, GUTTER, CONTENT, COL, LABEL_W, CHIP_W } from '../src/lib/ui.js';
 
 const CLI = path.resolve('src', 'cli.js');
 const width = (s) => stripAnsi(s).replace(/\s+$/, '').length;
@@ -83,6 +85,80 @@ test('every line the demo prints fits the grid', () => {
     .map((l) => `${width(l)}: ${stripAnsi(l)}`);
 
   assert.deepEqual(over, [], 'lines over the grid');
+});
+
+// ── the front door lives on the same grid (T4, reversing D99 per D7) ─────────
+
+test('the welcome components are grid citizens, not a second design system', () => {
+  for (const l of masthead('9.9.9').split('\n')) {
+    assert.match(l, new RegExp(`^ {${GUTTER}}\\S`), 'masthead starts at the gutter');
+    assert.ok(width(l) <= GUTTER + CONTENT, `"${stripAnsi(l)}" overflows the grid`);
+  }
+  assert.match(stripAnsi(masthead('9.9.9')), /PRAXIS\s+v9\.9\.9\s+─+/, 'the masthead is set like a rule — same family, no box');
+
+  for (const l of mascotBlock().split('\n')) {
+    assert.ok(width(l) <= GUTTER + CONTENT, 'the mascot fits the measure');
+  }
+
+  const slash = slashBlock().split('\n');
+  assert.match(stripAnsi(slash[0]), /^ {2}INSIDE CLAUDE CODE, TYPE \/\s+─+$/, 'the menu is a section, marked like every section');
+  const descCols = slash.slice(1, -1).map((l) => stripAnsi(l).match(/^ {2}\/praxis-\S+\s+/)[0].length);
+  assert.equal(new Set(descCols).size, 1, 'command descriptions share one column — aligned, not ragged');
+  for (const l of slash) assert.ok(width(l) <= GUTTER + CONTENT, `"${stripAnsi(l)}" overflows`);
+
+  // The box is retired. Its resurrection would mean two systems again.
+  return import('../src/lib/ui.js').then((ui) => {
+    for (const gone of ['box', 'banner', 'bigBanner', 'slashHelp']) {
+      assert.equal(ui[gone], undefined, `${gone}() was retired with D7 — the welcome is composition, not a box`);
+    }
+  });
+});
+
+test('every line the front door prints fits the grid — welcome and plain status', () => {
+  // A throwaway project so the run is hermetic: memory exists, no receipts.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-ui-door-'));
+  fs.mkdirSync(path.join(dir, '.praxis'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.praxis', 'memory.md'), '# PRAXIS Memory\n## Project\n\n### 2026-01-01 - session\n- x\n');
+
+  const max = GUTTER + CONTENT;
+  const check = (args) => {
+    const r = spawnSync(process.execPath, [CLI, ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+      timeout: 60000,
+      env: { ...process.env, PRAXIS_SKIP_TRAY: '1' },
+    });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const over = (r.stdout || '')
+      .split('\n')
+      .filter((l) => width(l) > max)
+      .map((l) => `${width(l)}: ${stripAnsi(l)}`);
+    assert.deepEqual(over, [], `lines over the grid in \`praxis ${args.join(' ') || '(front door)'}\``);
+    return r.stdout;
+  };
+
+  const welcome = check([]); // the front door: full welcome
+  assert.match(welcome, /INSIDE CLAUDE CODE, TYPE \//, 'the slash menu made it onto the grid');
+  assert.ok(!/[╭╰│╮╯]/.test(welcome), 'no box characters anywhere — the rounded box is gone');
+
+  const plain = check(['status']);
+  assert.ok(!/INSIDE CLAUDE CODE/.test(plain), 'plain status stays lean — the menu is the front door’s');
+});
+
+test('the state caption never restates the state word', () => {
+  // "state ● near the cap — At the cap — …" shipped once. The near-cap copy is
+  // pinned here so the duplication cannot come back reworded.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-ui-cap-'));
+  fs.mkdirSync(path.join(dir, '.praxis'), { recursive: true });
+  // over 90% of the default 16384-byte cap, so the near-the-cap branch renders
+  fs.writeFileSync(path.join(dir, '.praxis', 'memory.md'), '# PRAXIS Memory\n' + '- filler line\n'.repeat(1200));
+
+  const r = spawnSync(process.execPath, [CLI, 'status'], { cwd: dir, encoding: 'utf8', timeout: 60000, env: { ...process.env, PRAXIS_SKIP_TRAY: '1' } });
+  const out = stripAnsi(r.stdout || '');
+  assert.match(out, /near the cap/, 'the near-cap branch is the one on screen');
+  assert.ok(!/At the cap/i.test(out.replace(/near the cap/g, '')), 'the caption explains, the row states — neither repeats the other');
+  const capMentions = (out.match(/the cap/gi) || []).length;
+  assert.equal(capMentions, 1, 'one mention of the cap, total');
 });
 
 test('the demo indents from one gutter, not from taste', () => {

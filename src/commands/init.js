@@ -9,7 +9,7 @@ import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchSettings, resolveHookScope, contributorCount, ignoreLocalSettings } from '../lib/settings.js';
 import { patchMcpConfig } from '../lib/mcp/config.js';
-import { bigBanner, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
+import { masthead, mascotBlock, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
 import { tray } from './tray.js';
 import { readFileSync } from 'node:fs';
@@ -179,7 +179,8 @@ export async function init() {
   ensureGitignore(p.root);
 
   if (firstRun) {
-    console.log('\n' + bigBanner(pkgVersion()) + '\n');
+    console.log('\n' + masthead(pkgVersion()) + '\n');
+    console.log(mascotBlock() + '\n');
     console.log('  ' + bold('Memory is set up.') + '\n');
   } else {
     console.log('\n  ' + miniHeader(pkgVersion(), 'init') + '\n');
