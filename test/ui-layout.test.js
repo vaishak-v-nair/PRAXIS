@@ -161,6 +161,35 @@ test('the state caption never restates the state word', () => {
   assert.equal(capMentions, 1, 'one mention of the cap, total');
 });
 
+test('help descriptions share their columns — measured, in both command forms', () => {
+  // `demo --live` spent three releases two spaces off every other row because
+  // the column was hand-counted spaces per line. Now it is measured — and so
+  // is this: primaries on one column, sub-rows (a command's variants) on one
+  // deeper column, whether the CLI calls itself `praxis` or the npx long form.
+  for (const cmd of ['praxis', 'npx praxis-memory']) {
+    const r = spawnSync(process.execPath, [CLI, 'help'], {
+      encoding: 'utf8',
+      timeout: 60000,
+      env: { ...process.env, PRAXIS_CMD: cmd },
+    });
+    assert.equal(r.status, 0);
+
+    const primaries = new Set();
+    const subs = new Set();
+    for (const raw of (r.stdout || '').split('\n')) {
+      const l = stripAnsi(raw);
+      if (!l.startsWith('  npx praxis-memory') && !l.startsWith(`  ${cmd} `)) continue;
+      const gap = l.slice(2).match(/^(\S.*?) {2,}\S/);
+      if (!gap) continue; // prose lines like the "Also included" list
+      const col = 2 + gap[0].length - 1;
+      (/verify <file>|--verify/.test(gap[1]) ? subs : primaries).add(col);
+    }
+    assert.ok(primaries.size >= 1 && subs.size >= 1, `found rows to measure (${cmd})`);
+    assert.equal(primaries.size, 1, `one primary column with \`${cmd}\` — got ${[...primaries].join(', ')}`);
+    assert.equal(subs.size, 1, `one sub-row column with \`${cmd}\` — got ${[...subs].join(', ')}`);
+  }
+});
+
 test('the demo indents from one gutter, not from taste', () => {
   const r = spawnSync(process.execPath, [CLI, 'demo'], {
     encoding: 'utf8',

@@ -50,34 +50,54 @@ function version() {
 
 function help() {
   const c = praxisCmd();
-  const pad = ' '.repeat(Math.max(0, c.length - 'praxis'.length));
+
+  // The command rows are data, and the description column is MEASURED over
+  // every name it has to clear — primaries share one column, sub-rows (a
+  // command's variants, indented under it) share a deeper one. It used to be
+  // hand-counted spaces per line, which is how `demo --live` sat two spaces
+  // off every other row through three releases with nothing able to notice.
+  // 'quiet' rows are de-emphasised but keep the primary column.
+  const sections = [
+    [bold('Start'), [
+      ['npx praxis-memory', `set up PRAXIS here ${grey('(or show status if already set up)')}`],
+      [`${c} demo`, `see the whole thing in one minute ${grey('— no setup, no network')}`],
+      [`${c} demo --live`, grey('the same loop on real work: a sandbox agent, judged live (spends tokens)'), 'quiet'],
+    ]],
+    [bold('The daily four') + ' ' + grey('— most days you need nothing else (and the hooks run these for you)'), [
+      [`${c} status`, 'memory, session health, latest receipt verdict'],
+      [`${c} receipt`, `proof of what the AI did ${grey('· --html share card · --list')}`],
+      [`${c} receipt verify <file>`, grey('offline proof — chain + signature, free'), 'sub'],
+      [`${c} receipt --verify`, grey('judge this session — one paid model call'), 'sub'],
+      [`${c} recap`, 'catch me up on this project, right in the terminal'],
+      [`${c} save`, 'log the current session into memory, mid-flight'],
+    ]],
+    [bold('The deck') + ' ' + grey('— Mission Control (new): agents working for you in the background'), [
+      [`${c} deck`, 'Mission Control in your BROWSER — goal bar, fleet, approve buttons'],
+      [`${c} gov "<goal>"`, `the Governor staffs the deck from one goal ${grey('· gov alone = the report')}`],
+      [`${c} run "<task>"`, `hand a task to an agent, keep your terminal ${grey('· safe draft by default')}`],
+      [`${c} jobs`, `every background job, honest status, last words ${grey('· jobs <id>')}`],
+      [`${c} approve`, `the inbox: drafts wait for you ${grey('· approve <id> executes · --deny closes')}`],
+    ]],
+    [bold('The memory underneath') + ' ' + grey('— context survives the session, so you never re-explain'), [
+      [`${c} remember "<f>"`, `save a fact into memory now ${grey(`· ${c} forget "<t>" removes it`)}`],
+      [`${c} health`, 'how full is this Claude session, really — and where to go next'],
+      [`${c} doctor`, `what is set up, what broke, and the fix for each ${grey('(local read only)')}`],
+    ]],
+  ];
+
+  const all = sections.flatMap(([, rows]) => rows);
+  const col = Math.max(...all.filter((r) => r[2] !== 'sub').map((r) => r[0].length)) + 2;
+  const subCol = Math.max(...all.filter((r) => r[2] === 'sub').map((r) => r[0].length)) + 2;
+  const line = ([name, desc, kind]) =>
+    '  ' + (kind ? grey : bold)(name.padEnd(kind === 'sub' ? subCol : col)) + desc;
+
   console.log('\n  ' + miniHeader(version()) + '\n');
-  console.log(`  ${bold('Start')}
-  ${bold('npx praxis-memory')}${pad}     set up PRAXIS here ${grey('(or show status if already set up)')}
-  ${bold(`${c} demo`)}           see the whole thing in one minute ${grey('— no setup, no network')}
-  ${grey(`${c} demo --live`)}      ${grey('the same loop on real work: a sandbox agent, judged live (spends tokens)')}
-
-  ${bold('The daily four')} ${grey('— most days you need nothing else (and the hooks run these for you)')}
-  ${bold(`${c} status`)}         memory, session health, latest receipt verdict
-  ${bold(`${c} receipt`)}        proof of what the AI did ${grey('· --html share card · --list')}
-  ${grey(`${c} receipt verify <file>`)}  ${grey('offline proof — chain + signature, free')}
-  ${grey(`${c} receipt --verify`)}       ${grey('judge this session — one paid model call')}
-  ${bold(`${c} recap`)}          catch me up on this project, right in the terminal
-  ${bold(`${c} save`)}           log the current session into memory, mid-flight
-
-  ${bold('The deck')} ${grey('— Mission Control (new): agents working for you in the background')}
-  ${bold(`${c} deck`)}           Mission Control in your BROWSER — goal bar, fleet, approve buttons
-  ${bold(`${c} gov "<goal>"`)}   the Governor staffs the deck from one goal ${grey('· gov alone = the report')}
-  ${bold(`${c} run "<task>"`)}   hand a task to an agent, keep your terminal ${grey('· safe draft by default')}
-  ${bold(`${c} jobs`)}           every background job, honest status, last words ${grey('· jobs <id>')}
-  ${bold(`${c} approve`)}        the inbox: drafts wait for you ${grey('· approve <id> executes · --deny closes')}
-
-  ${bold('The memory underneath')} ${grey('— context survives the session, so you never re-explain')}
-  ${bold(`${c} remember "<f>"`)} save a fact into memory now ${grey(`· ${c} forget "<t>" removes it`)}
-  ${bold(`${c} health`)}         how full is this Claude session, really — and where to go next
-  ${bold(`${c} doctor`)}         what is set up, what broke, and the fix for each ${grey('(local read only)')}
-
-  ${bold('Also included')}
+  for (const [title, rows] of sections) {
+    console.log('  ' + title);
+    for (const r of rows) console.log(line(r));
+    console.log('');
+  }
+  console.log(`  ${bold('Also included')}
   ${grey(`${c} switch <tool> · ${c} checkpoint · ${c} trace · ${c} gate · ${c} vault <path> · ${c} tray · ${c} telemetry · ${c} feedback`)}
   ${grey(`${c} init · ${c} capture — setup and the (internal) Stop-hook entry`)}
   ${grey(`--json on status · receipt · jobs · doctor — one document on stdout, stable keys, same exit codes`)}
