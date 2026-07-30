@@ -71,6 +71,80 @@ jobs:
             echo "stub judge failed certification, as it must"
           fi
 
+  tray-macos:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    name: macOS tray host compiles and reports
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      # The macOS tray was written on a Windows machine with no Mac to run it
+      # on. These steps are the substitute: they cannot prove the axolotl
+      # appears in the menu bar — a CI runner has no GUI session — but they
+      # catch every failure that killed it before it ever drew a pixel.
+
+      # 1. Does the JXA host even parse? osacompile compiles WITHOUT running,
+      #    which is the whole point: running it would try to claim a status bar
+      #    item on a machine with no menu bar and hang the job.
+      - name: the JXA host compiles
+        run: |
+          osacompile -l JavaScript -o /tmp/praxis-tray.scpt src/tray/tray-mac.js
+          echo "compiled: $(ls -la /tmp/praxis-tray.scpt | awk '{print $5}') bytes"
+
+      # 2. Does the ObjC bridge the host depends on actually load here?
+      - name: the ObjC bridge reaches AppKit
+        run: |
+          out=$(osascript -l JavaScript -e 'ObjC.import("Cocoa"); ObjC.import("stdlib"); $.NSStatusBar ? "bridge-ok" : "bridge-missing"')
+          echo "$out"
+          [ "$out" = "bridge-ok" ] || { echo "::error::the Cocoa bridge did not load — the tray host cannot work here"; exit 1; }
+
+      # 3. The state bridge is the one piece the host runs on every poll. If
+      #    this prints anything but parseable JSON, the menu bar shows nothing.
+      - name: the state bridge prints JSON on macOS
+        run: |
+          mkdir -p /tmp/praxis-proj/.praxis
+          printf '# Memory\n### 2026-07-30T09:05:00.000Z - a decision\n' > /tmp/praxis-proj/.praxis/memory.md
+          node src/tray/tray-state.mjs /tmp/praxis-proj "$PWD/src/lib" > /tmp/state.json
+          cat /tmp/state.json
+          node -e "
+            const s = JSON.parse(require('fs').readFileSync('/tmp/state.json','utf8'));
+            const need = ['name','label','kb','capKb','entries','recent','project'];
+            for (const k of need) if (!(k in s)) { console.error('::error::state is missing ' + k); process.exit(1); }
+            if (s.entries !== 1) { console.error('::error::expected 1 entry, got ' + s.entries); process.exit(1); }
+            console.log('state bridge ok:', s.name, '/', s.label);
+          "
+
+      # 4. The darwin branch of the tray command, end to end, minus AppKit.
+      - name: praxis tray --once runs the darwin path
+        run: |
+          cd /tmp/praxis-proj
+          out=$(node "$GITHUB_WORKSPACE/src/cli.js" tray --once)
+          echo "$out"
+          case "$out" in
+            state=*) echo "darwin --once ok" ;;
+            *) echo "::error::tray --once did not report a state on macOS"; exit 1 ;;
+          esac
+
+      # 5. Every emotion the host can ask for must exist as a menu bar icon,
+      #    at both glow intensities. A missing PNG is an invisible tray.
+      - name: every state has a menu bar icon
+        run: |
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            import { TRAY_STATES } from './src/lib/tray-state.js';
+            let bad = 0;
+            for (const s of TRAY_STATES) for (const suf of ['', '2']) {
+              const f = 'src/tray/icons-mac/' + s + suf + '.png';
+              if (!fs.existsSync(f)) { console.error('::error::missing ' + f); bad++; continue; }
+              if (fs.readFileSync(f).slice(1, 4).toString() !== 'PNG') { console.error('::error::not a PNG: ' + f); bad++; }
+            }
+            if (bad) process.exit(1);
+            console.log(TRAY_STATES.length * 2 + ' menu bar icons present and valid');
+          "
+
   pack-smoke:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: pack + install + launch · ${{ matrix.os }}
