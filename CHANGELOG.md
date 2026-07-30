@@ -14,6 +14,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+### Added
+
+- **The tray companion now has a macOS host.** The axolotl lives in the menu
+  bar, its glow tracking session health exactly as it does on Windows, with the
+  same six emotions and the same precedence rules. Built on JavaScript for
+  Automation driving AppKit — the scripting runtime macOS already ships, chosen
+  for the same reason Windows uses PowerShell + WinForms: PRAXIS adds no runtime
+  dependencies, and a menu bar worth installing must not cost more than the tool
+  it decorates.
+- **The tray's rules moved into `src/lib/tray-state.js`**, one implementation in
+  plain JavaScript, unit-tested on any platform. Reimplementing the precedence
+  ("a carry-over beats a live session beats the memory cap"; "a session idle for
+  five minutes is history, not an alarm") a second time in a second language was
+  the reliable way to end up with two trays that disagree. The macOS host asks
+  this what to draw and draws it. Windows keeps its inline copy for now; where
+  they differ, the JavaScript is right.
+
+> **Not yet verified on macOS hardware.** This was written and tested on
+> Windows: the state logic has 11 unit tests and its output was diffed against
+> the shipped PowerShell host on a live project (identical). The AppKit layer —
+> menu bar item, icon, menu, run loop — has never been executed on a Mac.
+> Treat it as unproven until someone runs `praxis tray` on one.
+
 ## [0.10.1] — 2026-07-30
 
 ### Fixed

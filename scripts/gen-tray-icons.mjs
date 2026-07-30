@@ -174,3 +174,38 @@ for (const [state, color] of Object.entries(GLOW)) {
     console.log(file, Math.round(fs.statSync(file).size / 1024) + ' KB');
   }
 }
+
+// ---- macOS menu bar icons ----
+// AppKit wants a plain PNG, not an .ico, and it wants retina: the menu bar
+// draws at 18pt, so 44px gives 2x with room to breathe. Same mascot, same two
+// glow intensities — the emotion has to read identically on both platforms or
+// they are two different products wearing one name.
+const MAC_OUT = 'src/tray/icons-mac';
+const MAC_PX = 44;
+fs.mkdirSync(MAC_OUT, { recursive: true });
+for (const [state, color] of Object.entries(GLOW)) {
+  for (const [suffix, strength] of [
+    ['', 0.55],
+    ['2', 0.95],
+  ]) {
+    const body = await sharp(mascotMaster)
+      .resize(Math.round(MAC_PX * 0.92), Math.round(MAC_PX * 0.92), {
+        fit: 'contain',
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png()
+      .toBuffer();
+    const buf = await sharp({
+      create: { width: MAC_PX, height: MAC_PX, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+    })
+      .composite([
+        { input: await sharp(glowSvg(MAC_PX, color, strength)).png().toBuffer(), left: 0, top: 0 },
+        { input: body, gravity: 'centre' },
+      ])
+      .png()
+      .toBuffer();
+    const file = path.join(MAC_OUT, `${state}${suffix}.png`);
+    fs.writeFileSync(file, buf);
+    console.log(file, Math.round(fs.statSync(file).size / 1024) + ' KB');
+  }
+}
