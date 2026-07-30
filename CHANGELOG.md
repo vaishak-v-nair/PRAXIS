@@ -14,6 +14,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-07-30
+
+### Removed
+
+- **`praxis cost` and `praxis roi` are gone. Use [ccusage](https://github.com/ryoppippi/ccusage)** —
+  `npx ccusage`, or `npx ccusage monthly`. It reads the same local files, covers
+  Codex and other agents too, and is simply better at it.
+- **`praxis hud` is gone. Use [cctop](https://github.com/stefanprodan/cctop)** —
+  `npx cctop`. Live session monitoring is a niche already served by seven
+  maintained tools; ours was the weakest of them.
+- All three were deprecated in 0.10.0 and printed a pointer for a full release
+  before being deleted, which is the contract: sixteen shipped files run
+  unpinned `npx -y praxis-memory`, so every release lands on every install
+  automatically and a silent deletion would break somebody's script overnight.
+  Running them now prints where to go and exits 1 — a removal is not a typo,
+  and it does not deserve a "did you mean" guess.
+- Why at all: keeping a weaker copy of somebody else's tool padded the tarball,
+  padded the help, and diluted the one sentence this product exists to say. A
+  real user called PRAXIS a side-project on the strength of them. PRAXIS is the
+  evidence layer — receipts, the judge, the deck.
+
+### Changed
+
+- **Node 20 will no longer run PRAXIS.** `engines` has said `>=22` since 0.10.0,
+  but the code stayed accidentally Node-20-runnable as an unadvertised grace
+  period — deliberately one release long, because the auto-upgrading fleet
+  means an old install pulls the newest version without asking. That grace ends
+  here. Node 22, 24 and 26 are tested on every push, on all three platforms.
+
 ### Added
 
 - **The tray companion now has a macOS host.** The axolotl lives in the menu

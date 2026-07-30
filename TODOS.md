@@ -4,9 +4,9 @@ Deferred work with context. Added by /plan-ceo-review 2026-07-23 (receipts plan)
 tracked publicly since v0.9.2 — receipts shipped and the direction is announced
 in the README. The website relaunched 2026-07-29 (proof-first, GitHub Pages).
 
-## P2 — macOS/Linux tray port
+## P3 — Linux tray port (macOS shipped in 0.11.0)
 
-- **What:** Port the tray (verdict glow, ambient presence) beyond Windows.
+- **What:** Port the tray beyond Windows. macOS shipped in 0.11.0 (JXA + AppKit, menu bar). Linux remains: appindicator / libayatana, no obvious zero-dependency host.
 - **Why:** Tray is Windows-only (PowerShell NotifyIcon); most Claude Code users
   are macOS/Linux — the ambient-trust story is invisible to the majority.
 - **Pros:** Ambient layer for the whole install base; the "glance, green, merge"
@@ -19,7 +19,7 @@ in the README. The website relaunched 2026-07-29 (proof-first, GitHub Pages).
 - **Priority:** P2
 - **Depends on:** receipts Phase 2 shipped; catch-rate data justifying it.
 
-## Remove `cost`, `roi` and `hud` at 0.11.0 (decided 2026-07-28)
+## DONE (0.11.0, 2026-07-30) — removed `cost`, `roi` and `hud`
 
 - **What:** delete the three deprecated commands, their tests, and their
   `/praxis-*` templates. Announce the removal in the 0.11.0 release notes.
@@ -96,7 +96,7 @@ something only PRAXIS has — a verdict — and it must beat an incumbent with
 - **Priority:** P3
 - **Depends on:** the D21 budget actually breaking.
 
-## Expire the Node-20 grace at 0.11.0 (eng review D58/D68, 2026-07-28)
+## DONE (0.11.0, 2026-07-30) — Node-20 grace expired
 - **What:** At 0.11.0, lift the D58 constraint (Node-22-only syntax becomes allowed); announce the grace expiry in that release's notes. Until then, 0.10.x PATCHES must also avoid 22-only syntax.
 - **Why:** 0.10.0 advertises engines >=22 but stays Node-20-runnable as unadvertised grace, because 16 shipped hook/template files run unpinned `npx -y praxis-memory` and auto-pull latest onto old installs. The grace is deliberately ONE release; without this entry it either persists silently or gets broken accidentally by a mid-grace patch.
 - **Pros:** The release-boundary commitment has an owner and an expiry; patch releases get an explicit warning.

@@ -7,20 +7,17 @@ import { status } from './commands/status.js';
 import { capture } from './commands/capture.js';
 import { feedback } from './commands/feedback.js';
 import { tray } from './commands/tray.js';
-import { hud } from './commands/hud.js';
 import { switchTool } from './commands/switch.js';
 import { health } from './commands/health.js';
 import { telemetry } from './commands/telemetry.js';
 import { trace } from './commands/trace.js';
 import { vault } from './commands/vault.js';
-import { cost } from './commands/cost.js';
 import { checkpoint } from './commands/checkpoint.js';
 import { remember } from './commands/remember.js';
 import { recap } from './commands/recap.js';
 import { forget } from './commands/forget.js';
 import { save } from './commands/save.js';
 import { gate } from './commands/gate.js';
-import { roi } from './commands/roi.js';
 import { receipt } from './commands/receipt.js';
 import { run } from './commands/run.js';
 import { jobs } from './commands/jobs.js';
@@ -30,7 +27,7 @@ import { deck } from './commands/deck.js';
 import { mcp } from './commands/mcp.js';
 import { doctor } from './commands/doctor.js';
 import { demo } from './commands/demo.js';
-import { warnDeprecated } from './lib/deprecate.js';
+import { warnDeprecated, removalNotice } from './lib/deprecate.js';
 import { didYouMean } from './lib/suggest.js';
 import { record, flush } from './lib/telemetry.js';
 import { projectPaths } from './lib/paths.js';
@@ -119,9 +116,10 @@ const cmd = process.argv[2];
 // tier-2 telemetry: one counter per command, opt-in only, counts-and-enums only
 record('cmd_' + (cmd || 'default'));
 
-// Commands other people build better are on their way out — they still run,
-// they just say where to go instead. See lib/deprecate.js for why this is a
-// notice and not a deletion.
+// Commands other people build better are on their way out — while they are
+// deprecated they still run and just say where to go instead. Nothing is on
+// notice today; cost, roi and hud completed the walk and were removed in
+// 0.11.0. See lib/deprecate.js for why removal leaves a headstone.
 warnDeprecated(cmd);
 
 // Error boundary: a command must never dump a raw stack — especially the
@@ -141,9 +139,9 @@ async function dispatch(cmd) {
 // Every name the switch below answers to, kept adjacent so a new case lands
 // here in the same diff. A stale list only costs a suggestion, never a command.
 const COMMANDS = [
-  'init', 'status', 'capture', 'feedback', 'tray', 'hud', 'switch', 'health',
-  'telemetry', 'trace', 'vault', 'cost', 'checkpoint', 'remember', 'recap',
-  'forget', 'save', 'explain', 'gate', 'roi', 'receipt', 'run', 'jobs',
+  'init', 'status', 'capture', 'feedback', 'tray', 'switch', 'health',
+  'telemetry', 'trace', 'vault', 'checkpoint', 'remember', 'recap',
+  'forget', 'save', 'explain', 'gate', 'receipt', 'run', 'jobs',
   'approve', 'gov', 'deck', 'mcp', 'doctor', 'demo', 'help',
 ];
 switch (cmd) {
@@ -162,9 +160,6 @@ switch (cmd) {
   case 'tray':
     await tray(process.argv.slice(3));
     break;
-  case 'hud':
-    await hud(process.argv.slice(3));
-    break;
   case 'switch':
     await switchTool(process.argv.slice(3));
     break;
@@ -179,9 +174,6 @@ switch (cmd) {
     break;
   case 'vault':
     vault(process.argv.slice(3));
-    break;
-  case 'cost':
-    cost(process.argv.slice(3));
     break;
   case 'checkpoint':
     await checkpoint(process.argv.slice(3));
@@ -204,9 +196,6 @@ switch (cmd) {
     break;
   case 'gate':
     gate(process.argv.slice(3));
-    break;
-  case 'roi':
-    roi(process.argv.slice(3));
     break;
   case 'receipt':
     await receipt(process.argv.slice(3));
@@ -271,6 +260,16 @@ switch (cmd) {
     help();
     break;
   default: {
+    // A command we removed is not a typo, and answering it with "did you mean
+    // roi?" would be a joke at the user's expense. The fleet auto-upgrades, so
+    // someone's script hits this the morning the release lands: name the
+    // version that took it away and what to use instead.
+    const gone = removalNotice(cmd);
+    if (gone) {
+      console.log('\n  ' + gone.split('\n').join('\n  ') + '\n');
+      process.exitCode = 1;
+      break;
+    }
     // An answer sized to the mistake: one typo gets one suggestion, not the
     // entire help screen at scroll-destroying length. The full help stays one
     // named command away, and the miss still exits non-zero for scripts.

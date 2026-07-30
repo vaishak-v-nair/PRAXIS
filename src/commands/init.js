@@ -137,28 +137,14 @@ export async function init() {
 
   // slash commands
   fs.mkdirSync(p.commandsDir, { recursive: true });
-  const slashCmds = [
-    'praxis-save.md',
-    'praxis-status.md',
-    'praxis-remember.md',
-    'praxis-forget.md',
-    'praxis-recap.md',
-    'praxis-health.md',
-    'praxis-switch.md',
-    'praxis-feedback.md',
-    'praxis-hud.md',
-    'praxis-explain.md',
-    'praxis-checkpoint.md',
-    'praxis-trace.md',
-    'praxis-cost.md',
-    'praxis-gate.md',
-    'praxis-roi.md',
-    'praxis-receipt.md',
-    'praxis-vault.md',
-    'praxis-telemetry.md',
-    'praxis-tray.md',
-    'praxis-doctor.md',
-  ];
+  // Read the directory rather than list it here. This was a hardcoded array
+  // until 0.11.0, when removing three commands deleted three templates and
+  // init died on the first missing copyfile — a setup step broken by a
+  // deletion three files away. The templates directory is the list.
+  const slashCmds = fs
+    .readdirSync(TEMPLATES)
+    .filter((f) => f.startsWith('praxis-') && f.endsWith('.md'))
+    .sort();
   for (const name of slashCmds) {
     fs.copyFileSync(path.join(TEMPLATES, name), path.join(p.commandsDir, name));
   }

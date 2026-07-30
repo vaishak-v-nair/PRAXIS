@@ -161,8 +161,6 @@ test('every deprecation is announced in the changelog, removal version included'
 
 test('deprecated commands still work, and say where to go instead', async () => {
   const { deprecationNotice, isDeprecated, DEPRECATED, REMOVAL_VERSION } = await import('../src/lib/deprecate.js');
-  const { spawnSync } = await import('node:child_process');
-  const path = await import('node:path');
 
   for (const name of Object.keys(DEPRECATED)) {
     const n = deprecationNotice(name);
@@ -172,12 +170,30 @@ test('deprecated commands still work, and say where to go instead', async () => 
   }
   assert.equal(isDeprecated('receipt'), false, 'the spine is not deprecated');
   assert.equal(deprecationNotice('receipt'), null);
+});
 
-  // The contract that matters: a deprecated command STILL RUNS. Every install
-  // auto-upgrades through npx, so a removal without warning breaks scripts.
+test('a removed command leaves a headstone, not a typo guess', async () => {
+  // The other half of the contract. Sixteen shipped files run unpinned
+  // `npx -y praxis-memory`, so the release that deletes a command lands on
+  // every install automatically and somebody's script calls it that morning.
+  // "Unknown command: cost — did you mean gate?" would be a dead end.
+  const { removalNotice, isRemoved, REMOVED } = await import('../src/lib/deprecate.js');
+  const { spawnSync } = await import('node:child_process');
+  const path = await import('node:path');
+
+  for (const [name, r] of Object.entries(REMOVED)) {
+    const n = removalNotice(name);
+    assert.match(n, new RegExp(`praxis ${name} was removed in ${r.since.replace(/\./g, '\\.')}`));
+    assert.match(n, new RegExp(r.instead), 'and names what replaced it');
+    assert.match(n, /npx \w+/, 'with a command that can be pasted');
+    assert.ok(CHANGELOG.includes(`praxis ${name}`), `${name}'s removal is announced, not silent`);
+  }
+  assert.equal(isRemoved('receipt'), false, 'the spine is not removed');
+  assert.equal(removalNotice('receipt'), null);
+
   const r = spawnSync(process.execPath, [path.resolve('src', 'cli.js'), 'cost'], { encoding: 'utf8', timeout: 60000 });
-  assert.notEqual(r.status, 127);
-  assert.match(r.stderr, /deprecated/, 'the notice goes to stderr so piped output stays clean');
-  assert.match(r.stderr, /ccusage/);
-  assert.ok(!/deprecated/.test(r.stdout), 'and never pollutes stdout');
+  assert.equal(r.status, 1, 'a gone command still fails, so scripts notice');
+  assert.match(r.stdout, /was removed in/);
+  assert.match(r.stdout, /ccusage/, 'and points somewhere useful');
+  assert.doesNotMatch(r.stdout, /did you mean/, 'a removal is not a typo');
 });
