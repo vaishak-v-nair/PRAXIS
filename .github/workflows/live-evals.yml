@@ -1,8 +1,12 @@
 name: Judge certification (live)
 
-# Defined ONCE and called from two places — the release workflow and the weekly
-# drift monitor — so the certification that gates a publish and the one that
-# watches for drift can never diverge (D36).
+# NO CALLERS TODAY. This is workflow_call-only, so it never fires on its own —
+# it is kept as the one definition of what certifying the judge means, so that
+# restoring the gate is adding a caller rather than rewriting this from memory.
+# It needs an ANTHROPIC_API_KEY repository secret, which this project does not
+# keep; the release workflow no longer depends on it. The scenarios still run on
+# every push against a recorded judge (test/judge-evals.test.js), and
+# `node scripts/ci/run-live-evals.mjs` grades a live model on demand.
 on:
   workflow_call:
     inputs:

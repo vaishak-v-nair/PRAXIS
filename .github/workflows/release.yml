@@ -78,23 +78,19 @@ jobs:
           node-version: 24
       - run: node scripts/ci/pack-smoke.mjs
 
-  # Certification runs BEFORE the human approval gate, so what the founder
-  # approves is a build whose judge has already earned the right to rule.
-  # A degraded judge cannot reach npm.
-  certify:
-    if: github.repository == 'vaishak-v-nair/PRAXIS'
-    name: judge certification
-    needs: [test, pack-smoke]
-    uses: ./.github/workflows/live-evals.yml
-    with:
-      reason: release
-    secrets:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  # Live judge certification used to gate this step. It needs an ANTHROPIC_API_KEY
+  # repository secret to run the shipped judge for real, and this project does not
+  # keep one — so the gate was removed rather than left to fail, or worse, faked
+  # against a model nobody ships. The suite itself is intact: the same seven
+  # iron-rule scenarios run in CI on every push against a recorded judge
+  # (test/judge-evals.test.js), and `node scripts/ci/run-live-evals.mjs` grades a
+  # live model on demand. To restore the gate, add the secret and re-add a job
+  # calling .github/workflows/live-evals.yml with publish depending on it.
 
   publish:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: publish to npm (provenance)
-    needs: [certify, changelog]
+    needs: [test, pack-smoke, changelog]
     runs-on: ubuntu-latest
     # The human control point. Everything above is machine-verified; this is
     # the one place a person says "ship it."

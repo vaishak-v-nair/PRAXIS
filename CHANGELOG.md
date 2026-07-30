@@ -43,9 +43,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 - **CI:** tests on nine runtimes (3 OS × Node 22/24/26) on every push, a
   tarball size budget, and a pack-smoke job that installs the real tarball
   into an empty project and runs the demo end to end.
-- **Releases publish themselves** — a v-tag triggers test → pack-smoke → judge
-  certification → human approval → `npm publish` with an OIDC provenance
+- **Releases publish themselves** — a v-tag triggers test → pack-smoke →
+  changelog gate → human approval → `npm publish` with an OIDC provenance
   attestation. No long-lived npm token exists anywhere.
+- **Live judge certification no longer gates a release.** Running the shipped
+  judge for real needs an API key held in CI, and this project does not keep
+  one; a gate that cannot run — or that certifies some other model instead —
+  is worse than no gate. The suite is unchanged and still runs on every push
+  against a recorded judge, with `node scripts/ci/run-live-evals.mjs` grading a
+  live model on demand. The weekly drift monitor is retired for the same reason.
 - **`--json` across the CLI** — `status`, `receipt` (view, `--list`,
   `verify <file>`, `--verify`), `jobs` and `doctor` emit one JSON document on
   stdout with stable keys; `ok` mirrors the exit code. For scripts, CI gates,

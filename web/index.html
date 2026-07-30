@@ -516,7 +516,7 @@ footer .fcol a:hover{color:var(--rose)}
     <div class="rows">
       <div class="wrow rv"><span class="n">&#10003;</span><h3>praxis receipt</h3><p>The signed record of a session: commands run, files edited, commits made &mdash; harvested from the transcript, hash-chained, sealed with this machine's key. Recorded automatically when a session ends. <code>--html</code> renders a card you can attach to the PR.</p></div>
       <div class="wrow rv"><span class="n">&#8809;</span><h3>praxis receipt verify &lt;file&gt;</h3><p>The offline check: recomputes every hash, verifies the signature, names the exact line where tampering broke the chain. Runs on a stranger's machine with no network, no account, no model call &mdash; the public key travels inside the receipt.</p></div>
-      <div class="wrow rv"><span class="n">&#9878;</span><h3>the judge</h3><p>Opt-in, one real model call: an independent process rules each of the AI's claims against the sealed evidence &mdash; TRUE, FALSE, or the honest UNVERIFIABLE. Certified against seven iron-rule scenarios before any release ships, with a zero false-accusation floor.</p></div>
+      <div class="wrow rv"><span class="n">&#9878;</span><h3>the judge</h3><p>Opt-in, one real model call: an independent process rules each of the AI's claims against the sealed evidence &mdash; TRUE, FALSE, or the honest UNVERIFIABLE. A judge that cannot rule returns no verdict &mdash; one is never invented.</p></div>
       <div class="wrow rv"><span class="n">!</span><h3>praxis gate</h3><p>A slop-risk score for a commit from local signals &mdash; churn, tests untouched, how full the session was when it landed, whether it carries a decision trail. A five-second triage before a human spends ninety minutes reviewing. A signal, never a verdict.</p></div>
     </div>
   </div>
@@ -566,7 +566,7 @@ footer .fcol a:hover{color:var(--rose)}
       </details>
       <details>
         <summary>Can I trust the judge's verdicts?</summary>
-        <p>The judge rules only what the evidence supports — TRUE, FALSE, or the honest UNVERIFIABLE — and it runs as a separate process that gets the sealed record, not the AI's self-report. Before any release ships, it must pass seven certification scenarios against a live model, including one where the correct answer is admitting it cannot tell, with a hard floor of zero false accusations. A judge that can't rule returns no verdict; one is never invented.</p>
+        <p>The judge rules only what the evidence supports — TRUE, FALSE, or the honest UNVERIFIABLE — and it runs as a separate process that gets the sealed record, not the AI's self-report. Seven iron-rule scenarios hold it to a floor of zero false accusations — including one where the correct answer is admitting it cannot tell — and they run in CI on every push against a recorded judge, or against a live model on demand. A judge that can't rule returns no verdict; one is never invented.</p>
       </details>
       <details>
         <summary>Can my team share the memory?</summary>
