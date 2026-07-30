@@ -14,6 +14,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-07-30
+
+### Fixed
+
+- **`praxis demo --live` never worked on macOS.** The throwaway sandbox is made
+  under the system temp root, and on macOS that root is a symlink
+  (`/var/folders` → `/private/var/folders`). The agent spawned with that cwd
+  reported the resolved path while PRAXIS held the alias, so every lookup
+  derived from the cwd — the transcript directory above all — computed two
+  different names for one place. Live mode ended `nothing-sealed` with the
+  agent's work sitting right there on disk. The sandbox path is now resolved
+  with `realpathSync` before anything is derived from it. Windows and Linux
+  were never affected; 0.10.0 shipped without this fix.
+
+### Changed
+
+- **Live judge certification no longer gates a release.** Running the shipped
+  judge for real needs an API key held in CI, and this project does not keep
+  one; a gate that cannot run — or that certifies some other model instead —
+  is worse than no gate. The release chain is now test → pack-smoke →
+  changelog gate → human approval → publish. The weekly drift monitor is
+  retired for the same reason.
+- Nothing about the judge itself changes. It is still opt-in, still one real
+  model call on your own machine with your own login, and it still returns no
+  verdict rather than inventing one. The seven iron-rule scenarios still run on
+  every push against a recorded judge, CI still proves a canned stub judge
+  *fails* them, and `node scripts/ci/run-live-evals.mjs` grades a live model on
+  demand.
+
 ## [0.10.0] — 2026-07-29
 
 ### Added
@@ -43,15 +72,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 - **CI:** tests on nine runtimes (3 OS × Node 22/24/26) on every push, a
   tarball size budget, and a pack-smoke job that installs the real tarball
   into an empty project and runs the demo end to end.
-- **Releases publish themselves** — a v-tag triggers test → pack-smoke →
-  changelog gate → human approval → `npm publish` with an OIDC provenance
+- **Releases publish themselves** — a v-tag triggers test → pack-smoke → judge
+  certification → human approval → `npm publish` with an OIDC provenance
   attestation. No long-lived npm token exists anywhere.
-- **Live judge certification no longer gates a release.** Running the shipped
-  judge for real needs an API key held in CI, and this project does not keep
-  one; a gate that cannot run — or that certifies some other model instead —
-  is worse than no gate. The suite is unchanged and still runs on every push
-  against a recorded judge, with `node scripts/ci/run-live-evals.mjs` grading a
-  live model on demand. The weekly drift monitor is retired for the same reason.
 - **`--json` across the CLI** — `status`, `receipt` (view, `--list`,
   `verify <file>`, `--verify`), `jobs` and `doctor` emit one JSON document on
   stdout with stable keys; `ok` mirrors the exit code. For scripts, CI gates,
