@@ -1,0 +1,23 @@
+# Who gets asked to review what.
+#
+# One maintainer today, so this is less about routing and more about being
+# honest with a contributor: every PR lands on the same desk, and these paths
+# are the ones where a change needs an argument rather than just a diff.
+
+*                       @vaishak-v-nair
+
+# The evidence spine. A change here can make `receipt verify` say VERIFIED
+# about a record that was altered, which is the only bug this project cannot
+# ship. Expect questions.
+/src/lib/receipt/       @vaishak-v-nair
+/RECEIPT-SPEC.md        @vaishak-v-nair
+
+# The judge and its scorecard. The bar is asymmetric on purpose — one false
+# accusation fails the suite outright — so prompt changes need a before/after
+# scorecard, not a vibe.
+/test/fixtures/eval-scenarios.mjs   @vaishak-v-nair
+/scripts/ci/run-live-evals.mjs      @vaishak-v-nair
+
+# Release machinery. This publishes to npm with provenance under a trusted
+# publisher; a wrong edit here is a supply-chain edit.
+/.github/workflows/     @vaishak-v-nair
