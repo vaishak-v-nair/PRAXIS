@@ -38,25 +38,59 @@ test('an empty project is idle and healthy, never a crash', () => {
   assert.ok(TRAY_STATES.includes(s.name));
 });
 
-test('memory filling past 60% warns, past 90% hits the limit', () => {
+test('a full memory file is the steady state, not an alarm', () => {
   const root = sandbox();
   write(root, 'config.json', JSON.stringify({ maxLogBytes: 1000 }));
+
+  // The trimmer stops the instant the log is under the cap
+  // (memory.js: `while (bytes > maxBytes) pop()`), so "just under" is where
+  // every healthy project parks forever. It once glowed red there, which meant
+  // the axolotl could never be green again after its first trim.
+  write(root, 'memory.md', 'x'.repeat(930));
+  assert.equal(computeTrayState(root).name, 'idle', '93% of the cap is normal operation');
+
   write(root, 'memory.md', 'x'.repeat(650));
-  assert.equal(computeTrayState(root).name, 'warning');
-  write(root, 'memory.md', 'x'.repeat(950));
-  assert.equal(computeTrayState(root).name, 'limit');
+  assert.equal(computeTrayState(root).name, 'idle', '65% of the cap is not a warning either');
+
+  // Over the cap is still not an alarm: the Project section is never trimmed,
+  // so the file legitimately exceeds maxLogBytes, which caps the log alone.
+  write(root, 'memory.md', 'x'.repeat(1160));
+  assert.equal(computeTrayState(root).name, 'idle', 'nothing is lost — entries rotate to the archive');
 });
 
 test('a carry-over outranks everything, but only while it is fresh', () => {
   const root = sandbox();
   write(root, 'config.json', JSON.stringify({ maxLogBytes: 1000 }));
-  write(root, 'memory.md', 'x'.repeat(980)); // would otherwise be `limit`
+  write(root, 'memory.md', 'x'.repeat(980));
+  write(root, 'health.json', JSON.stringify({
+    pct: 97, level: 'critical', sessionId: 'abc', updated: new Date().toISOString(),
+  })); // would otherwise be `limit`
   write(root, 'state.json', JSON.stringify({ phase: 'switching', ts: new Date().toISOString() }));
   assert.equal(computeTrayState(root).name, 'switching');
 
-  // ...and 10 minutes later the switch is history, so the memory cap wins again
+  // ...and 10 minutes later the switch is history, so the live session wins again
   write(root, 'state.json', JSON.stringify({ phase: 'switching', ts: new Date(Date.now() - 600_000).toISOString() }));
   assert.equal(computeTrayState(root).name, 'limit');
+});
+
+test('only a live session can turn the glow amber or red', () => {
+  const root = sandbox();
+  write(root, 'config.json', JSON.stringify({ maxLogBytes: 1000 }));
+  write(root, 'memory.md', 'x'.repeat(1500)); // way over the cap, and irrelevant
+
+  const now = () => new Date().toISOString();
+  write(root, 'health.json', JSON.stringify({ pct: 74, level: 'heavy', sessionId: 'a', updated: now() }));
+  assert.equal(computeTrayState(root).name, 'warning');
+
+  write(root, 'health.json', JSON.stringify({ pct: 96, level: 'critical', sessionId: 'a', updated: now() }));
+  assert.equal(computeTrayState(root).name, 'limit');
+
+  // and both clear on their own when the session goes quiet — which is what
+  // makes them alarms rather than permanent decoration
+  write(root, 'health.json', JSON.stringify({
+    pct: 96, level: 'critical', sessionId: 'a', updated: new Date(Date.now() - 20 * 60_000).toISOString(),
+  }));
+  assert.equal(computeTrayState(root).name, 'idle');
 });
 
 test('a session that stopped writing 20 minutes ago must not hold the glow amber', () => {

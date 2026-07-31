@@ -1,14 +1,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { praxisCmd } from '../lib/runner.js';
+import { parsePidFile, isHostCommandLine, shouldRestage } from '../lib/tray-host.js';
 import { sage, amber, red, blue, gold, rose, bold, grey, dim } from '../lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TRAY_SRC = path.join(__dirname, '..', 'tray');
 const STATES = ['idle', 'warning', 'limit', 'switching', 'restored', 'happy'];
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function pkgVersion() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8')).version;
+  } catch {
+    return '0.0.0';
+  }
+}
+
+function sha256(buf) {
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
 
 function pidAlive(pid) {
   try {
@@ -17,6 +33,124 @@ function pidAlive(pid) {
   } catch {
     return false;
   }
+}
+
+function readPid(pidFile) {
+  try {
+    return parsePidFile(fs.readFileSync(pidFile, 'utf8'));
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * The command line of a live process, or '' when it cannot be read.
+ *
+ * On Windows this is deliberately two stages. `tasklist` is a native binary and
+ * answers in tens of milliseconds, and a recycled pid is almost never
+ * powershell.exe, so the cheap check rejects nearly every impostor. Only a pid
+ * that really is a PowerShell process costs the slower CIM query — and that
+ * query is the only thing that can tell OUR host from any other PowerShell on
+ * the machine.
+ */
+function commandLineOf(pid) {
+  if (process.platform === 'win32') {
+    try {
+      const row = execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      if (!/^"powershell\.exe"/i.test(row.trim())) return '';
+    } catch {
+      return ''; // cannot tell -> caller treats it as not ours
+    }
+    try {
+      return execFileSync(
+        'powershell.exe',
+        ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+      ).trim();
+    } catch {
+      return '';
+    }
+  }
+  try {
+    return execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Is this pid actually THIS project's tray host?
+ *
+ * Everything downstream of a `true` here is destructive, so the answer is false
+ * whenever it cannot be proven. A pidfile survives the host that wrote it, and
+ * Windows reuses pids, so "the number in the file is alive" was never evidence
+ * of anything — acting on it force-killed unrelated process trees.
+ */
+function isOurHost(pid, root) {
+  return isHostCommandLine(commandLineOf(pid), root);
+}
+
+function readStagedMeta(trayDir) {
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(trayDir, 'staged.json'), 'utf8'));
+    return m && typeof m === 'object' ? m : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStagedMeta(trayDir, meta) {
+  try {
+    fs.writeFileSync(path.join(trayDir, 'staged.json'), JSON.stringify(meta, null, 2) + '\n');
+  } catch {
+    /* the tray still works without its stamp; the next run restages once */
+  }
+}
+
+/**
+ * Ask a Windows host to retire itself, and only force it if it will not.
+ *
+ * The host's ONE cleanup path is $doQuit — Visible=false, Dispose(), Exit —
+ * and `taskkill /F` delivers no WM_CLOSE, so that path never ran and
+ * Shell_NotifyIcon(NIM_DELETE) was never sent. The shell then keeps the icon
+ * registered against a dead owner, which is where the extra axolotls came
+ * from: one orphan per restart. The host watches for this sentinel file and
+ * quits properly when it appears.
+ */
+async function stopWindowsHost(trayDir, pid, { timeoutMs = 6000 } = {}) {
+  const stopFile = path.join(trayDir, 'stop.request');
+  let graceful = false;
+  try {
+    fs.writeFileSync(stopFile, String(Date.now()));
+    for (let waited = 0; waited < timeoutMs; waited += 150) {
+      await sleep(150);
+      if (!pidAlive(pid)) {
+        graceful = true;
+        break;
+      }
+    }
+  } catch {
+    /* fall through to the hard stop */
+  }
+  if (!graceful) {
+    try {
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    } catch {
+      /* already gone */
+    }
+  }
+  try {
+    fs.rmSync(stopFile, { force: true });
+  } catch {
+    /* fine */
+  }
+  return graceful;
 }
 
 /**
@@ -31,22 +165,24 @@ async function trayMac(args, ensure) {
   const trayDir = path.join(p.praxisDir, 'tray');
   const pidFile = path.join(trayDir, 'tray.pid');
   const stateScript = path.join(trayDir, 'tray-state.mjs');
-  const libDir = path.join(__dirname, '..', 'lib');
 
   if (args.includes('--stop')) {
-    let pid = 0;
-    try {
-      pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
-    } catch {
-      /* no pid file */
-    }
+    const pid = readPid(pidFile);
     if (pid && pidAlive(pid)) {
-      try {
-        process.kill(pid, 'SIGTERM');
-      } catch {
-        /* already gone */
+      if (isOurHost(pid, p.root)) {
+        // SIGTERM, never SIGKILL: AppKit tears the status item down on the way
+        // out, which is the macOS equivalent of the NIM_DELETE the Windows host
+        // owes the shell.
+        try {
+          process.kill(pid, 'SIGTERM');
+        } catch {
+          /* already gone */
+        }
+        console.log('\n  ' + sage('✓') + ' tray companion stopped.\n');
+      } else {
+        console.log('\n  ' + amber('!') + ' the pid on file belongs to something else — leaving it alone.');
+        console.log('    ' + dim('a stale pidfile plus a reused pid; clearing the file.') + '\n');
       }
-      console.log('\n  ' + sage('✓') + ' tray companion stopped.\n');
     } else {
       console.log('\n  tray companion is not running here.\n');
     }
@@ -86,24 +222,28 @@ async function trayMac(args, ensure) {
     return;
   }
 
-  // Already running the current version? Leave it alone.
-  let stagedFresh = false;
-  try {
-    stagedFresh = fs
-      .readFileSync(path.join(trayDir, 'tray-mac.js'))
-      .equals(fs.readFileSync(path.join(TRAY_SRC, 'tray-mac.js')));
-  } catch {
-    /* nothing staged yet */
-  }
-  try {
-    const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
-    if (pid && pidAlive(pid)) {
-      if (stagedFresh) {
-        if (!ensure) {
-          console.log('\n  tray companion is already running ' + grey(`(${praxisCmd()} tray --stop to stop it)`) + '\n');
-        }
-        return;
+  const shipped = fs.readFileSync(path.join(TRAY_SRC, 'tray-mac.js'));
+  const incoming = { version: pkgVersion(), sha256: sha256(shipped) };
+  const staged = fs.existsSync(path.join(trayDir, 'tray-mac.js')) ? readStagedMeta(trayDir) : null;
+  const restage = shouldRestage({ staged, incoming, explicit: !ensure });
+
+  const pid = readPid(pidFile);
+  if (pid && pidAlive(pid)) {
+    if (!isOurHost(pid, p.root)) {
+      // a stale pidfile pointing at a recycled pid. It is emphatically not
+      // ours, so it is not killed — but it must not be mistaken for a running
+      // tray either, or the tray silently never starts again in this project.
+      try {
+        fs.rmSync(pidFile, { force: true });
+      } catch {
+        /* fine */
       }
+    } else if (!restage) {
+      if (!ensure) {
+        console.log('\n  tray companion is already running ' + grey(`(${praxisCmd()} tray --stop to stop it)`) + '\n');
+      }
+      return;
+    } else {
       try {
         process.kill(pid, 'SIGTERM');
       } catch {
@@ -115,10 +255,8 @@ async function trayMac(args, ensure) {
         /* fine */
       }
       if (!ensure) console.log('\n  tray companion was running an older version — restarting it fresh.');
-      await new Promise((r) => setTimeout(r, 300));
+      await sleep(300);
     }
-  } catch {
-    /* not running */
   }
 
   // stage host + state bridge + icons
@@ -129,7 +267,10 @@ async function trayMac(args, ensure) {
     return;
   }
   fs.mkdirSync(path.join(trayDir, 'icons-mac'), { recursive: true });
-  fs.copyFileSync(path.join(TRAY_SRC, 'tray-mac.js'), path.join(trayDir, 'tray-mac.js'));
+  if (restage) {
+    fs.copyFileSync(path.join(TRAY_SRC, 'tray-mac.js'), path.join(trayDir, 'tray-mac.js'));
+    writeStagedMeta(trayDir, { ...incoming, stagedAt: new Date().toISOString() });
+  }
   fs.copyFileSync(path.join(TRAY_SRC, 'tray-state.mjs'), stateScript);
   for (const f of fs.readdirSync(iconSrc)) {
     fs.copyFileSync(path.join(iconSrc, f), path.join(trayDir, 'icons-mac', f));
@@ -163,15 +304,11 @@ async function trayMac(args, ensure) {
 
   let confirmed = false;
   for (let i = 0; i < 24; i++) {
-    await new Promise((r) => setTimeout(r, 150));
-    try {
-      const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
-      if (pid && pidAlive(pid)) {
-        confirmed = true;
-        break;
-      }
-    } catch {
-      /* not yet */
+    await sleep(150);
+    const started = readPid(pidFile);
+    if (started && pidAlive(started)) {
+      confirmed = true;
+      break;
     }
   }
   if (!confirmed) {
@@ -217,19 +354,18 @@ export async function tray(args = []) {
   const pidFile = path.join(trayDir, 'tray.pid');
 
   if (args.includes('--stop')) {
-    let pid = 0;
-    try {
-      pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
-    } catch {
-      /* no pid file */
-    }
+    const pid = readPid(pidFile);
     if (pid && pidAlive(pid)) {
-      try {
-        execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-      } catch {
-        /* already gone */
+      if (isOurHost(pid, p.root)) {
+        const graceful = await stopWindowsHost(trayDir, pid);
+        console.log('\n  ' + sage('✓') + ' tray companion stopped.' + (graceful ? '' : dim('  (it had to be forced)')) + '\n');
+      } else {
+        // The pidfile outlived its host and Windows handed the number to
+        // something else. Killing it would have taken that process and its
+        // whole tree down.
+        console.log('\n  ' + amber('!') + ' the pid on file is not a PRAXIS tray — leaving it alone.');
+        console.log('    ' + dim('stale pidfile plus a reused pid; clearing the file instead.') + '\n');
       }
-      console.log('\n  ' + sage('✓') + ' tray companion stopped.\n');
     } else {
       console.log('\n  tray companion is not running here.\n');
     }
@@ -255,46 +391,46 @@ export async function tray(args = []) {
     }
   }
 
-  // A running host keeps executing the STAGED copy of tray.ps1 forever —
-  // without this check, upgrades never reach the tray until someone happens
-  // to run --stop. Compare shipped vs staged: same → leave the host alone;
-  // different → restart it on the new version (silently under --ensure, so
-  // upgrades ride the SessionStart hook into every project).
-  let stagedFresh = false;
-  try {
-    stagedFresh = fs
-      .readFileSync(path.join(trayDir, 'tray.ps1'))
-      .equals(fs.readFileSync(path.join(TRAY_SRC, 'tray.ps1')));
-  } catch {
-    /* nothing staged yet */
-  }
+  // A running host keeps executing the STAGED copy of tray.ps1 forever, so
+  // upgrades have to be able to replace it. What they must NOT do is replace it
+  // on every invocation: comparing bytes alone meant a global `praxis` and an
+  // `npx -y praxis-memory` took turns overwriting each other, one kill and one
+  // orphaned tray icon per session start. The stamp on disk records WHICH
+  // version staged the script, so an automatic run only ever moves forward.
+  const shipped = fs.readFileSync(path.join(TRAY_SRC, 'tray.ps1'));
+  const incoming = { version: pkgVersion(), sha256: sha256(shipped) };
+  const staged = fs.existsSync(path.join(trayDir, 'tray.ps1')) ? readStagedMeta(trayDir) : null;
+  const restage = shouldRestage({ staged, incoming, explicit: !ensure });
 
   if (!args.includes('--once')) {
-    try {
-      const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
-      if (pid && pidAlive(pid)) {
-        if (stagedFresh) {
-          if (!ensure) {
-            console.log('\n  tray companion is already running ' + grey(`(${praxisCmd()} tray --stop to stop it)`) + '\n');
-          }
-          return;
-        }
-        try {
-          execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
-        } catch {
-          /* already gone */
+    const pid = readPid(pidFile);
+    if (pid && pidAlive(pid)) {
+      if (!isOurHost(pid, p.root)) {
+        if (!ensure) {
+          console.log('\n  ' + amber('!') + ' the pid on file is not a PRAXIS tray — leaving that process alone.');
+          console.log('    ' + dim('starting a fresh host for this project.'));
         }
         try {
           fs.rmSync(pidFile, { force: true });
         } catch {
           /* fine */
         }
+      } else if (!restage) {
+        if (!ensure) {
+          console.log('\n  tray companion is already running ' + grey(`(${praxisCmd()} tray --stop to stop it)`) + '\n');
+        }
+        return;
+      } else {
         if (!ensure) console.log('\n  tray companion was running an older version — restarting it fresh.');
+        await stopWindowsHost(trayDir, pid);
+        try {
+          fs.rmSync(pidFile, { force: true });
+        } catch {
+          /* fine */
+        }
         // give the dying host a beat to release its file handles before restaging
-        await new Promise((r) => setTimeout(r, 400));
+        await sleep(400);
       }
-    } catch {
-      /* not running */
     }
   }
 
@@ -310,7 +446,10 @@ export async function tray(args = []) {
   };
   fs.mkdirSync(path.join(trayDir, 'icons'), { recursive: true });
   fs.mkdirSync(path.join(trayDir, 'anim'), { recursive: true });
-  safeCopy(path.join(TRAY_SRC, 'tray.ps1'), path.join(trayDir, 'tray.ps1'));
+  if (restage) {
+    safeCopy(path.join(TRAY_SRC, 'tray.ps1'), path.join(trayDir, 'tray.ps1'));
+    writeStagedMeta(trayDir, { ...incoming, stagedAt: new Date().toISOString() });
+  }
   for (const s of STATES) {
     for (const suffix of ['', '2']) {
       safeCopy(
@@ -351,6 +490,12 @@ export async function tray(args = []) {
   } catch {
     /* fine */
   }
+  try {
+    // a stop request left by a crash would retire the host we are about to start
+    fs.rmSync(path.join(trayDir, 'stop.request'), { force: true });
+  } catch {
+    /* fine */
+  }
   // Launch through a throwaway PowerShell + Start-Process: the host ends up
   // fully detached from this console (node's `detached` flag is unreliable
   // for hidden WinForms hosts).
@@ -373,15 +518,11 @@ export async function tray(args = []) {
   // the host writes its own real pid; wait briefly to confirm liftoff
   let confirmed = false;
   for (let i = 0; i < 20; i++) {
-    await new Promise((r) => setTimeout(r, 150));
-    try {
-      const pid = parseInt(fs.readFileSync(pidFile, 'utf8'), 10);
-      if (pid && pidAlive(pid)) {
-        confirmed = true;
-        break;
-      }
-    } catch {
-      /* not yet */
+    await sleep(150);
+    const started = readPid(pidFile);
+    if (started && pidAlive(started)) {
+      confirmed = true;
+      break;
     }
   }
   if (!confirmed) {

@@ -18,20 +18,47 @@ $ErrorActionPreference = 'SilentlyContinue'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+# The mutex name is a name, not a secret - nothing here depends on collision
+# resistance. MD5 was still the wrong choice, for an operational reason: on a
+# machine with the FIPS algorithm policy enabled, MD5::Create() THROWS, the
+# throw landed in the outer catch, and that catch let the host start anyway.
+# The duplicate-instance guard switched itself off, silently, on exactly the
+# fleets most likely to have several projects open at once - and the symptom
+# was two axolotls for one project. SHA256 is FIPS-approved, and the arithmetic
+# fallback cannot throw at all, so the guard has no way left to fail open.
+#
+# Changing the name does mean a host started by an older PRAXIS is invisible to
+# a new one. That resolves itself the first time the old host is replaced.
+function Get-TrayMutexName([string]$root) {
+  $key = $root.ToLower()
+  try {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    $bytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($key))
+    $sha.Dispose()
+    return 'Local\PraxisTray_' + (([System.BitConverter]::ToString($bytes) -replace '-', '').Substring(0, 32))
+  } catch {
+    # FNV-1a in plain integer arithmetic: no provider, no policy, no throw.
+    $h = [uint64]2166136261
+    foreach ($ch in $key.ToCharArray()) {
+      $h = $h -bxor [uint64][int][char]$ch
+      $h = ($h * [uint64]16777619) -band [uint64]4294967295
+    }
+    return 'Local\PraxisTray_f' + $h.ToString('x8') + '_' + $key.Length
+  }
+}
+
 if (-not $Once) {
-  # one tray per project — a second instance exits immediately
+  # one tray per project - a second instance exits immediately
   $acquired = $true
   try {
-    $md5 = [System.Security.Cryptography.MD5]::Create()
-    $hash = [System.BitConverter]::ToString($md5.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($ProjectRoot.ToLower()))) -replace '-', ''
-    $script:mutex = New-Object System.Threading.Mutex($false, ('Local\PraxisTray_' + $hash))
+    $script:mutex = New-Object System.Threading.Mutex($false, (Get-TrayMutexName $ProjectRoot))
     try {
       $acquired = $script:mutex.WaitOne(0)
     } catch [System.Threading.AbandonedMutexException] {
       $acquired = $true # previous holder was killed; the mutex is ours now
     }
   } catch {
-    $acquired = $true # never let the guard break the tray itself
+    $acquired = $true # a mutex we cannot even construct must not block the tray
   }
   if (-not $acquired) { exit 0 }
   # record the REAL host pid (the launcher pid can differ)
@@ -43,6 +70,8 @@ $configFile = Join-Path $ProjectRoot '.praxis\config.json'
 $stateFile  = Join-Path $ProjectRoot '.praxis\state.json'
 $healthFile = Join-Path $ProjectRoot '.praxis\health.json'
 $receiptsDir = Join-Path $ProjectRoot '.praxis\receipts'
+# How this host is asked to retire. See the check in the main timer tick.
+$stopFile   = Join-Path $ProjectRoot '.praxis\tray\stop.request'
 $startTime  = Get-Date
 $projName   = Split-Path $ProjectRoot -Leaf
 
@@ -183,8 +212,13 @@ function Get-PraxisState {
   elseif ($phase -eq 'restored' -and $phaseAge -lt 120) { $name = 'restored'; $label = 'context restored' }
   elseif ($sessLive -and $sess.level -eq 'critical') { $name = 'limit'; $label = ('session ' + $sess.pct + '% full - switch soon') }
   elseif ($sessLive -and $sess.level -eq 'heavy') { $name = 'warning'; $label = ('session ' + $sess.pct + '% full') }
-  elseif ($ratio -ge 0.9) { $name = 'limit'; $label = 'memory near the cap' }
-  elseif ($ratio -ge 0.6) { $name = 'warning'; $label = 'memory filling up' }
+  # the memory file deliberately does NOT drive the glow. it used to: >=0.6 of
+  # the cap went amber, >=0.9 went red. but the trimmer stops the instant the
+  # log is under the cap, so "just under" is where every healthy project parks
+  # and stays - one trim turned the axolotl red permanently, on every project
+  # at once, for the ordinary condition this tray's own tooltip calls "nothing
+  # is lost". an alarm that can never clear is not an alarm. size still shows
+  # in the panel; it just no longer shouts. (mirrors lib/tray-state.js)
   else {
     $name = 'idle'; $label = 'healthy'
     if (((Get-Date) - $startTime).TotalSeconds -lt 8) { $name = 'happy'; $label = 'hello!' }
@@ -218,8 +252,8 @@ function Get-PraxisState {
 $SUGGEST = @{
   happy     = 'Fresh start. Your memory loads automatically each time a session opens.'
   idle      = 'All caught up. /praxis-save before you wrap up keeps today''s decisions.'
-  warning   = 'Memory is filling. /praxis-forget stale entries, or raise maxLogBytes in .praxis/config.json.'
-  limit     = 'At the cap. Oldest entries move to .praxis/archive - nothing is lost. /praxis-save the essentials first.'
+  warning   = 'This session is filling up. /praxis-save now so nothing is lost to the next compaction.'
+  limit     = 'This session is nearly full. /praxis-save, then /compact or praxis switch to carry the context over.'
   switching = 'Carrying your context across sessions. Hold on...'
   restored  = 'Context written back. The next session opens pre-briefed.'
 }
@@ -701,6 +735,19 @@ $script:rootGone = 0
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 2000
 $timer.add_Tick({
+  # A cooperative stop, and the reason it exists: `praxis tray --stop` and the
+  # upgrade path used to reach straight for `taskkill /F`. A forced kill
+  # delivers no WM_CLOSE, so $doQuit never ran, Shell_NotifyIcon(NIM_DELETE)
+  # was never sent, and the shell went on drawing an axolotl owned by a process
+  # that no longer existed. One orphan per restart is what filled the
+  # notification area. Now the stopper drops a file and this host retires
+  # itself properly; /F is only the timeout fallback.
+  if (Test-Path -LiteralPath $stopFile) {
+    Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
+    $timer.Stop()
+    & $doQuit
+    return
+  }
   # A host whose project is gone must go with it. Anything that inits PRAXIS
   # in a short-lived directory (a test run, a scratch clone, a CI sandbox)
   # spawns a host that would otherwise outlive its project FOREVER - the
@@ -766,6 +813,8 @@ $timer.add_Tick({
   $ni.Text = $tip
   $header.Text = 'PRAXIS - ' + $s.label + ' (' + $s.kb + ' / ' + $s.capKb + ' KB)'
 })
+# A stop request left behind by a crash must not retire the host replacing it.
+Remove-Item -LiteralPath $stopFile -Force -ErrorAction SilentlyContinue
 $timer.Start()
 
 if ($env:PRAXIS_TRAY_TEST -eq 'panel') { Show-Panel }
@@ -787,5 +836,10 @@ if ($env:PRAXIS_TRAY_TEST -like 'overlay*') {
 }
 
 [System.Windows.Forms.Application]::Run()
+# Belt and braces. Run() also returns without $doQuit having fired: the
+# project-deleted guard calls Application::Exit directly, and so does Windows at
+# logoff. Dispose() is idempotent, so calling it twice costs nothing - NOT
+# calling it leaves a dead icon behind, which is the whole bug.
 $timer.Stop()
 $ni.Visible = $false
+$ni.Dispose()

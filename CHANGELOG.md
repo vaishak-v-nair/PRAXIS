@@ -14,6 +14,87 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+### Security
+
+- **`praxis tray` no longer force-kills a process it cannot prove is its own.**
+  Both the `--stop` path and the upgrade-restart path read a pid out of
+  `.praxis/tray/tray.pid` and ran `taskkill /PID <n> /T /F` on it — killing that
+  process **and its entire child tree** — after checking only that the number
+  belonged to something alive. A pidfile outlives the host that wrote it and
+  Windows recycles pids, so after a reboot that number routinely belongs to
+  something else entirely: an editor with unsaved work, a database, a security
+  agent. No attacker is needed to trigger it; any code already running as you
+  can also just write a pid of its choosing into the file and let PRAXIS swing
+  the axe on the next session start. Reproduced by putting a sacrificial
+  process's pid in a pidfile and watching `praxis tray` destroy it.
+  The kill is now gated on `isHostCommandLine` (`src/lib/tray-host.js`), which
+  requires the live process to actually be a tray host **for this project root**
+  — compared argument-by-argument, so `E:\PA` never matches `E:\PA2`. Anything
+  it cannot confirm is left alone, including when the identity check itself
+  fails. A pid that is alive but not ours no longer blocks startup either: the
+  stale file is cleared and a fresh host starts, where before the tray would
+  have silently never come back in that project.
+  `src/lib/demo/live.js` `killJob` has the same missing check on a much smaller
+  blast radius (job metadata, `SIGTERM`, no tree kill) and is not changed here.
+
+### Fixed
+
+- **The extra axolotls.** Two bugs compounded into one visible symptom, and
+  both are fixed.
+  1. *Force-kill skipped the only cleanup path.* The host's single teardown is
+     `$doQuit` — `Visible=false`, `Dispose()`, `Application::Exit` — and
+     `taskkill /F` delivers no `WM_CLOSE`, so `$doQuit` never ran and
+     `Shell_NotifyIcon(NIM_DELETE)` was never sent. Windows then kept drawing an
+     icon owned by a process that no longer existed. One orphan per restart.
+     Stopping is now cooperative: the stopper drops `.praxis/tray/stop.request`,
+     the host sees it on its next tick and retires itself properly, and `/F` is
+     only the timeout fallback. `$ni.Dispose()` was also added after
+     `Application::Run()` returns, which covers the paths `$doQuit` never sees
+     (the project-deleted guard, and logoff).
+  2. *Two installs took turns restaging.* `stagedFresh` compared the staged
+     `tray.ps1` byte-for-byte against the running install's copy, and **any**
+     difference meant kill-and-restage. With a global `praxis` at one version
+     and the `npx -y praxis-memory` that the SessionStart hook runs at another,
+     each undid the other once per invocation, forever — six alternating runs
+     produced four different host pids, and every respawn leaked an icon per
+     bug 1. The staged script now carries a stamp
+     (`.praxis/tray/staged.json`, `{version, sha256}`) and an **automatic**
+     run only ever moves forward: an older install passing through leaves a
+     newer stage alone. Typing `praxis tray` yourself still stages what you
+     typed, so working from a dev tree is unaffected — and no longer gets
+     silently reverted by the next session start.
+- **The one-tray-per-project guard could not fail open any more.** The mutex was
+  named from an MD5 of the project root, and on a machine with the FIPS
+  algorithm policy enabled `MD5::Create()` throws. That throw landed in a
+  `catch { $acquired = $true }`, so the duplicate-instance guard switched itself
+  off — silently, with `$ErrorActionPreference = 'SilentlyContinue'` — and the
+  symptom was two axolotls for a single project. The name now comes from SHA256,
+  which is FIPS-approved, with a plain-arithmetic FNV-1a fallback that cannot
+  throw at all. Because the name changed, a host started by an older PRAXIS is
+  invisible to a new one; that resolves the first time the old host is replaced.
+- **The tray stopped glowing red forever.** Memory fill no longer drives the
+  axolotl's glow at all. It used to: `>=0.6` of `maxLogBytes` went amber and
+  `>=0.9` went red. But the trimmer stops the instant the log is under the cap
+  (`while (bytes > maxBytes) pop()`), so "just under" is exactly where every
+  healthy project parks and stays — and returning to green needed `<0.6`, which
+  would require the log to shrink 40% on its own. It never does. The practical
+  effect was that one trim turned the axolotl red **permanently**, on every
+  project at once, for the ordinary condition the tooltip itself calls "nothing
+  is lost". An alarm that can never clear is not an alarm. Amber and red are now
+  reachable only from a live session's fill — the one condition that is a real
+  event and resolves on its own. Size still shows in the panel; it just no
+  longer shouts.
+- Fixed in **both** hosts. `src/tray/tray.ps1` computes the same rules inline,
+  so a fix in `src/lib/tray-state.js` alone would have changed macOS and left
+  every Windows tray red — the exact drift issue #3 exists to close.
+- `praxis status` matched the same thresholds and is now calm too, so the two
+  surfaces cannot disagree about the same project on the same machine. The
+  memory row reads `at the cap, rotating` in sage instead of `near the cap` in
+  red. The JSON `state` field (`healthy` / `filling-up` / `near-cap`) is
+  unchanged — it is descriptive data for scripts, not an alarm.
+- The suggestion text for `warning` and `limit` now talks about the session,
+  since that is the only thing that can raise them.
+
 ## [0.11.0] — 2026-07-30
 
 ### Removed

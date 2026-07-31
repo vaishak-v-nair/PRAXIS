@@ -180,10 +180,32 @@ test('the state caption never restates the state word', () => {
 
   const r = spawnSync(process.execPath, [CLI, 'status'], { cwd: dir, encoding: 'utf8', timeout: 60000, env: { ...process.env, PRAXIS_SKIP_TRAY: '1' } });
   const out = stripAnsi(r.stdout || '');
-  assert.match(out, /near the cap/, 'the near-cap branch is the one on screen');
-  assert.ok(!/At the cap/i.test(out.replace(/near the cap/g, '')), 'the caption explains, the row states — neither repeats the other');
+  assert.match(out, /at the cap, rotating/, 'the at-the-cap branch is the one on screen');
+  assert.ok(!/At the cap/i.test(out.replace(/at the cap, rotating/g, '')), 'the caption explains, the row states — neither repeats the other');
   const capMentions = (out.match(/the cap/gi) || []).length;
   assert.equal(capMentions, 1, 'one mention of the cap, total');
+});
+
+test('a full memory file is never painted as a problem', () => {
+  // The trimmer parks every healthy project just under the cap and leaves it
+  // there, so an amber or red dot for memory fill is a permanent false alarm —
+  // the same defect that kept three trays glowing red at once. Nothing is lost
+  // at the cap; the oldest entries rotate to .praxis/archive.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-ui-cap-calm-'));
+  fs.mkdirSync(path.join(dir, '.praxis'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.praxis', 'memory.md'), '# PRAXIS Memory\n' + '- filler line\n'.repeat(1200));
+
+  const r = spawnSync(process.execPath, [CLI, 'status'], {
+    cwd: dir, encoding: 'utf8', timeout: 60000,
+    env: { ...process.env, PRAXIS_SKIP_TRAY: '1', PRAXIS_RICH: '1' },
+  });
+  const raw = r.stdout || '';
+  const memRow = stripAnsi(raw).split('\n').find((l) => l.includes('the cap')) || '';
+  assert.ok(memRow, 'the memory state row renders');
+  assert.doesNotMatch(memRow, /filling up|near the cap/, 'no alarm wording for the steady state');
+  // and it must not be drawn in the warning or danger colour
+  const rowRaw = raw.split('\n').find((l) => stripAnsi(l).includes('the cap')) || '';
+  assert.doesNotMatch(rowRaw, /\x1b\[38;2;(224;96;77|237;181;79)m/, 'not red, not amber'); // eslint-disable-line no-control-regex
 });
 
 test('help descriptions share their columns — measured, in both command forms', () => {

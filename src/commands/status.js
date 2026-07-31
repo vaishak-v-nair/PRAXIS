@@ -82,12 +82,14 @@ export function status(opts = {}) {
     });
     return;
   }
-  const health =
-    fill < 0.6
-      ? sage('●') + ' healthy'
-      : fill < 0.9
-        ? amber('●') + ' filling up'
-        : red('●') + ' near the cap';
+  // Memory fill is a fuel gauge, not a warning light. The trimmer stops the
+  // instant the log is under the cap (lib/memory.js), so a full log is where
+  // every healthy project parks and stays — and nothing is lost when it does,
+  // the oldest entries rotate into .praxis/archive. Painting that amber and
+  // then red meant the steady state looked like a problem forever. The tray
+  // had the identical bug and stopped glowing for it; this row matches, or the
+  // two surfaces disagree about the same project on the same machine.
+  const health = fill < 0.9 ? sage('●') + ' healthy' : sage('●') + ' at the cap, rotating';
   // The caption never restates the state word — the row above already said it.
   // ("state ● near the cap — At the cap — …" shipped once. Once.)
   const healthPlain =
@@ -95,7 +97,7 @@ export function status(opts = {}) {
       ? 'plenty of room — nothing to do'
       : fill < 0.9
         ? 'oldest session notes will be trimmed automatically — nothing to do'
-        : 'oldest notes are trimmed as new ones arrive — put anything precious in the Project section, it is never trimmed';
+        : 'oldest notes move to .praxis/archive as new ones arrive — nothing is lost, and anything in the Project section is never trimmed';
 
   const caption = (text) => {
     for (const l of wrap(text, CONTENT - COL)) console.log(g(' '.repeat(COL) + dim(l)));

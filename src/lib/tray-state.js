@@ -56,9 +56,21 @@ export function receiptBadge(receiptsDir) {
  * What the axolotl should look like right now, and why.
  *
  * Precedence is deliberate and matches tray.ps1: an active carry-over beats
- * everything, then the LIVE session fill, then the memory file fill. A session
- * that stopped writing more than 5 minutes ago is history — it must not hold
- * the glow amber while you are working on something else.
+ * everything, then the LIVE session fill. A session that stopped writing more
+ * than 5 minutes ago is history — it must not hold the glow amber while you
+ * are working on something else.
+ *
+ * The memory file deliberately does NOT drive the glow. It used to: >=0.6 of
+ * `maxLogBytes` went amber and >=0.9 went red. But the trimmer stops the
+ * instant the log is under the cap (memory.js: `while (bytes > maxBytes)
+ * pop()`), so "just under the cap" is exactly where every healthy project
+ * parks and stays. Green needs <0.6, which would require the log to shrink 40%
+ * on its own — it never does. The effect was that one trim turned the axolotl
+ * red permanently, on every project at once, for the ordinary condition the
+ * tooltip itself describes as "nothing is lost". An alarm that can never clear
+ * is not an alarm, and this tray's whole premise is being invisible until
+ * something actually needs a human. Size still travels in `kb`/`capKb` for the
+ * panel to show; it just no longer shouts.
  *
  * @param {string} root project root
  * @param {{now?: number, uptimeMs?: number}} [opts]
@@ -134,12 +146,6 @@ export function computeTrayState(root, opts = {}) {
   } else if (sessLive && sess.level === 'heavy') {
     name = 'warning';
     label = `session ${sess.pct}% full`;
-  } else if (ratio >= 0.9) {
-    name = 'limit';
-    label = 'memory near the cap';
-  } else if (ratio >= 0.6) {
-    name = 'warning';
-    label = 'memory filling up';
   } else if (uptimeMs < 8000) {
     name = 'happy';
     label = 'hello!';
@@ -189,11 +195,14 @@ export function computeTrayState(root, opts = {}) {
 
 export const TRAY_STATES = STATES;
 
+// `warning` and `limit` are now reachable only from a live session's fill, so
+// they say what to do about a session — not about the memory file, which no
+// longer drives the glow at all.
 export const SUGGEST = {
   happy: 'Fresh start. Your memory loads automatically each time a session opens.',
   idle: 'All caught up. /praxis-save before you wrap up keeps today’s decisions.',
-  warning: 'Memory is filling. /praxis-forget stale entries, or raise maxLogBytes in .praxis/config.json.',
-  limit: 'At the cap. Oldest entries move to .praxis/archive — nothing is lost. /praxis-save the essentials first.',
+  warning: 'This session is filling up. /praxis-save now so nothing is lost to the next compaction.',
+  limit: 'This session is nearly full. /praxis-save, then /compact or praxis switch to carry the context over.',
   switching: 'Carrying your context across sessions. Hold on…',
   restored: 'Context written back. The next session opens pre-briefed.',
 };
