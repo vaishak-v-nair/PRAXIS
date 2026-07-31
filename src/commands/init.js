@@ -11,7 +11,6 @@ import { patchSettings, resolveHookScope, contributorCount, ignoreLocalSettings 
 import { patchMcpConfig } from '../lib/mcp/config.js';
 import { masthead, mascotBlock, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
-import { tray } from './tray.js';
 import { readFileSync } from 'node:fs';
 
 function pkgVersion() {
@@ -37,7 +36,11 @@ export async function init() {
   if (!fs.existsSync(p.configFile)) {
     fs.writeFileSync(
       p.configFile,
-      JSON.stringify({ capture: true, maxLogBytes: 16384, redact: true, tray: true, overlay: true }, null, 2) + '\n',
+      // tray: false is deliberate (0.11.1). One host per project meant `init`
+      // in five repos put five axolotls by the clock, and the only way back was
+      // uninstalling PRAXIS from projects that were otherwise fine. `praxis
+      // tray` turns it on here, and remembers.
+      JSON.stringify({ capture: true, maxLogBytes: 16384, redact: true, tray: false, overlay: true }, null, 2) + '\n',
     );
   }
   done.push('.praxis/memory.md + config.json');
@@ -118,8 +121,8 @@ export async function init() {
     set.already
       ? `${where} (hooks already present)`
       : scope.scope === 'local'
-        ? `${where} — capture on Stop · snapshot before compact · tray on SessionStart ${grey('(just you — gitignored)')}`
-        : `${where} — capture on Stop · snapshot before compact · tray on SessionStart ${grey('(whole project — teammates included)')}`,
+        ? `${where} — capture on Stop · snapshot before compact ${grey('(just you — gitignored)')}`
+        : `${where} — capture on Stop · snapshot before compact ${grey('(whole project — teammates included)')}`,
   );
 
   // .mcp.json — the platform surface. With this, Claude Code hands the model the
@@ -175,20 +178,19 @@ export async function init() {
   }
   for (const d of done) console.log('  ' + sage('✓') + ' ' + d);
 
-  // the tray companion starts with the very first install — no second command
-  let trayWanted = process.platform === 'win32';
-  try {
-    const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
-    if (cfg.tray === false) trayWanted = false;
-  } catch {
-    /* default on */
-  }
-  if (trayWanted) {
-    try {
-      await tray([]);
-    } catch {
-      /* the tray is a bonus, never a blocker */
-    }
+  // The tray no longer starts itself here. It used to, and the arithmetic was
+  // unkind: one host per project times every project you ever ran init in,
+  // which is how somebody ends up with a row of axolotls they never asked for
+  // and uninstalls PRAXIS from working projects to get rid of them. An icon
+  // nobody chose is clutter, not ambience. One command turns it on, per
+  // project, and that choice is remembered.
+  if (process.platform === 'win32' || process.platform === 'darwin') {
+    console.log(
+      '  ' +
+        grey('○ tray companion — off. ') +
+        rose(`${praxisCmd()} tray`) +
+        grey(' puts the axolotl by the clock for this project.'),
+    );
   }
   // tier-2 consent: one honest question, once, and only when a receiver
   // actually exists — asking consent for a send that can't happen is noise
@@ -237,7 +239,7 @@ export async function init() {
      the AI actually did. ${bold(`${c} receipt`)} shows the proof.
   ${grey('4.')} ${bold(`${c} status`)} any time — memory, session health, latest receipt verdict.
 
-  ${dim('The hooks (auto-capture, snapshots, tray auto-start) run through npx,')}
+  ${dim('The hooks (auto-capture, snapshots) run through npx,')}
   ${dim('so they work with no global install. Want the short `praxis` command?')}
   ${dim('Optional: ')}${bold('npm install -g praxis-memory')}
 

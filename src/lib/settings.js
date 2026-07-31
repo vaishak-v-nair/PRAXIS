@@ -11,14 +11,22 @@ import { projectPaths } from './paths.js';
 //
 // - Stop:         capture the session into memory when it ends
 // - PreCompact:   snapshot BEFORE Claude squeezes the session (detail rescue)
-// - SessionStart: make sure the tray companion is up the moment Claude starts
-//                 (health must be ambient, not a command you remember to run)
+// - SessionStart: bring the tray companion up. OPT-IN since 0.11.1, and `init`
+//                 no longer writes it. One host per project meant a person with
+//                 five projects got five axolotls by the clock without ever
+//                 asking for one, and the only way out was uninstalling PRAXIS
+//                 from projects that were otherwise happy. An icon nobody chose
+//                 is not ambient, it is clutter. `praxis tray` adds this hook;
+//                 `praxis tray --stop` takes it away again.
 const RUNNER = 'npx -y praxis-memory';
+const CORE_EVENTS = ['Stop', 'PreCompact'];
+const TRAY_EVENT = 'SessionStart';
 const HOOKS = {
   Stop: 'capture',
   PreCompact: 'capture',
-  SessionStart: 'tray --ensure',
+  [TRAY_EVENT]: 'tray --ensure',
 };
+const trayCommands = () => [`${RUNNER} ${HOOKS[TRAY_EVENT]}`, `praxis ${HOOKS[TRAY_EVENT]}`];
 
 /** Does this settings file already carry PRAXIS's hooks? */
 export function hasPraxisHooks(file) {
@@ -123,7 +131,7 @@ export function ignoreLocalSettings(cwd = process.cwd()) {
  * Also repairs hooks written by older versions as bare `praxis <cmd>`,
  * which fail when no global `praxis` shim exists.
  */
-export function patchSettings(settingsFile, { repairOnly = false } = {}) {
+export function patchSettings(settingsFile, { repairOnly = false, tray = false } = {}) {
   // repairOnly is what the no-args front door uses. It fixes legacy bare-`praxis`
   // commands in a file that ALREADY has hooks, and adds nothing. Without it the
   // front door would create a second copy of every hook in the shared file for
@@ -144,6 +152,10 @@ export function patchSettings(settingsFile, { repairOnly = false } = {}) {
 
   let added = 0;
   let repaired = 0;
+  // Repair every hook PRAXIS has ever written, including the tray one — an
+  // install that opted into the tray under an older version still has a legacy
+  // bare-`praxis` command to fix. Only ADD the events this call asked for.
+  const wanted = new Set(tray ? Object.keys(HOOKS) : CORE_EVENTS);
   for (const [event, sub] of Object.entries(HOOKS)) {
     const command = `${RUNNER} ${sub}`;
     const legacy = `praxis ${sub}`;
@@ -161,13 +173,60 @@ export function patchSettings(settingsFile, { repairOnly = false } = {}) {
         }
       }
     }
-    if (!repairOnly && !JSON.stringify(settings.hooks[event]).includes(command)) {
+    if (!repairOnly && wanted.has(event) && !JSON.stringify(settings.hooks[event]).includes(command)) {
       settings.hooks[event].push({ hooks: [{ type: 'command', command }] });
       added++;
     }
+    // an event we neither want nor found anything in must not be left as an
+    // empty array in somebody's settings file
+    if (!settings.hooks[event].length) delete settings.hooks[event];
   }
   if (repairOnly && !repaired) return { already: true, repaired: 0 };
 
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
   return { already: added === 0 && repaired === 0, repaired };
+}
+
+/**
+ * Turn the tray's auto-start hook on or off, touching nothing else in the file.
+ *
+ * This is what makes the tray a real switch rather than a flag. Starting it
+ * with `praxis tray` has to survive the end of the session, or the opt-in lasts
+ * until you close the terminal; stopping it with `praxis tray --stop` has to
+ * survive too, or the thing you just dismissed is back at the next SessionStart
+ * and the button did nothing. Both legacy bare-`praxis` and the npx form are
+ * recognised on the way out, so an old install can actually turn it off.
+ */
+export function setTrayHook(settingsFile, on) {
+  let settings = {};
+  try {
+    settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8') || '{}');
+  } catch {
+    settings = {};
+  }
+  if (typeof settings !== 'object' || settings === null) settings = {};
+  settings.hooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};
+
+  const command = `${RUNNER} ${HOOKS[TRAY_EVENT]}`;
+  const list = Array.isArray(settings.hooks[TRAY_EVENT]) ? settings.hooks[TRAY_EVENT] : [];
+  const before = JSON.stringify(list);
+
+  let next;
+  if (on) {
+    next = before.includes(command) ? list : [...list, { hooks: [{ type: 'command', command }] }];
+  } else {
+    const cmds = new Set(trayCommands());
+    next = list
+      .map((e) => (e && Array.isArray(e.hooks) ? { ...e, hooks: e.hooks.filter((h) => !(h && cmds.has(h.command))) } : e))
+      .filter((e) => !e || !Array.isArray(e.hooks) || e.hooks.length > 0);
+  }
+  if (JSON.stringify(next) === before) return { already: true, on: Boolean(on) };
+
+  if (next.length) settings.hooks[TRAY_EVENT] = next;
+  else delete settings.hooks[TRAY_EVENT];
+  if (!Object.keys(settings.hooks).length) delete settings.hooks;
+
+  fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
+  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + '\n');
+  return { already: false, on: Boolean(on) };
 }

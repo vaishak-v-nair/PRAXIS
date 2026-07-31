@@ -79,7 +79,8 @@ export function checkAgentCli(probe = (bin) => onPath(bin)) {
   );
 }
 
-/** The Stop / PreCompact / SessionStart hooks that make capture automatic. */
+/** The Stop / PreCompact hooks that make capture automatic. (The SessionStart
+ *  tray hook is opt-in since 0.11.1, so its absence is never a fault.) */
 export function checkHooks(cwd = process.cwd()) {
   const p = projectPaths(cwd);
   // Hooks live in the personal file by default and the shared one by choice

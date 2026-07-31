@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { projectPaths } from '../lib/paths.js';
 import { praxisCmd } from '../lib/runner.js';
 import { parsePidFile, isHostCommandLine, shouldRestage } from '../lib/tray-host.js';
+import { resolveHookScope, setTrayHook } from '../lib/settings.js';
 import { sage, amber, red, blue, gold, rose, bold, grey, dim } from '../lib/ui.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -94,6 +95,40 @@ function commandLineOf(pid) {
  */
 function isOurHost(pid, root) {
   return isHostCommandLine(commandLineOf(pid), root);
+}
+
+/**
+ * Remember, past the end of this terminal, whether this project wants a tray.
+ *
+ * The tray is opt-in per project as of 0.11.1, and an opt-in that expires when
+ * the session ends is not one: `praxis tray` has to still be true tomorrow, and
+ * `--stop` has to mean stopped rather than stopped-until-SessionStart. So both
+ * write the config flag AND add or remove the hook that restarts it.
+ */
+function setTrayPreference(p, on) {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
+    if (cfg.tray !== on) {
+      cfg.tray = on;
+      fs.writeFileSync(p.configFile, JSON.stringify(cfg, null, 2) + '\n');
+    }
+  } catch {
+    /* no config here yet — nothing to remember against */
+  }
+  try {
+    setTrayHook(resolveHookScope(p.root, { interactive: false }).file, on);
+  } catch {
+    /* unwritable settings; the config flag still holds for explicit runs */
+  }
+}
+
+/** Has this project actually asked for a tray? Silence means no, since 0.11.1. */
+function trayOptedIn(configFile) {
+  try {
+    return JSON.parse(fs.readFileSync(configFile, 'utf8')).tray === true;
+  } catch {
+    return false;
+  }
 }
 
 function readStagedMeta(trayDir) {
@@ -186,6 +221,9 @@ async function trayMac(args, ensure) {
     } else {
       console.log('\n  tray companion is not running here.\n');
     }
+    // Stopped means stopped. Without this the next SessionStart hook would put
+    // it straight back and the command would have accomplished nothing.
+    setTrayPreference(p, false);
     try {
       fs.rmSync(pidFile, { force: true });
     } catch {
@@ -199,14 +237,11 @@ async function trayMac(args, ensure) {
     console.log('\n  PRAXIS is not set up here yet. Run ' + bold('npx praxis-memory') + ' first.\n');
     return;
   }
-  if (ensure) {
-    try {
-      const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
-      if (cfg.tray === false) return;
-    } catch {
-      /* default on */
-    }
-  }
+  // Opt-in, and silence means no. This used to be "start unless explicitly
+  // disabled", which handed an axolotl to every project anyone ever ran `init`
+  // in — five projects, five icons, none of them asked for. Nothing starts
+  // automatically now until somebody types `praxis tray` once.
+  if (ensure && !trayOptedIn(p.configFile)) return;
 
   // --once: compute the state in the foreground and print it. No AppKit, no
   // menu bar — this is the debug path, and it is the one thing that can be
@@ -320,6 +355,8 @@ async function trayMac(args, ensure) {
     return;
   }
 
+  // Typing the command IS the opt-in, and it has to outlive this terminal.
+  setTrayPreference(p, true);
   console.log('\n  ' + rose('✦') + ' ' + bold('tray companion is live') + ' — look for the axolotl in the menu bar.');
   console.log(
     '    ' +
@@ -330,7 +367,8 @@ async function trayMac(args, ensure) {
       blue('switching') + grey(' · ') +
       gold('restored'),
   );
-  console.log('    ' + rose(`${praxisCmd()} tray --stop`) + dim('  when you want it gone.') + '\n');
+  console.log('    ' + dim('it comes back on its own each session, in this project only.'));
+  console.log('    ' + rose(`${praxisCmd()} tray --stop`) + dim('  turns that off again.') + '\n');
 }
 
 export async function tray(args = []) {
@@ -369,6 +407,9 @@ export async function tray(args = []) {
     } else {
       console.log('\n  tray companion is not running here.\n');
     }
+    // Stopped means stopped. Without this the next SessionStart hook would put
+    // it straight back and the command would have accomplished nothing.
+    setTrayPreference(p, false);
     try {
       fs.rmSync(pidFile, { force: true });
     } catch {
@@ -382,14 +423,11 @@ export async function tray(args = []) {
     console.log('\n  PRAXIS is not set up here yet. Run ' + bold('npx praxis-memory') + ' first.\n');
     return;
   }
-  if (ensure) {
-    try {
-      const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
-      if (cfg.tray === false) return;
-    } catch {
-      /* default on */
-    }
-  }
+  // Opt-in, and silence means no. This used to be "start unless explicitly
+  // disabled", which handed an axolotl to every project anyone ever ran `init`
+  // in — five projects, five icons, none of them asked for. Nothing starts
+  // automatically now until somebody types `praxis tray` once.
+  if (ensure && !trayOptedIn(p.configFile)) return;
 
   // A running host keeps executing the STAGED copy of tray.ps1 forever, so
   // upgrades have to be able to replace it. What they must NOT do is replace it
@@ -530,6 +568,8 @@ export async function tray(args = []) {
     return;
   }
 
+  // Typing the command IS the opt-in, and it has to outlive this terminal.
+  setTrayPreference(p, true);
   console.log('\n  ' + rose('✦') + ' ' + bold('tray companion is live') + ' — look for the axolotl by the clock.');
   console.log(
     '    ' +
@@ -540,5 +580,6 @@ export async function tray(args = []) {
       blue('switching') + grey(' · ') +
       gold('restored'),
   );
-  console.log('    ' + rose(`${praxisCmd()} tray --stop`) + dim('  when you want it gone.') + '\n');
+  console.log('    ' + dim('it comes back on its own each session, in this project only.'));
+  console.log('    ' + rose(`${praxisCmd()} tray --stop`) + dim('  turns that off again.') + '\n');
 }

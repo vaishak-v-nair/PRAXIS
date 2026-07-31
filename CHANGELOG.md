@@ -14,6 +14,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+## [0.11.1] — 2026-08-01
+
+### Changed
+
+- **The tray is opt-in now, per project.** `init` no longer starts it and no
+  longer writes the `SessionStart` hook; new projects get `tray: false`. The old
+  behaviour was one host per project, started automatically, which meant running
+  PRAXIS in five repos put five axolotls by the clock without anyone asking for
+  one — and the only way back was uninstalling PRAXIS from projects that were
+  otherwise perfectly happy. An icon nobody chose is clutter, not ambience.
+  `praxis tray` turns it on for a project and **remembers**: it writes
+  `tray: true` and adds the `SessionStart` hook, so it comes back on its own
+  next session. `praxis tray --stop` does the reverse — flag off, hook removed —
+  so stopped means stopped rather than stopped-until-the-next-session.
+  Capture, snapshots, receipts and the MCP tools are untouched: this turns off
+  an icon, never your memory.
+  **Existing installs keep their tray.** They already carry `tray: true`, which
+  is exactly what the new opt-in check looks for, so nothing disappears on
+  upgrade. Anyone who wants it gone now has a button that works.
+
 ### Security
 
 - **`praxis tray` no longer force-kills a process it cannot prove is its own.**

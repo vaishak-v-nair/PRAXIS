@@ -67,8 +67,15 @@ test('patchSettings adds all hooks without clobbering existing ones', () => {
   assert.match(JSON.stringify(s.hooks.Stop), /npx -y praxis-memory capture/);
   assert.equal(s.hooks.PreCompact.length, 1, 'snapshot hook present once');
   assert.match(JSON.stringify(s.hooks.PreCompact), /npx -y praxis-memory capture/);
-  assert.equal(s.hooks.SessionStart.length, 1, 'tray auto-start hook present once');
-  assert.match(JSON.stringify(s.hooks.SessionStart), /npx -y praxis-memory tray --ensure/);
+  // The tray is opt-in as of 0.11.1: `init` installs capture, and nothing that
+  // puts an icon on the user's screen. Five projects used to mean five
+  // axolotls nobody asked for.
+  assert.equal(s.hooks.SessionStart, undefined, 'no tray hook unless asked for');
+
+  patchSettings(file, { tray: true });
+  const t = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(t.hooks.SessionStart.length, 1, 'and exactly one once it is asked for');
+  assert.match(JSON.stringify(t.hooks.SessionStart), /npx -y praxis-memory tray --ensure/);
 });
 
 test('patchSettings repairs legacy bare-praxis hooks in place', () => {
