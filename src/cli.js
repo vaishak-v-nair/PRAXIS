@@ -26,6 +26,7 @@ import { gov } from './commands/gov.js';
 import { deck } from './commands/deck.js';
 import { mcp } from './commands/mcp.js';
 import { doctor } from './commands/doctor.js';
+import { uninstall } from './commands/uninstall.js';
 import { demo } from './commands/demo.js';
 import { warnDeprecated, removalNotice } from './lib/deprecate.js';
 import { didYouMean } from './lib/suggest.js';
@@ -80,6 +81,7 @@ function help() {
       [`${c} remember "<f>"`, `save a fact into memory now ${grey(`· ${c} forget "<t>" removes it`)}`],
       [`${c} health`, 'how full is this Claude session, really — and where to go next'],
       [`${c} doctor`, `what is set up, what broke, and the fix for each ${grey('(local read only)')}`],
+      [`${c} uninstall`, `take PRAXIS out of this project ${grey('· your memory is archived, never deleted')}`],
     ]],
   ];
 
@@ -220,6 +222,9 @@ switch (cmd) {
     break;
   case 'doctor':
     process.exitCode = doctor(process.argv.slice(3));
+    break;
+  case 'uninstall':
+    await uninstall(process.argv.slice(3));
     break;
   case 'demo':
     process.exitCode = await demo(process.argv.slice(3));

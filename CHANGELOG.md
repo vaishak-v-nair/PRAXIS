@@ -14,6 +14,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+### Added
+
+- **`praxis uninstall`** — takes PRAXIS out of a project, properly. Until now
+  there was no answer to "I want this out of here", so the thing people reach
+  for is `rm -rf .praxis` — which leaves the hooks firing `npx -y praxis-memory`
+  at the end of every session against a directory that no longer exists. Doing
+  it by hand meant six surfaces: `.praxis/`, the hooks in either settings file,
+  the `praxis` server in `.mcp.json`, the managed block in `CLAUDE.md`, the
+  `praxis-*` slash commands, and the notes written into an Obsidian vault. That
+  last one needs you to know which half of your own vault a machine wrote.
+  Nothing is deleted before it is copied. Memory, receipts, the archive and the
+  vault notes go to `~/.praxis/removed/<project>-<date>/` first, because "I
+  changed my mind" and "I ran that in the wrong project" are both ordinary and
+  neither should cost anyone their history.
+  Every removal is surgical and proves it: hooks belonging to other tools stay,
+  other MCP servers stay, a `CLAUDE.md` holding the project's own brief is
+  edited rather than deleted, and **only** the `Praxis/` subfolder of a vault is
+  touched — never a note you wrote. A settings file or `.mcp.json` that PRAXIS
+  created and nothing else uses is removed rather than left as an empty `{}`.
+  Legacy bare-`praxis` hooks from 0.9.1 and earlier are recognised too, and so
+  are `praxis-cost` / `praxis-roi` / `praxis-hud`, which 0.11.0 retired but
+  `init` never deleted from projects that already had them.
+  `--dry-run` shows the plan and changes nothing. `--yes` skips the prompt; with
+  no TTY and no `--yes` it refuses rather than guessing. `--global` also removes
+  the user-wide `/praxis-*` commands, which is opt-in because other projects may
+  still be using them. The sentence `init` writes into `CLAUDE.md` ("This
+  project uses PRAXIS…") comes out with the block — leaving it puts a false
+  instruction in a file Claude reads at the start of every session.
+
 ## [0.11.1] — 2026-08-01
 
 ### Changed
