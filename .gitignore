@@ -26,7 +26,17 @@ skills-lock.json
 assets/
 TRAY-VISION.md
 
-# personal Obsidian vault content - never public
+# Personal Obsidian vault content — never public.
+#
+# This rule named only "Personal Intelligence/" until the vault was renamed on
+# disk to "Praxis iIntelligence", at which point the pattern quietly stopped
+# matching and 387 files of private research sat untracked in a public repo,
+# one `git add -A` away from being pushed. Nothing leaked (checked: zero
+# commits touch it in any branch). Then it happened AGAIN on the rename to
+# "Praxis Intelligence". Renames are the failure mode, so this now matches on
+# shape rather than on any one spelling: any top-level "* Intelligence/" folder
+# is personal-vault content and never belongs in this repo.
+*Intelligence/
 Personal Intelligence/
 .obsidian/
 
