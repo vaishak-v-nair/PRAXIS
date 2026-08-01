@@ -19,8 +19,15 @@ function sandbox() {
   return dir;
 }
 
-async function settled(p, id, tries = 40) {
-  for (let i = 0; i < tries; i++) {
+// Approving a draft spawns a real twin job. On a CI runner starting a node
+// process costs an order of magnitude more than locally, and this waited a
+// fixed 40 iterations — "~8 s" only if every iteration is free. Deadline-based
+// and generous on CI; unchanged locally.
+const SLOW = process.env.CI ? 4 : 1;
+
+async function settled(p, id, budgetMs = 8000 * SLOW) {
+  const deadline = Date.now() + budgetMs;
+  while (Date.now() < deadline) {
     const m = readMeta(p, id);
     if (m && jobStatus(m) !== 'running') return m;
     await new Promise((r) => setTimeout(r, 200));

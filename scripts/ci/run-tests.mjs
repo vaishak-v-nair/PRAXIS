@@ -52,8 +52,31 @@ export function annotationsFor(failures) {
   );
 }
 
+/**
+ * How many test FILES to run at once.
+ *
+ * `node --test` defaults to one per CPU. Seventeen of this suite's thirty-nine
+ * files spawn real child processes — fixture agents, judges, detached job
+ * runners — so on a two-core CI runner several spawn-heavy files compete for
+ * process startup at the same time. That contention, not any one test, is what
+ * made a different leg go red on nearly every push while a rerun with no code
+ * change went green. A suite that needs a rerun to be believed is a suite
+ * nobody reads, and this one gates the release workflow.
+ *
+ * Capping it on CI trades a couple of minutes of wall clock for a result that
+ * means something. Local runs are untouched.
+ */
+export function testConcurrency(env = process.env) {
+  if (!env.CI) return null; // local: node's default, one per core
+  const n = Number(env.PRAXIS_TEST_CONCURRENCY);
+  return Number.isInteger(n) && n > 0 ? n : 2;
+}
+
 function main() {
-  const args = ['--test', '--test-reporter=tap', '--test-reporter-destination=stdout', 'test/*.test.js'];
+  const args = ['--test', '--test-reporter=tap', '--test-reporter-destination=stdout'];
+  const concurrency = testConcurrency();
+  if (concurrency) args.push(`--test-concurrency=${concurrency}`);
+  args.push('test/*.test.js');
   // No test may spawn a tray host, whether or not it remembered the env var
   // itself. Learned the observable way: every full-suite run left one hidden
   // NotifyIcon host per throwaway init repo, and a day of runs left ten

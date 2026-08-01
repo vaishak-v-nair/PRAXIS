@@ -8,6 +8,7 @@ import { checkTrackedPaths, RULES } from '../scripts/ci/leak-guard.mjs';
 import { parseCoverage, checkFloor, readFloor } from '../scripts/ci/coverage-floor.mjs';
 import { runWithConcurrency, summarize, DEFAULT_CONCURRENCY } from '../scripts/ci/run-live-evals.mjs';
 import { sections, notesFor } from '../scripts/ci/changelog.mjs';
+import { testConcurrency } from '../scripts/ci/run-tests.mjs';
 
 const MB = 1024 * 1024;
 const CHANGELOG = fs.readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
@@ -119,6 +120,19 @@ test('every rule carries a reason a human can act on', () => {
     assert.ok(rule.id && rule.why && typeof rule.test === 'function');
     assert.equal(typeof rule.publicOnly, 'boolean', `${rule.id} states whether confidential tracks it`);
   }
+});
+
+test('test files run capped on CI and uncapped locally', () => {
+  // 17 of 39 test files spawn real child processes. node --test defaults to one
+  // file per CPU, so on a two-core runner several spawn-heavy files competed for
+  // process startup and a different leg went red on nearly every push — while a
+  // rerun with no code change went green. A suite that needs a rerun to be
+  // believed is one nobody reads, and this one gates the release workflow.
+  assert.equal(testConcurrency({}), null, 'local keeps node’s default — full speed');
+  assert.equal(testConcurrency({ CI: 'true' }), 2);
+  assert.equal(testConcurrency({ CI: '1', PRAXIS_TEST_CONCURRENCY: '4' }), 4, 'tunable without a code change');
+  assert.equal(testConcurrency({ CI: '1', PRAXIS_TEST_CONCURRENCY: 'nope' }), 2, 'garbage falls back, never to NaN');
+  assert.equal(testConcurrency({ CI: '1', PRAXIS_TEST_CONCURRENCY: '0' }), 2, 'zero would run nothing');
 });
 
 // ── the coverage ratchet ─────────────────────────────────────────────────────
