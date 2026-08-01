@@ -34,6 +34,27 @@ test('create/read/update meta round-trips', () => {
   assert.equal(readMeta(p, 'j-x').pid, 12345);
 });
 
+test('a job that has not recorded its pid yet is starting, not dead', () => {
+  // createJob writes pid:null and the detached runner patches the real pid in a
+  // moment later. In that window pidAlive(null) is false, and jobStatus used to
+  // answer 'gone' — so a job that had just been launched read as crashed. The
+  // demo's live mode maps 'gone' straight to 'spawn-failed', which is how a
+  // healthy run reported that the agent failed to start, 449ms after starting
+  // it, and took a CI leg red on nearly every push.
+  const now = Date.parse('2026-08-01T12:00:00Z');
+  const justStarted = { pid: null, exitCode: null, startedAt: '2026-08-01T11:59:59Z' };
+  assert.equal(jobStatus(justStarted, now), 'running', 'one second old: still starting');
+
+  const stale = { pid: null, exitCode: null, startedAt: '2026-08-01T11:59:00Z' };
+  assert.equal(jobStatus(stale, now), 'gone', 'a minute later with no pid, it really is gone');
+
+  // A REAL spawn failure is caught by exitCode and never waits out the grace.
+  assert.equal(jobStatus({ pid: null, exitCode: -1, startedAt: '2026-08-01T11:59:59Z' }, now), 'failed');
+
+  // No startedAt at all is not a licence to assume health.
+  assert.equal(jobStatus({ pid: null, exitCode: null }, now), 'gone');
+});
+
 test('jobStatus is honest: running / done / failed / gone', () => {
   assert.equal(jobStatus({ pid: process.pid, exitCode: null }), 'running'); // a pid that IS alive
   assert.equal(jobStatus({ pid: 999999, exitCode: 0 }), 'done');
@@ -44,8 +65,14 @@ test('jobStatus is honest: running / done / failed / gone', () => {
 
 test('listJobs returns newest first with derived status', () => {
   const p = path.join(sandbox(), '.praxis');
-  createJob(p, { id: 'j-20260101000000-aaaa', task: 'old', tool: 'claude', argv: [], cwd: '' });
-  createJob(p, { id: 'j-20260102000000-bbbb', task: 'new', tool: 'claude', argv: [], cwd: '' });
+  // `now` is passed explicitly and set in the past, so these are jobs whose
+  // runner never attached — genuinely gone. They used to be created with the
+  // current time and still expected to read 'gone', which quietly encoded the
+  // bug above: that a job with no pid is dead even if it was launched a
+  // millisecond ago. It is not; it is starting.
+  const longAgo = '2026-01-01T00:00:00.000Z';
+  createJob(p, { id: 'j-20260101000000-aaaa', task: 'old', tool: 'claude', argv: [], cwd: '', now: longAgo });
+  createJob(p, { id: 'j-20260102000000-bbbb', task: 'new', tool: 'claude', argv: [], cwd: '', now: longAgo });
   const rows = listJobs(p);
   assert.equal(rows[0].task, 'new');
   assert.equal(rows[1].status, 'gone'); // no pid, no exit — honest

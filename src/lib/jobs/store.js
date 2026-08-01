@@ -158,7 +158,9 @@ function pidAlive(pid) {
  * 'gone' matters: a Mission Control that shows a dead job as "running"
  * forever is lying — the exact failure mode cloud dashboards have.
  */
-export function jobStatus(meta) {
+export const JOB_STARTUP_GRACE_MS = 10000;
+
+export function jobStatus(meta, now = Date.now()) {
   if (!meta) return 'unknown';
   if (meta.exitCode === 0) {
     if (meta.mode === 'plan' && meta.approval === 'pending') return 'draft';
@@ -166,6 +168,24 @@ export function jobStatus(meta) {
   }
   if (meta.exitCode != null) return 'failed';
   if (pidAlive(meta.pid)) return 'running';
+
+  // A job whose runner has not recorded its pid YET is starting, not dead.
+  //
+  // createJob writes `pid: null` and the detached runner patches the real pid
+  // in a moment later. Between those two writes, pidAlive(null) is false and
+  // this used to answer 'gone' — so a job that had just been launched read as
+  // crashed. The demo's live mode maps 'gone' straight to 'spawn-failed', which
+  // is how a perfectly healthy run reported that the agent had failed to start,
+  // 449 ms after starting it. Mission Control calling a live job dead is the
+  // same lie as calling a dead one running, just in the other direction.
+  //
+  // A REAL spawn failure is not covered by this grace and does not need to be:
+  // the runner records exitCode -1 with exitSource 'spawn-failed', so it is
+  // caught above by the exitCode branch within milliseconds.
+  if (meta.pid == null) {
+    const started = Date.parse(meta.startedAt || '');
+    if (Number.isFinite(started) && now - started < JOB_STARTUP_GRACE_MS) return 'running';
+  }
   return 'gone';
 }
 
