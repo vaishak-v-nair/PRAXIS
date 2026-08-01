@@ -50,7 +50,7 @@ export const ALTERNATES_FOR_CLAUDE = ['gemini', 'codex', 'cursor', 'antigravity'
 export function onPath(bin) {
   try {
     const probe = process.platform === 'win32' ? 'where' : 'which';
-    return spawnSync(probe, [bin], { stdio: 'ignore', shell: false }).status === 0;
+    return spawnSync(probe, [bin], { windowsHide: true, stdio: 'ignore', shell: false }).status === 0;
   } catch {
     return false;
   }

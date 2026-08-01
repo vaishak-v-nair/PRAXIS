@@ -35,7 +35,7 @@ function openInBrowser(url) {
       ? ['open', [url]]
       : ['xdg-open', [url]];
   try {
-    return spawnSync(cmd, args, { stdio: 'ignore' }).status === 0;
+    return spawnSync(cmd, args, { windowsHide: true, stdio: 'ignore' }).status === 0;
   } catch {
     return false;
   }

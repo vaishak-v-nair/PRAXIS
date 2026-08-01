@@ -51,7 +51,7 @@ const fargs = isCmdShim ? ['/c', cmd, ...args] : args;
 
 let child;
 try {
-  child = spawn(file, fargs, { cwd: meta.cwd || undefined, stdio: ['pipe', out, err] });
+  child = spawn(file, fargs, { windowsHide: true, cwd: meta.cwd || undefined, stdio: ['pipe', out, err] });
 } catch (e) {
   patchMeta({ exitCode: -1, endedAt: new Date().toISOString(), exitSource: 'spawn-failed: ' + (e && e.message) });
   process.exit(0);

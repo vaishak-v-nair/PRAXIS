@@ -134,7 +134,7 @@ export function runJudgeProcess(prompt, { cmd, cwd, timeoutMs = 120000, env } = 
     try {
       child = spawn(file, args, {
         cwd: cwd || judgeCwd(),
-        env: { ...process.env, PRAXIS_JUDGING: '1', ...env },
+        env: { windowsHide: true, ...process.env, PRAXIS_JUDGING: '1', ...env },
         stdio: ['pipe', 'pipe', 'ignore'],
       });
     } catch (e) {

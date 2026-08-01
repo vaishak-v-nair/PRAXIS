@@ -55,6 +55,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ### Fixed
 
+- **Console windows no longer flash on Windows.** PRAXIS spawns child processes
+  from the Stop hook (`git log`, at the end of every session), from the tray
+  (`tasklist`, `powershell`, `taskkill`), from tool detection, from the job
+  runner, the judge and the Governor — and 18 of 24 of those spawns did not pass
+  `windowsHide`. On Windows each one pops a black console window on the desktop,
+  so anybody working with PRAXIS installed got shells opening at them all day
+  while they typed. Every spawn now passes it, and a source check in the suite
+  keeps it that way: no unit test can see a console window, which is exactly why
+  this one had to be a rule about the code rather than an assertion about
+  behaviour.
 - **A just-launched job could be reported as crashed.** `createJob` writes
   `pid: null` and the detached runner patches the real pid in a moment later. In
   that window the job had no live pid and no exit code, so its status read

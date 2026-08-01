@@ -57,7 +57,7 @@ function readPid(pidFile) {
 function commandLineOf(pid) {
   if (process.platform === 'win32') {
     try {
-      const row = execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'], {
+      const row = execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/NH', '/FO', 'CSV'], { windowsHide: true,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'ignore'],
       });
@@ -69,14 +69,14 @@ function commandLineOf(pid) {
       return execFileSync(
         'powershell.exe',
         ['-NoProfile', '-Command', `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`],
-        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+        { windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
       ).trim();
     } catch {
       return '';
     }
   }
   try {
-    return execFileSync('ps', ['-o', 'command=', '-p', String(pid)], {
+    return execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { windowsHide: true,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -175,7 +175,7 @@ async function stopWindowsHost(trayDir, pid, { timeoutMs = 6000 } = {}) {
   }
   if (!graceful) {
     try {
-      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+      execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
     } catch {
       /* already gone */
     }
@@ -333,7 +333,7 @@ async function trayMac(args, ensure) {
       process.execPath,
       pidFile,
     ],
-    { detached: true, stdio: 'ignore' },
+    { windowsHide: true, detached: true, stdio: 'ignore' },
   );
   child.unref();
 
@@ -518,7 +518,7 @@ export async function tray(args = []) {
 
   if (args.includes('--once')) {
     // debug/verify mode: compute state once in the foreground and exit
-    const out = execFileSync('powershell.exe', [...psArgs, '-Once'], { encoding: 'utf8' });
+    const out = execFileSync('powershell.exe', [...psArgs, '-Once'], { windowsHide: true, encoding: 'utf8' });
     process.stdout.write(out);
     return;
   }
@@ -550,7 +550,7 @@ export async function tray(args = []) {
   execFileSync(
     'powershell.exe',
     ['-NoProfile', '-Command', `Start-Process powershell.exe -ArgumentList ${quoted} -WindowStyle Hidden`],
-    { stdio: 'ignore' },
+    { windowsHide: true, stdio: 'ignore' },
   );
 
   // the host writes its own real pid; wait briefly to confirm liftoff

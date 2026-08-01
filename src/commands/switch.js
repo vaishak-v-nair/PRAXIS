@@ -122,7 +122,7 @@ function copyToClipboard(text) {
         : process.platform === 'darwin'
           ? ['pbcopy', []]
           : ['xclip', ['-selection', 'clipboard']];
-    return spawnSync(cmd, cmdArgs, { input: text, stdio: ['pipe', 'ignore', 'ignore'] }).status === 0;
+    return spawnSync(cmd, cmdArgs, { windowsHide: true, input: text, stdio: ['pipe', 'ignore', 'ignore'] }).status === 0;
   } catch {
     return false;
   }

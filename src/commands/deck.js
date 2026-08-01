@@ -12,9 +12,9 @@ import { bold, grey, sage } from '../lib/ui.js';
 
 function openBrowser(url) {
   try {
-    if (process.platform === 'win32') spawn('cmd.exe', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
-    else if (process.platform === 'darwin') spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-    else spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+    if (process.platform === 'win32') spawn('cmd.exe', ['/c', 'start', '', url], { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
+    else if (process.platform === 'darwin') spawn('open', [url], { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
+    else spawn('xdg-open', [url], { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
   } catch {
     /* the printed URL is the fallback */
   }

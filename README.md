@@ -13,6 +13,7 @@ It also gives your AI a durable **memory**: every session distilled into one mar
 file, handed back automatically next time, so you never re-explain your project.
 
 [![npm](https://img.shields.io/npm/v/praxis-memory?color=d6547a&label=npm)](https://www.npmjs.com/package/praxis-memory)
+[![CI](https://github.com/vaishak-v-nair/PRAXIS/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vaishak-v-nair/PRAXIS/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-4fa376)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A522-4e8fd0)](https://nodejs.org)
 [![local-first](https://img.shields.io/badge/data-never%20leaves%20your%20machine-dfa03a)](#safety)

@@ -122,6 +122,52 @@ test('every rule carries a reason a human can act on', () => {
   }
 });
 
+test('nothing PRAXIS spawns may flash a console window', () => {
+  // On Windows, spawning a console program without windowsHide pops a black
+  // window on the user's desktop. PRAXIS spawns from the Stop hook (git log,
+  // every session end), from the tray (tasklist, powershell, taskkill), from
+  // tool detection, from the job runner, the judge and the governor — so a
+  // person working with PRAXIS installed got shells opening at random all day
+  // while they typed. 18 of 24 call sites were missing it.
+  //
+  // No unit test can see a console window, which is exactly why this is a
+  // source check: the failure is on someone's screen, not in any assertion.
+  const files = [];
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = `${d}/${e.name}`;
+      if (e.isDirectory()) walk(p);
+      else if (/\.(js|mjs)$/.test(p)) files.push(p);
+    }
+  };
+  walk('src');
+
+  const offenders = [];
+  for (const f of files) {
+    const src = fs.readFileSync(f, 'utf8');
+    const re = /(spawnSync|execFileSync|execSync|spawn)\s*\(/g;
+    let m;
+    while ((m = re.exec(src))) {
+      let i = re.lastIndex - 1;
+      let depth = 0;
+      let end = -1;
+      for (; i < src.length; i++) {
+        if (src[i] === '(') depth++;
+        else if (src[i] === ')') {
+          depth--;
+          if (!depth) { end = i; break; }
+        }
+      }
+      if (end < 0) continue;
+      const call = src.slice(m.index, end + 1);
+      if (!/windowsHide/.test(call)) {
+        offenders.push(`${f}:${src.slice(0, m.index).split('\n').length} ${m[1]}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'every spawn must pass windowsHide: true');
+});
+
 test('test files run capped on CI and uncapped locally', () => {
   // 17 of 39 test files spawn real child processes. node --test defaults to one
   // file per CPU, so on a two-core runner several spawn-heavy files competed for

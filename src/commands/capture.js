@@ -90,7 +90,7 @@ export function sessionCommits(text, cwd, max = 3) {
       }
     }
     if (!since) return [];
-    const out = execFileSync('git', ['log', `--since=${since}`, '--format=%h %s'], {
+    const out = execFileSync('git', ['log', `--since=${since}`, '--format=%h %s'], { windowsHide: true,
       cwd,
       timeout: 3000,
       stdio: ['ignore', 'pipe', 'ignore'],

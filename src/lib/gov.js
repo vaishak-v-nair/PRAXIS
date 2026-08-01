@@ -117,7 +117,7 @@ export function runGovProcess(prompt, { cmd, cwd, timeoutMs = 150000, env } = {}
     try {
       child = spawn(file, fargs, {
         cwd: cwd || govCwd(),
-        env: { ...process.env, PRAXIS_GOVERNING: '1', ...env },
+        env: { windowsHide: true, ...process.env, PRAXIS_GOVERNING: '1', ...env },
         stdio: ['pipe', 'pipe', 'ignore'],
       });
     } catch (e) {

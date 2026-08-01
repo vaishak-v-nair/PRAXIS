@@ -85,7 +85,7 @@ export async function startJob({ task, tool = 'claude', mode = 'plan', approvedF
     runner = spawn(process.execPath, [runnerPath, dir], {
       detached: true, // survives this CLI and the terminal that called it
       stdio: 'ignore', // the runner owns the job's log files itself
-      env: { ...process.env, PRAXIS_JOB_ID: id },
+      env: { windowsHide: true, ...process.env, PRAXIS_JOB_ID: id },
     });
   } catch (e) {
     updateMeta(p.praxisDir, id, { exitCode: -1, endedAt: new Date().toISOString(), exitSource: 'runner-spawn-failed' });
