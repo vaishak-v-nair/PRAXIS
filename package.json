@@ -1,6 +1,6 @@
 {
   "name": "praxis-memory",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "Your AI says \"done.\" PRAXIS proves it. Signed, tamper-evident receipts of what your coding agent actually did — plus durable project memory. Local-first: no server, no account, your code never leaves your machine.",
   "type": "module",
   "bin": {
