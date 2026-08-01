@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { testConcurrency } from './run-tests.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const FLOOR_FILE = path.join(HERE, 'coverage-floor.json');
@@ -61,15 +62,31 @@ export function readFloor(file = FLOOR_FILE) {
 function main() {
   const update = process.argv.includes('--update');
 
-  const r = spawnSync(
-    process.execPath,
-    ['--test', '--experimental-test-coverage', 'test/*.test.js'],
-    { encoding: 'utf8', timeout: 900000, maxBuffer: 64 * 1024 * 1024 },
-  );
+  // The SAME concurrency cap run-tests.mjs uses. This job runs the suite a
+  // second time, and without the cap it hit exactly the contention flake the
+  // cap exists to prevent: all nine test legs green, and this one red with "the
+  // test run itself failed". Two runners of one suite must not disagree about
+  // how to run it.
+  const args = ['--test', '--experimental-test-coverage'];
+  const concurrency = testConcurrency();
+  if (concurrency) args.push(`--test-concurrency=${concurrency}`);
+  args.push('test/*.test.js');
+
+  const r = spawnSync(process.execPath, args, {
+    windowsHide: true,
+    encoding: 'utf8',
+    timeout: 900000,
+    maxBuffer: 64 * 1024 * 1024,
+    env: { ...process.env, PRAXIS_SKIP_TRAY: '1' },
+  });
   const out = (r.stdout || '') + (r.stderr || '');
   if (r.status !== 0) {
-    console.error('the test run itself failed — fix that before the coverage floor means anything');
-    console.error(out.split('\n').slice(-25).join('\n'));
+    console.error('the test run itself failed — fix that before the coverage floor means anything\n');
+    // Name the failing tests. The previous version dumped the last 25 lines,
+    // which is the summary block — it says how many failed and never which.
+    const failed = out.split('\n').filter((l) => /^\s*(not ok \d+|✖)/.test(l));
+    if (failed.length) for (const f of failed.slice(0, 20)) console.error('  ' + f.trim());
+    else console.error(out.split('\n').slice(-25).join('\n'));
     process.exit(1);
   }
 
