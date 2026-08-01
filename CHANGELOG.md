@@ -55,6 +55,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ### Fixed
 
+- **A just-launched job could be reported as crashed.** `createJob` writes
+  `pid: null` and the detached runner patches the real pid in a moment later. In
+  that window the job had no live pid and no exit code, so its status read
+  `gone` — and the demo's live mode maps `gone` straight to `spawn-failed`. A
+  perfectly healthy run announced that the agent had failed to start, 449 ms
+  after starting it. Unattached jobs now get a ten-second startup grace; a real
+  spawn failure is unaffected, because the runner records an exit code for it
+  within milliseconds.
+- **A job read while it was being written showed up nameless.** `meta.json` has
+  two writer processes and is written with a plain `writeFileSync` (the
+  rename-based fix was tried and reverted years back — on Windows it turned a
+  rare read race into a constant write failure). The reader was supposed to
+  absorb that, but retried twice in a tight loop microseconds apart, which is no
+  wait at all. A file caught mid-write failed both reads, and `praxis jobs` and
+  the deck then showed `unknown` with no task, no mode and no goal.
 - **`praxis deck --help` started a server instead of printing help** — it bound
   a port, opened a browser window, and then blocked forever on a promise that
   never settles, so asking what the deck does left you with a running server and
