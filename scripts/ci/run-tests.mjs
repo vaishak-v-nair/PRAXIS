@@ -69,7 +69,12 @@ export function annotationsFor(failures) {
 export function testConcurrency(env = process.env) {
   if (!env.CI) return null; // local: node's default, one per core
   const n = Number(env.PRAXIS_TEST_CONCURRENCY);
-  return Number.isInteger(n) && n > 0 ? n : 2;
+  // One at a time on CI. Two was not enough: the remaining failures were
+  // `spawn-failed` in ~430ms — a child failing to fork outright, which is what
+  // resource pressure looks like, not a timeout. A GitHub runner has two cores
+  // and every one of those files starts node children of its own. Serialising
+  // costs about a minute of wall clock and removes the entire class.
+  return Number.isInteger(n) && n > 0 ? n : 1;
 }
 
 function main() {

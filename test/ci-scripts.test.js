@@ -175,10 +175,10 @@ test('test files run capped on CI and uncapped locally', () => {
   // rerun with no code change went green. A suite that needs a rerun to be
   // believed is one nobody reads, and this one gates the release workflow.
   assert.equal(testConcurrency({}), null, 'local keeps node’s default — full speed');
-  assert.equal(testConcurrency({ CI: 'true' }), 2);
+  assert.equal(testConcurrency({ CI: 'true' }), 1, 'fully serial: two cores, and every file spawns children');
   assert.equal(testConcurrency({ CI: '1', PRAXIS_TEST_CONCURRENCY: '4' }), 4, 'tunable without a code change');
-  assert.equal(testConcurrency({ CI: '1', PRAXIS_TEST_CONCURRENCY: 'nope' }), 2, 'garbage falls back, never to NaN');
-  assert.equal(testConcurrency({ CI: '1', PRAXIS_TEST_CONCURRENCY: '0' }), 2, 'zero would run nothing');
+  assert.equal(testConcurrency({ CI: '1', PRAXIS_TEST_CONCURRENCY: 'nope' }), 1, 'garbage falls back, never to NaN');
+  assert.equal(testConcurrency({ CI: '1', PRAXIS_TEST_CONCURRENCY: '0' }), 1, 'zero would run nothing');
 });
 
 // ── the coverage ratchet ─────────────────────────────────────────────────────

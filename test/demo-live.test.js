@@ -98,7 +98,7 @@ async function liveRun({ mode = 'ok', timeoutMs = 30000 * SLOW, judgeFn, session
 
 test('live does real work in a sandbox and seals a judged receipt from it', async () => {
   const res = await liveRun();
-  assert.equal(res.ok, true, res.reason || 'live should complete on the happy path');
+  assert.equal(res.ok, true, [res.reason, res.detail].filter(Boolean).join(': ') || 'live should complete on the happy path');
 
   // 1. the work is REAL — the agent's files are on disk in the sandbox
   assert.ok(fs.existsSync(path.join(res.sandbox, 'sum.js')), 'the agent actually wrote sum.js');
