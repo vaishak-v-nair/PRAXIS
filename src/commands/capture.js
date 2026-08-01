@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { projectPaths } from '../lib/paths.js';
 import { extractEssence } from '../lib/checkpoint.js';
 import { ensureMemory, addSessionEntry } from '../lib/memory.js';
-import { writeState } from '../lib/state.js';
+import { writeState, writeCaptureState } from '../lib/state.js';
 import { analyzeTranscript, classifyContext, writeHealthFile, DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
 import { cleanUserText, asLines, readTranscriptLines } from '../lib/transcript.js';
 import { vaultDirFor, mirrorMemory, writeSessionNote, appendArchiveNote } from '../lib/vault.js';
@@ -134,7 +134,14 @@ export async function captureRun(opts = {}) {
   let wrote = false;
   const note = (phase, e) => {
     recorded = true;
-    if (praxisDir) recordError(praxisDir, phase, e);
+    if (!praxisDir) return;
+    // last-error.json is the general "most recent thing PRAXIS swallowed",
+    // written by several commands and meant for a human. capture.json is
+    // capture's alone, and is what the doctor's liveness check reads.
+    recordError(praxisDir, phase, e);
+    writeCaptureState(praxisDir, 'started', {
+      error: { phase, message: (e && e.message) || String(e), at: new Date().toISOString() },
+    });
   };
   try {
     const raw = opts.raw !== undefined ? opts.raw : await readStdin();
@@ -151,10 +158,29 @@ export async function captureRun(opts = {}) {
       return { outcome: 'not-a-praxis-project', recorded, wrote }; // nothing to do here
     }
     praxisDir = p.praxisDir;
+
+    // Config is read ONCE, and BEFORE anything is written. It used to be read
+    // twice, and late — so `capture: false` returned after state.json already
+    // said 'switching', and half an hour later doctor reported "a capture
+    // started and never finished" about a capture somebody had deliberately
+    // turned off. An opt-out must leave no trace at all.
+    let maxBytes = 16384;
+    let redactOn = true;
+    let cfg = {};
+    try {
+      cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8')) || {};
+      if (Number.isFinite(cfg.maxLogBytes)) maxBytes = cfg.maxLogBytes;
+      if (cfg.redact === false) redactOn = false;
+    } catch {
+      /* no config, or unreadable: the defaults above are the documented ones */
+    }
+    if (cfg.capture === false) return { outcome: 'capture-disabled', recorded, wrote };
+
     // PreCompact = snapshot BEFORE Claude squeezes the session and detail is
     // lost forever. Stop = the regular end-of-session capture.
     const snapshot = data.hook_event_name === 'PreCompact';
     writeState(p.praxisDir, 'switching'); // tray: context is being carried over
+    writeCaptureState(p.praxisDir, 'started'); // liveness: only capture writes this
     ensureMemory(p.memoryFile);
 
     let files = [];
@@ -228,16 +254,7 @@ export async function captureRun(opts = {}) {
       .filter(Boolean)
       .join('\n');
 
-    let maxBytes = 16384;
-    let redactOn = true;
-    try {
-      const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
-      if (Number.isFinite(cfg.maxLogBytes)) maxBytes = cfg.maxLogBytes;
-      if (cfg.redact === false) redactOn = false;
-      if (cfg.capture === false) return { outcome: 'capture-disabled', recorded, wrote };
-    } catch {
-      /* use defaults */
-    }
+    // (config was read once at the top, before any breadcrumb was written)
 
     if (!nothingHappened) {
       wrote = true;
@@ -250,7 +267,6 @@ export async function captureRun(opts = {}) {
 
       // Obsidian bridge: the session becomes a linked note in the user's vault
       try {
-        const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
         const project = path.basename(p.root);
         const vd = vaultDirFor(cfg, project, undefined, p.root);
         if (vd) {
@@ -294,6 +310,7 @@ export async function captureRun(opts = {}) {
     }
 
     writeState(p.praxisDir, 'restored'); // tray: context safely written back
+    if (!recorded) writeCaptureState(p.praxisDir, 'done'); // liveness: got all the way through
 
     // Got all the way through. Anything recorded during THIS run stands; a
     // fault from an earlier run does not, or one bad session would show a

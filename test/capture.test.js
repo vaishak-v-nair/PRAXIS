@@ -12,8 +12,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { captureRun, summarizeTranscriptText, recentAsks } from '../src/commands/capture.js';
-import { readLastError } from '../src/lib/errors.js';
-import { readState } from '../src/lib/state.js';
+import { readLastError, recordError } from '../src/lib/errors.js';
+import { readState, writeState } from '../src/lib/state.js';
 import { checkCapture } from '../src/lib/doctor.js';
 import { asLines, readTranscriptLines } from '../src/lib/transcript.js';
 import { extractEssence } from '../src/lib/checkpoint.js';
@@ -125,11 +125,41 @@ test('a PreCompact snapshot is written even when a Stop would not be', async () 
   assert.match(fs.readFileSync(path.join(root, '.praxis', 'memory.md'), 'utf8'), /pre-compact snapshot/);
 });
 
-test('capture: false in config is honoured before anything is written', async () => {
+test('capture: false is honoured before ANY breadcrumb is written', async () => {
+  // Regression. Config used to be read late, after state.json already said
+  // 'switching' — so a deliberately disabled capture left a half-finished
+  // breadcrumb, and half an hour later the doctor reported "a capture started
+  // and never finished" about something nobody had asked to run.
   const root = project({ config: { capture: false } });
   const r = await captureRun({ raw: hook(root, { transcript_path: transcript(root) }) });
   assert.equal(r.outcome, 'capture-disabled');
   assert.doesNotMatch(fs.readFileSync(path.join(root, '.praxis', 'memory.md'), 'utf8'), /Session Log/);
+
+  assert.equal(fs.existsSync(path.join(root, '.praxis', 'capture.json')), false, 'no liveness record');
+  assert.equal(fs.existsSync(path.join(root, '.praxis', 'state.json')), false, 'no tray breadcrumb either');
+  assert.equal(checkCapture(root).ok, true, 'and the doctor does not invent a fault from an opt-out');
+});
+
+test('another command moving context is NOT a capture', async () => {
+  // Regression, and the worst bug this feature could have had. The liveness
+  // check first read state.json — which capture, checkpoint (five times),
+  // switch and trace all write. So `praxis checkpoint` made the doctor report
+  // a successful capture that never happened: a FALSE GREEN, which is strictly
+  // worse than no check, because it answers the question wrongly and with
+  // confidence. capture.json has exactly one writer.
+  const root = project();
+  writeState(path.join(root, '.praxis'), 'restored'); // what checkpoint/switch leave behind
+
+  const v = checkCapture(root);
+  assert.doesNotMatch(v.detail, /last completed/, 'someone else’s breadcrumb is not evidence capture ran');
+
+  // and a vault failure recorded by checkpoint or trace is not a capture fault
+  recordError(path.join(root, '.praxis'), 'vault-commit-note', new Error('drive not mounted'));
+  assert.equal(checkCapture(root).ok, true, 'another command’s error does not accuse capture');
+
+  // only capture itself moves this needle
+  await captureRun({ raw: hook(root, { transcript_path: transcript(root) }) });
+  assert.match(checkCapture(root).detail, /last completed/, 'a real capture does');
 });
 
 test('a directory that is not a PRAXIS project is left completely alone', async () => {

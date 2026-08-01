@@ -16,8 +16,7 @@ import { spawnSync } from 'node:child_process';
 import { TOOLS, isInstalled, onPath } from './tools.js';
 import { projectPaths } from './paths.js';
 import { praxisCmd } from './runner.js';
-import { readLastError } from './errors.js';
-import { readState } from './state.js';
+import { readCaptureState } from './state.js';
 import { listTranscripts, transcriptDir } from './transcript.js';
 
 // The Node line PRAXIS advertises in package.json engines. Kept here as one
@@ -188,17 +187,30 @@ export function captureVerdict({ lastError = null, state = null, missedSessions 
   return check('capture', 'Capture ran', true, `last completed ${ago}`);
 }
 
-/** The IO half: gather the two breadcrumbs and count the sessions that ended after them. */
+/**
+ * The IO half: read capture's OWN breadcrumb and count sessions that ended
+ * after it.
+ *
+ * Deliberately NOT state.json. That file is written by capture, checkpoint
+ * (five times), switch and trace — so reading it here meant `praxis checkpoint`
+ * made the doctor report a successful capture that never ran. A false green is
+ * worse than no check, because it answers the question wrongly with confidence.
+ * capture.json has exactly one writer.
+ */
 export function checkCapture(cwd = process.cwd(), now = Date.now()) {
   const p = projectPaths(cwd);
-  const lastError = readLastError(p.praxisDir);
-  const state = readState(p.praxisDir, now);
+  const cap = readCaptureState(p.praxisDir, now);
   const sessions = listTranscripts(transcriptDir(cwd));
-  const since = state ? Date.parse(state.ts) : NaN;
+  const since = cap ? Date.parse(cap.ts) : NaN;
   const missedSessions = Number.isFinite(since)
     ? sessions.filter((s) => s.mtimeMs > since && now - s.mtimeMs > CAPTURE_IDLE_MS).length
     : 0;
-  return captureVerdict({ lastError, state, missedSessions, hasSessions: sessions.length > 0 });
+  return captureVerdict({
+    lastError: cap && cap.error ? cap.error : null,
+    state: cap ? { phase: cap.phase === 'done' ? 'restored' : 'switching', ts: cap.ts, ageMs: cap.ageMs } : null,
+    missedSessions,
+    hasSessions: sessions.length > 0,
+  });
 }
 
 /** The CLAUDE.md managed block — this is what auto-loads memory each session. */
