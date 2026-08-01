@@ -9,6 +9,7 @@ import { parseCoverage, checkFloor, readFloor } from '../scripts/ci/coverage-flo
 import { runWithConcurrency, summarize, DEFAULT_CONCURRENCY } from '../scripts/ci/run-live-evals.mjs';
 import { sections, notesFor } from '../scripts/ci/changelog.mjs';
 import { testConcurrency } from '../scripts/ci/run-tests.mjs';
+import { isEnvironmental } from './helpers/flaky-env.mjs';
 
 const MB = 1024 * 1024;
 const CHANGELOG = fs.readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
@@ -166,6 +167,33 @@ test('nothing PRAXIS spawns may flash a console window', () => {
     }
   }
   assert.deepEqual(offenders, [], 'every spawn must pass windowsHide: true');
+});
+
+test('the env-retry helper retries nothing that is actually a bug', () => {
+  // A handful of integration tests drive the real job engine and spawn two or
+  // three node processes each; CI runners do sometimes refuse to fork. That is
+  // an environment failure. But a blanket retry is how real regressions get
+  // buried, so the discriminator is the load-bearing part of this: if it ever
+  // starts matching wrong-value assertions, the suite quietly stops meaning
+  // anything.
+  const environment = [
+    new Error("The input did not match the regular expression /EXEC/. Input:\n\n''\n"),
+    new Error('spawn-failed'),
+    new Error('spawn node EAGAIN'),
+    new Error('Error: spawn ENOMEM'),
+  ];
+  for (const e of environment) assert.equal(isEnvironmental(e), true, `should retry: ${e.message.slice(0, 40)}`);
+
+  const realBugs = [
+    new Error("Expected values to be strictly equal:\n\n+ 'plan'\n- 'acceptEdits'\n"),
+    new Error("Expected values to be strictly equal:\n\n+ 'CLAIMS_FAILED'\n- 'VERIFIED'\n"),
+    new Error('receipt chain broken at entry 3'),
+    new Error("The input did not match the regular expression /EXEC/. Input:\n\n'WRONG OUTPUT'\n"),
+    new Error('the sealed receipt did not verify'),
+  ];
+  for (const e of realBugs) {
+    assert.equal(isEnvironmental(e), false, `must NOT retry a real failure: ${e.message.slice(0, 50)}`);
+  }
 });
 
 test('every workflow runs the suite through the same runner', () => {

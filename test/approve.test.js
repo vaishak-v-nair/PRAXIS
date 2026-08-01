@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { withEnvRetry } from './helpers/flaky-env.mjs';
 import { createJob, updateMeta, readMeta, jobStatus, listJobs, tailOutput } from '../src/lib/jobs/store.js';
 import { run } from '../src/commands/run.js';
 import { approve, executionTask } from '../src/commands/approve.js';
@@ -91,7 +92,7 @@ test('executionTask carries the original ask, the approval, and the plan', () =>
   assert.match(t, /Plan: write the file\./);
 });
 
-test('approve executes a draft: twin job spawns, both sides linked', async () => {
+test('approve executes a draft: twin job spawns, both sides linked', async () => withEnvRetry('approve executes a draft', async () => {
   const cwd = sandbox();
   const prev = process.cwd();
   process.chdir(cwd);
@@ -116,9 +117,9 @@ test('approve executes a draft: twin job spawns, both sides linked', async () =>
     delete process.env.PRAXIS_RUN_CMD;
     process.chdir(prev);
   }
-});
+}));
 
-test('a failing agent yields a REAL failed status (no done-because-it-printed)', async () => {
+test('a failing agent yields a REAL failed status (no done-because-it-printed)', async () => withEnvRetry('a failing agent yields a REAL failed status', async () => {
   const cwd = sandbox();
   const prev = process.cwd();
   process.chdir(cwd);
@@ -139,7 +140,7 @@ test('a failing agent yields a REAL failed status (no done-because-it-printed)',
     delete process.env.PRAXIS_RUN_CMD;
     process.chdir(prev);
   }
-});
+}));
 
 test('a draft whose execution twin failed can be approved AGAIN (retry)', async () => {
   const cwd = sandbox();

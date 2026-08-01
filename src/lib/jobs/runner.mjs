@@ -96,9 +96,28 @@ child.on('close', async (code) => {
   process.exit(0);
 });
 
+// Feed the task in and CLOSE the pipe. The close is the part that matters: an
+// agent reading its prompt from stdin (every one of them, including the real
+// `claude -p`) does nothing until stdin ends, so a pipe left open is a job that
+// hangs forever rather than a job that fails.
+//
+// This used to be a bare try/catch around write+end, which caught nothing worth
+// catching: a broken pipe on a child that died early surfaces as an 'error'
+// EVENT on the stream, not as a throw. The catch was empty, the error went
+// unhandled, and the stream could be torn down before `.end()` ever ran —
+// leaving a child waiting on a stdin that would never close, until something
+// upstream gave up half a minute later with no idea why.
 try {
-  child.stdin.write(task);
-  child.stdin.end();
-} catch {
-  /* close/error handlers record the outcome */
+  const stdin = child.stdin;
+  if (stdin) {
+    // An EPIPE here means the agent is already gone; its exit code is the real
+    // story and `close` above records it. Swallowing this specific error is
+    // what keeps a dead child from taking the runner down with it.
+    stdin.on('error', (e) => {
+      patchMeta({ stdinError: String((e && e.code) || e) });
+    });
+    stdin.end(task);
+  }
+} catch (e) {
+  patchMeta({ stdinError: 'write-failed: ' + ((e && e.message) || e) });
 }

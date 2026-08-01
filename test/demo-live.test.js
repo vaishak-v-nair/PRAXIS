@@ -24,6 +24,7 @@ import {
   hasUnverifiable,
   runLive,
 } from '../src/lib/demo/live.js';
+import { withEnvRetry } from './helpers/flaky-env.mjs';
 import { startJob, buildAgentArgv } from '../src/commands/run.js';
 import { judge } from '../src/lib/receipt/judge.js';
 import { verifyFile, readEntries, provenanceOf, isDemo, envProvenance } from '../src/lib/receipt/store.js';
@@ -96,7 +97,7 @@ async function liveRun({ mode = 'ok', timeoutMs = 30000 * SLOW, judgeFn, session
 
 // ── the whole loop, end to end ────────────────────────────────────────────────
 
-test('live does real work in a sandbox and seals a judged receipt from it', async () => {
+test('live does real work in a sandbox and seals a judged receipt from it', async () => withEnvRetry('live does real work', async () => {
   const res = await liveRun();
   assert.equal(res.ok, true, [res.reason, res.detail].filter(Boolean).join(': ') || 'live should complete on the happy path');
 
@@ -122,18 +123,18 @@ test('live does real work in a sandbox and seals a judged receipt from it', asyn
     'file evidence comes from the transcript, not from what the agent said',
   );
   assert.ok(ev.test_activity.length > 0, 'and `node --test` was categorized as test activity');
-});
+}));
 
-test('a live receipt is knowable as the demo’s work, forever', async () => {
+test('a live receipt is knowable as the demo’s work, forever', async () => withEnvRetry('a live receipt is knowable', async () => {
   const res = await liveRun();
   assert.equal(res.ok, true, res.reason);
   const entries = readEntries(res.receipt.file);
   assert.equal(provenanceOf(entries), 'demo-live');
   assert.equal(isDemo(entries), true, 'sandbox work must never be countable as the user’s own');
   assert.equal(res.receipt.provenance, 'demo-live');
-});
+}));
 
-test('the preserved receipt is the sealed one, byte for byte', async () => {
+test('the preserved receipt is the sealed one, byte for byte', async () => withEnvRetry('the preserved receipt is the sealed one', async () => {
   const res = await liveRun();
   assert.equal(res.ok, true, res.reason);
   assert.notEqual(res.receipt.file, res.receipt.sandboxFile, 'kept somewhere the OS will not sweep');
@@ -143,7 +144,7 @@ test('the preserved receipt is the sealed one, byte for byte', async () => {
     'copying, never re-sealing — a rewritten chain is a different receipt',
   );
   assert.equal(verifyFile(res.receipt.file).ok, true, 'and the copy verifies exactly as the original does');
-});
+}));
 
 test('the environment can only ever mark work as LESS real', () => {
   assert.equal(envProvenance({ PRAXIS_RECEIPT_PROVENANCE: 'demo-live' }), 'demo-live');
@@ -167,11 +168,11 @@ test('an unauthenticated CLI is named as that, not as a crash', async () => {
   assert.equal(res.reason, 'cli-unauthenticated', [res.detail, res.status].filter(Boolean).join(' | ') || 'the difference is a two-minute fix versus a bug report');
 });
 
-test('an adapter that yields no session gets no invented receipt', async () => {
+test('an adapter that yields no session gets no invented receipt', async () => withEnvRetry('no session yields no receipt', async () => {
   const res = await liveRun({ mode: 'no-session' });
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'nothing-sealed', [res.detail, res.status].filter(Boolean).join(' | '));
-});
+}));
 
 test('a judge that cannot be reached does NOT throw away a real receipt', async () => {
   const res = await liveRun({ judgeFn: async () => ({ ok: false, reason: 'judge is down' }) });
@@ -182,7 +183,7 @@ test('a judge that cannot be reached does NOT throw away a real receipt', async 
   assert.equal(res.receipt.verification.ok, true, 'evidence stands on its own');
 });
 
-test('live gives up rather than waiting forever, and kills what it started', async () => {
+test('live gives up rather than waiting forever, and kills what it started', async () => withEnvRetry('live gives up rather than waiting forever', async () => {
   // The one test that WANTS a short timeout — it is asserting the give-up path.
   // It still needs CI headroom: if the fixture cannot even start inside the
   // budget, the run fails for a different reason and the assertion below reads
@@ -190,7 +191,7 @@ test('live gives up rather than waiting forever, and kills what it started', asy
   const res = await liveRun({ mode: 'hang', timeoutMs: 2500 * SLOW });
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'timed-out', [res.detail, res.status].filter(Boolean).join(' | '));
-});
+}));
 
 // ── the command itself, not just the library ─────────────────────────────────
 

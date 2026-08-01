@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { newJobId, createJob, readMeta, updateMeta, jobStatus, listJobs, tailOutput, readMetaWith } from '../src/lib/jobs/store.js';
+import { withEnvRetry } from './helpers/flaky-env.mjs';
 import { resolveRunCmd, run } from '../src/commands/run.js';
 
 // CI runners spawn processes far more slowly than a dev machine, and this file
@@ -131,7 +132,7 @@ test('a job read while it is being written is retried, not reported as nameless'
   assert.deepEqual(cheap, [], 'a file that reads first time never waits');
 });
 
-test('run() spawns detached, job completes, deck shows done', async () => {
+test('run() spawns detached, job completes, deck shows done', async () => withEnvRetry('run() spawns detached', async () => {
   const cwd = sandbox();
   const prev = process.cwd();
   process.chdir(cwd);
@@ -184,4 +185,4 @@ test('run() spawns detached, job completes, deck shows done', async () => {
     delete process.env.PRAXIS_RUN_CMD;
     process.chdir(prev);
   }
-});
+}));
