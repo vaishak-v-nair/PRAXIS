@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { projectPaths } from '../lib/paths.js';
+import { recordError } from '../lib/errors.js';
 import { readMemory, ensureMemory, addSessionEntry } from '../lib/memory.js';
 import { transcriptDir, newestTranscript } from '../lib/transcript.js';
 import { buildArchive, buildResume, extractEssence, findObsidianVault } from '../lib/checkpoint.js';
@@ -178,8 +179,12 @@ export async function checkpoint(args = []) {
         tokens: archived ? archived.tokens : 0,
       });
       vaultNote = vd;
-    } catch {
-      /* the vault is a mirror, never a blocker */
+    } catch (e) {
+      // The vault is a mirror and never a blocker — but "never a blocker" is
+      // not the same as "never worth mentioning". An unmounted drive or a
+      // permissions change stops notes arriving in Obsidian while memory.md
+      // keeps growing, and without this the two just quietly drift apart.
+      recordError(p.praxisDir, 'vault-mirror', e);
     }
   }
 

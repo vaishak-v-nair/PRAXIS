@@ -7,7 +7,7 @@
 // Pure builders live here; the command orchestrates and asks on doubt.
 
 import path from 'node:path';
-import { cleanUserText, toolDetail, toolInPlainEnglish } from './transcript.js';
+import { cleanUserText, toolDetail, toolInPlainEnglish, asLines } from './transcript.js';
 import { extractBrief } from './handoff.js';
 
 /**
@@ -34,7 +34,7 @@ export function buildArchive(transcriptText, opts = {}) {
   let lastClaude = { id: null, text: null }; // streamed repeats carry the same id+text
   let lastAction = null; // burst of one tool reads as a single "×N" line
 
-  for (const line of String(transcriptText || '').split('\n')) {
+  for (const line of asLines(transcriptText)) {
     if (!line) continue;
     let e;
     try {
@@ -123,7 +123,7 @@ export function buildArchive(transcriptText, opts = {}) {
 export function extractEssence(transcriptText, maxAsks = 5) {
   const asks = [];
   let lastClaude = '';
-  for (const line of String(transcriptText || '').split('\n')) {
+  for (const line of asLines(transcriptText)) {
     if (!line) continue;
     let e;
     try {

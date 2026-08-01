@@ -6,9 +6,10 @@ import { extractEssence } from '../lib/checkpoint.js';
 import { ensureMemory, addSessionEntry } from '../lib/memory.js';
 import { writeState } from '../lib/state.js';
 import { analyzeTranscript, classifyContext, writeHealthFile, DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
-import { cleanUserText } from '../lib/transcript.js';
+import { cleanUserText, asLines, readTranscriptLines } from '../lib/transcript.js';
 import { vaultDirFor, mirrorMemory, writeSessionNote, appendArchiveNote } from '../lib/vault.js';
 import { recordReceipt } from '../lib/receipt/record.js';
+import { recordError, clearLastError } from '../lib/errors.js';
 
 // Called by the Claude Code Stop hook. Reads the hook's JSON from stdin,
 // derives a lightweight deterministic summary of the session, and appends it to
@@ -45,9 +46,8 @@ function collectFilePaths(obj, out, depth = 0) {
 
 export function summarizeTranscriptText(text) {
   const files = new Set();
-  let turns = 0;
-  const lines = text.split('\n').filter(Boolean);
-  turns = lines.length;
+  const lines = asLines(text).filter(Boolean);
+  const turns = lines.length;
   for (const line of lines) {
     try {
       collectFilePaths(JSON.parse(line), files);
@@ -61,7 +61,7 @@ export function summarizeTranscriptText(text) {
 /** The last few things the human actually asked for — the soul of a snapshot. */
 export function recentAsks(text, max = 3) {
   const asks = [];
-  for (const line of text.split('\n')) {
+  for (const line of asLines(text)) {
     if (!line.includes('"type":"user"')) continue;
     try {
       const e = JSON.parse(line);
@@ -81,7 +81,7 @@ export function recentAsks(text, max = 3) {
 export function sessionCommits(text, cwd, max = 3) {
   try {
     let since = '';
-    for (const line of text.split('\n')) {
+    for (const line of asLines(text)) {
       if (!line) continue;
       const m = line.match(/"timestamp":"([^"]+)"/);
       if (m) {
@@ -112,9 +112,32 @@ export function shorten(file, cwd) {
   }
 }
 
-export async function capture() {
+/**
+ * Everything capture does, minus the exit.
+ *
+ * Split out so the suite can run it in-process. `capture()` has to end in
+ * process.exit(0) — a hook that returns a non-zero code surfaces as an error in
+ * the user's Claude session — but a function whose last act is exiting cannot
+ * be called by a test without taking the test runner down with it, and V8
+ * coverage does not follow spawned processes. So the most-executed codepath in
+ * the product was structurally untestable: it had 0% function coverage not
+ * because nobody wrote the test, but because the shape forbade it.
+ *
+ * @param {{raw?: string}} [opts]  raw hook payload; read from stdin when absent
+ * @returns {Promise<{outcome: string, recorded: boolean, wrote: boolean}>}
+ */
+export async function captureRun(opts = {}) {
+  // Hoisted so the outer catch — the one that exists to keep a broken hook from
+  // ever breaking a session — still knows where to leave the evidence.
+  let praxisDir = null;
+  let recorded = false;
+  let wrote = false;
+  const note = (phase, e) => {
+    recorded = true;
+    if (praxisDir) recordError(praxisDir, phase, e);
+  };
   try {
-    const raw = await readStdin();
+    const raw = opts.raw !== undefined ? opts.raw : await readStdin();
     let data = {};
     try {
       data = JSON.parse(stripBom(raw).trim() || '{}');
@@ -125,8 +148,9 @@ export async function capture() {
     const cwd = typeof data.cwd === 'string' ? data.cwd : process.cwd();
     const p = projectPaths(cwd);
     if (!fs.existsSync(p.praxisDir)) {
-      process.exit(0); // not a PRAXIS project — nothing to do
+      return { outcome: 'not-a-praxis-project', recorded, wrote }; // nothing to do here
     }
+    praxisDir = p.praxisDir;
     // PreCompact = snapshot BEFORE Claude squeezes the session and detail is
     // lost forever. Stop = the regular end-of-session capture.
     const snapshot = data.hook_event_name === 'PreCompact';
@@ -139,18 +163,29 @@ export async function capture() {
     let lastClaude = '';
     let commits = [];
     let analysis = null;
-    let text = '';
+    let lines = [];
     if (typeof data.transcript_path === 'string') {
       try {
-        text = stripBom(fs.readFileSync(data.transcript_path, 'utf8'));
-      } catch {
-        /* transcript unreadable — degrade gracefully */
+        // One streamed pass. This used to be readFileSync(...,'utf8') followed
+        // by five separate split('\n') calls over the same 40 MB string —
+        // 455 ms and 153 MB RSS on a real session, and a hard throw above V8's
+        // 512 MiB string limit that this very catch then swallowed.
+        lines = await readTranscriptLines(data.transcript_path);
+      } catch (e) {
+        // Degrade gracefully, but SAY SO. This is the catch that hides the
+        // real failures: a permissions change, a moved transcript, or
+        // ERR_STRING_TOO_LONG on a session past V8's 512 MiB string ceiling —
+        // which is reachable, transcripts here already run past 100 MB. Every
+        // one of those produced a memory entry with nothing in it and no
+        // explanation anywhere.
+        note('transcript-read', e);
       }
-      ({ files, turns } = summarizeTranscriptText(text));
-      asks = recentAsks(text);
-      lastClaude = extractEssence(text, 1).lastClaude;
-      commits = sessionCommits(text, cwd);
-      analysis = analyzeTranscript(text);
+      // every consumer takes the SAME lines — one split, not five
+      ({ files, turns } = summarizeTranscriptText(lines));
+      asks = recentAsks(lines);
+      lastClaude = extractEssence(lines, 1).lastClaude;
+      commits = sessionCommits(lines, cwd);
+      analysis = analyzeTranscript(lines);
       if (analysis.contextTokens > 0) {
         const { pct, level } = classifyContext(analysis.contextTokens);
         writeHealthFile(
@@ -199,12 +234,13 @@ export async function capture() {
       const cfg = JSON.parse(fs.readFileSync(p.configFile, 'utf8'));
       if (Number.isFinite(cfg.maxLogBytes)) maxBytes = cfg.maxLogBytes;
       if (cfg.redact === false) redactOn = false;
-      if (cfg.capture === false) process.exit(0);
+      if (cfg.capture === false) return { outcome: 'capture-disabled', recorded, wrote };
     } catch {
       /* use defaults */
     }
 
     if (!nothingHappened) {
+      wrote = true;
       const entry = addSessionEntry(
         p.memoryFile,
         `${new Date().toISOString()} - ${snapshot ? 'pre-compact snapshot' : 'session'}`,
@@ -228,8 +264,12 @@ export async function capture() {
             tokens: analysis ? analysis.contextTokens : 0,
           });
         }
-      } catch {
-        /* the vault is a mirror, never a blocker */
+      } catch (e) {
+        // The vault is a mirror and never a blocker — but an unmounted drive
+        // or a permissions change means notes silently stop arriving in
+        // Obsidian while memory.md keeps growing, and the two surfaces drift
+        // apart with nothing to explain why.
+        note('vault-mirror', e);
       }
     }
 
@@ -239,20 +279,38 @@ export async function capture() {
     // (`praxis receipt --verify` or the MCP tool); it never fires in a hook.
     // A receipt failure must never break the session.
     try {
-      if (!snapshot && text && typeof data.transcript_path === 'string') {
+      if (!snapshot && lines.length && typeof data.transcript_path === 'string') {
         await recordReceipt(
           p.receiptsDir,
-          { text, sessionId: path.basename(data.transcript_path, '.jsonl') },
+          { text: lines, sessionId: path.basename(data.transcript_path, '.jsonl') },
           { project: path.basename(p.root), now: new Date().toISOString(), verify: false },
         );
       }
-    } catch {
-      /* receipts are a bonus on the hook path, never a blocker */
+    } catch (e) {
+      // Receipts are a bonus on the hook path, never a blocker — but an
+      // unwritable key dir means proof-of-work stops being sealed, which is
+      // the product's central claim quietly going false.
+      note('receipt-seal', e);
     }
 
     writeState(p.praxisDir, 'restored'); // tray: context safely written back
-  } catch {
-    // Swallow everything — a hook must never break the session.
+
+    // Got all the way through. Anything recorded during THIS run stands; a
+    // fault from an earlier run does not, or one bad session would show a
+    // permanent alarm and the check becomes the thing people learn to ignore.
+    if (!recorded) clearLastError(p.praxisDir);
+    return { outcome: nothingHappened ? 'nothing-to-record' : 'captured', recorded, wrote };
+  } catch (e) {
+    // Swallow everything — a hook must never break the session. Swallowing it
+    // SILENTLY was the bug: `praxis doctor` can only ever prove the hook is
+    // installed, and installed is not the same claim as ran.
+    note('capture', e);
   }
+  return { outcome: 'failed', recorded, wrote };
+}
+
+/** The hook entry point: do the work, then always exit 0, whatever happened. */
+export async function capture() {
+  await captureRun();
   process.exit(0);
 }

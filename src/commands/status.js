@@ -8,6 +8,7 @@ import { emitJson } from '../lib/jsonout.js';
 import { praxisCmd } from '../lib/runner.js';
 import { healthReport } from '../lib/health.js';
 import { listReceipts } from '../lib/receipt/render.js';
+import { checkCapture } from '../lib/doctor.js';
 
 function pkgVersion() {
   try {
@@ -79,6 +80,12 @@ export function status(opts = {}) {
         armed,
         latest: receipts[0] || null,
       },
+      // armed says the hook is installed; this says it ran. A script watching a
+      // fleet needs the second claim — the first one cannot go false on its own.
+      capture: (() => {
+        const c = checkCapture(p.root);
+        return { ok: c.ok, detail: c.detail, fix: c.fix };
+      })(),
     });
     return;
   }
@@ -132,6 +139,16 @@ export function status(opts = {}) {
     console.log(g(row('claude', amber('◐') + ` idle at ${hr.pct}% — paused, ${hr.idleMinutes}m since the last message`)));
   } else {
     console.log(g(row('claude', grey(`○ no recent session — last one reached ${hr.pct}% full`))));
+  }
+
+  // Did capture actually run? Silent when it did — this tool's whole posture is
+  // to stay out of the way until something genuinely needs a human. But a
+  // capture that is failing is exactly that, and until now it had no way to
+  // say so: the error was swallowed and every surface still looked healthy.
+  const captureRan = checkCapture(p.root);
+  if (!captureRan.ok) {
+    console.log(g(row('capture', amber('▲ ') + captureRan.detail)));
+    if (captureRan.fix) caption(captureRan.fix);
   }
 
   // proof-of-work: the receipts this project's sessions have left behind

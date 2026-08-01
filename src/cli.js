@@ -144,7 +144,7 @@ const COMMANDS = [
   'init', 'status', 'capture', 'feedback', 'tray', 'switch', 'health',
   'telemetry', 'trace', 'vault', 'checkpoint', 'remember', 'recap',
   'forget', 'save', 'explain', 'gate', 'receipt', 'run', 'jobs',
-  'approve', 'gov', 'deck', 'mcp', 'doctor', 'demo', 'help',
+  'approve', 'gov', 'deck', 'mcp', 'doctor', 'uninstall', 'demo', 'help',
 ];
 switch (cmd) {
   case 'init':

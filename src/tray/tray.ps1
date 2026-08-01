@@ -206,7 +206,7 @@ function Get-PraxisState {
   # what the glow means, in order of urgency: an active carry-over beats
   # everything; then the LIVE session fill; then the memory file fill
   # only a session writing RIGHT NOW (last 5 min) earns a warning glow or a
-  # nudge — a full session from 20 minutes ago is history; the next one is 0%
+  # nudge - a full session from 20 minutes ago is history; the next one is 0%
   $sessLive = ($sess -and $sess.ageMin -ne $null -and $sess.ageMin -le 5)
   if ($phase -eq 'switching' -and $phaseAge -lt 90) { $name = 'switching'; $label = 'carrying context over' }
   elseif ($phase -eq 'restored' -and $phaseAge -lt 120) { $name = 'restored'; $label = 'context restored' }
@@ -262,7 +262,7 @@ $STATECOLOR = @{
   limit = '#e0604d'; switching = '#6aa5e0'; restored = '#d9ad55'
 }
 
-# preload icons — two glow intensities per state, so the icon can breathe
+# preload icons - two glow intensities per state, so the icon can breathe
 $icons = @{}
 foreach ($n in @('idle', 'warning', 'limit', 'switching', 'restored', 'happy')) {
   $soft = Join-Path $IconDir ($n + '.ico')
@@ -379,7 +379,7 @@ function Refresh-Panel {
     $gif = Join-Path $AnimDir ($s.name + '.gif')
     if (Test-Path $gif) {
       try {
-        # load via MemoryStream, NOT FromFile — FromFile locks the file for the
+        # load via MemoryStream, NOT FromFile - FromFile locks the file for the
         # image's lifetime and breaks the next `praxis tray` restage (EBUSY)
         $old = $pic.Image; $oldStream = $script:picStream
         $script:picStream = New-Object System.IO.MemoryStream(,([System.IO.File]::ReadAllBytes($gif)))
@@ -783,7 +783,7 @@ $timer.add_Tick({
     }
     $script:lastName = $s.name
   }
-  # the directional nudge: the mascot speaks ONCE per session per level —
+  # the directional nudge: the mascot speaks ONCE per session per level -
   # a gentle heads-up at heavy, the exact way out at critical. Live sessions
   # only: a stale transcript is history, not something to interrupt anyone for.
   if ($s.sess -and $s.sess.ageMin -ne $null -and $s.sess.ageMin -le 5 -and ($s.sess.level -eq 'critical' -or $s.sess.level -eq 'heavy')) {

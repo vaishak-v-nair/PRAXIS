@@ -12,6 +12,7 @@ import { transcriptDir, newestTranscript } from '../lib/transcript.js';
 import { DEFAULT_CONTEXT_LIMIT } from '../lib/health.js';
 import { scanWindow, buildTraceBlock, patchHookScript, unpatchHookScript } from '../lib/trace.js';
 import { vaultDirFor, writeCommitNote } from '../lib/vault.js';
+import { recordError } from '../lib/errors.js';
 import { miniHeader, rose, sage, amber, bold, grey, dim } from '../lib/ui.js';
 
 const NOTES_REF = 'refs/notes/praxis';
@@ -92,8 +93,10 @@ function capture(quiet) {
       const [hash, subject] = (head.stdout || '').trim().split('\t');
       writeCommitNote(vd, project, { hash, subject, block });
     }
-  } catch {
-    /* the vault is a mirror, never a blocker */
+  } catch (e) {
+    // A mirror, never a blocker - but silence here means commit notes stop
+    // arriving in Obsidian with nothing anywhere to say why.
+    recordError(path.join(root, '.praxis'), 'vault-commit-note', e);
   }
   if (!quiet) {
     console.log(

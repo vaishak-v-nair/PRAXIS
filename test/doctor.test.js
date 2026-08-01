@@ -152,14 +152,17 @@ test('checkWritable: passes on a real project dir', () => {
 test('runChecks returns every check, never throws, and summarize counts failures', () => {
   const dir = tmpProject('all');
   const results = runChecks(dir);
-  assert.equal(results.length, 8);
   const ids = results.map((r) => r.id);
-  assert.deepEqual(ids, ['node', 'git', 'agent-cli', 'writable', 'hooks', 'claudemd', 'mcp', 'key']);
+  // The order is the report's reading order, so it is part of the contract:
+  // 'capture' sits directly after 'hooks' because "installed" and "actually
+  // ran" are different claims and the difference is the whole point of it.
+  assert.deepEqual(ids, ['node', 'git', 'agent-cli', 'writable', 'hooks', 'capture', 'claudemd', 'mcp', 'key']);
+  assert.equal(results.length, ids.length);
   for (const r of results) assertFixShape(r);
 
   const s = summarize(results);
-  assert.equal(s.total, 8);
-  assert.equal(s.passed + s.failed.length, 8);
+  assert.equal(s.total, results.length);
+  assert.equal(s.passed + s.failed.length, results.length);
   // a bare temp dir has no hooks, no CLAUDE.md, no .mcp.json — three known failures
   assert.ok(s.failed.length >= 3, 'an uninitialized project reports its gaps');
 });

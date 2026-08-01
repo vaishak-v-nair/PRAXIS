@@ -32,6 +32,7 @@
 //      presence as attempt-only.
 
 import { redact } from '../redact.js';
+import { asLines } from '../transcript.js';
 
 // Tools whose command, when matched, we tag by category. Categorization is a
 // hint for the judge, never a verdict — a "git commit" command is evidence a
@@ -42,7 +43,7 @@ const BUILD_RE = /\b(npm\s+run\s+build|next\s+build|vite\s+build|tsc\b|go\s+buil
 
 function walk(text, onTool) {
   let turns = 0;
-  for (const line of String(text || '').split('\n')) {
+  for (const line of asLines(text)) {
     if (!line.trim()) continue;
     let e;
     try {
@@ -128,7 +129,7 @@ export function collectEvidence(transcriptText) {
 export function collectClaimProse(transcriptText, { maxBlocks = 200, maxChars = 4000, claimSignalOnly = false } = {}) {
   const blocks = [];
   let turns = 0;
-  for (const line of String(transcriptText || '').split('\n')) {
+  for (const line of asLines(transcriptText)) {
     if (!line.trim()) continue;
     let e;
     try {

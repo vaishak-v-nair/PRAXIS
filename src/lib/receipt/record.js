@@ -62,7 +62,9 @@ export function rightSizeForJudge(evidence, claimProse, { maxCommands = 60, maxA
  * Record (and seal) one session's receipt.
  *
  * @param {string} receiptsDir  .praxis/receipts
- * @param {{text:string, sessionId:string}} tr  the session transcript
+ * @param {{text:string|string[], sessionId:string}} tr  the session transcript,
+ *   as raw JSONL text or as lines already split. The hook passes lines: it
+ *   streams the file once and every consumer shares that one split.
  * @param {{project?:string, now?:string, verify?:boolean, judge?:Function}} opts
  * @returns {Promise<{id:string, evidence:object, verdict:string, verified:boolean,
  *   sealed:boolean, summary?:object, verdicts?:Array, judgeError?:string}>}

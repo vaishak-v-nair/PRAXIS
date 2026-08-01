@@ -18,6 +18,14 @@ import { projectPaths } from './paths.js';
 //                 from projects that were otherwise happy. An icon nobody chose
 //                 is not ambient, it is clutter. `praxis tray` adds this hook;
 //                 `praxis tray --stop` takes it away again.
+// This string is FROZEN. It is not a label — it is a resolution target that
+// gets written into the user's .claude/settings.json here, into their .mcp.json
+// (mcp/config.js), and into fifteen slash-command templates, at init time. No
+// upgrade ever rewrites those files, so every install that has ever run `init`
+// resolves this exact name on every hook fire, forever. Renaming the npm
+// package would break all of them silently — which is the one failure mode this
+// project cares most about. If the positioning ever needs to change, change the
+// description, the README and the help screen; the package name stays.
 const RUNNER = 'npx -y praxis-memory';
 const CORE_EVENTS = ['Stop', 'PreCompact'];
 const TRAY_EVENT = 'SessionStart';

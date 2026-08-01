@@ -16,6 +16,9 @@ import { spawnSync } from 'node:child_process';
 import { TOOLS, isInstalled, onPath } from './tools.js';
 import { projectPaths } from './paths.js';
 import { praxisCmd } from './runner.js';
+import { readLastError } from './errors.js';
+import { readState } from './state.js';
+import { listTranscripts, transcriptDir } from './transcript.js';
 
 // The Node line PRAXIS advertises in package.json engines. Kept here as one
 // constant so the doctor, the CI matrix and the engines field can be checked
@@ -119,6 +122,85 @@ export function checkHooks(cwd = process.cwd()) {
   );
 }
 
+/**
+ * Did capture actually RUN? — the check that `checkHooks` cannot make.
+ *
+ * checkHooks proves the hook is installed. That is presence, and presence
+ * proves attempted, never succeeded — the same rule receipts are built on,
+ * finally pointed at PRAXIS itself. Capture swallows every error so it can
+ * never break a session, which means a broken one is indistinguishable from a
+ * working one unless something looks for the evidence it leaves behind.
+ *
+ * Two signals, both already written by the existing capture loop:
+ *
+ *   .praxis/last-error.json   something was caught and swallowed
+ *   .praxis/state.json        'switching' at the start, 'restored' at the end
+ *
+ * so an old 'switching' means capture began and died in the middle, and a
+ * state.json older than several FINISHED sessions means the hook is not firing
+ * at all. Sessions still running are excluded on purpose: mid-session the
+ * transcript is always newer than the last capture, and calling that a fault
+ * would make this check cry wolf on every healthy project every day.
+ */
+export const CAPTURE_IDLE_MS = 30 * 60 * 1000; // a transcript untouched this long is a finished session
+export const CAPTURE_MISSED_SESSIONS = 2; // two finished sessions with no capture is a pattern, not a fluke
+
+export function captureVerdict({ lastError = null, state = null, missedSessions = 0, hasSessions = false } = {}) {
+  if (lastError) {
+    const when = lastError.at ? ` (${lastError.at})` : '';
+    return check(
+      'capture',
+      'Capture ran',
+      false,
+      `last run failed at ${lastError.phase}${when}: ${lastError.message}`,
+      'See .praxis/last-error.json for the stack. If it repeats, report it at ' +
+        'https://github.com/vaishak-v-nair/PRAXIS/issues — a capture that fails silently is the bug.',
+    );
+  }
+  if (state && state.phase === 'switching' && state.ageMs > CAPTURE_IDLE_MS) {
+    return check(
+      'capture',
+      'Capture ran',
+      false,
+      'a capture started and never finished — memory may be missing that session',
+      `Run ${praxisCmd()} save to write the current session by hand, then check .praxis/last-error.json.`,
+    );
+  }
+  if (missedSessions >= CAPTURE_MISSED_SESSIONS) {
+    return check(
+      'capture',
+      'Capture ran',
+      false,
+      `${missedSessions} finished sessions since capture last completed — the hook is installed but not running`,
+      `Restart Claude Code so it re-reads the hooks, then run ${praxisCmd()} doctor again.`,
+    );
+  }
+  if (!state) {
+    return check(
+      'capture',
+      'Capture ran',
+      true,
+      hasSessions ? 'no capture recorded yet — the next session that ends writes one' : 'no sessions here yet',
+    );
+  }
+  const mins = Math.floor(state.ageMs / 60000);
+  const ago = mins < 1 ? 'just now' : mins < 60 ? `${mins} m ago` : `${Math.floor(mins / 60)} h ago`;
+  return check('capture', 'Capture ran', true, `last completed ${ago}`);
+}
+
+/** The IO half: gather the two breadcrumbs and count the sessions that ended after them. */
+export function checkCapture(cwd = process.cwd(), now = Date.now()) {
+  const p = projectPaths(cwd);
+  const lastError = readLastError(p.praxisDir);
+  const state = readState(p.praxisDir, now);
+  const sessions = listTranscripts(transcriptDir(cwd));
+  const since = state ? Date.parse(state.ts) : NaN;
+  const missedSessions = Number.isFinite(since)
+    ? sessions.filter((s) => s.mtimeMs > since && now - s.mtimeMs > CAPTURE_IDLE_MS).length
+    : 0;
+  return captureVerdict({ lastError, state, missedSessions, hasSessions: sessions.length > 0 });
+}
+
 /** The CLAUDE.md managed block — this is what auto-loads memory each session. */
 export function checkMemoryBlock(cwd = process.cwd()) {
   const p = projectPaths(cwd);
@@ -219,6 +301,9 @@ export function runChecks(cwd = process.cwd()) {
     ['agent-cli', () => checkAgentCli()],
     ['writable', () => checkWritable(cwd)],
     ['hooks', () => checkHooks(cwd)],
+    // straight after the hooks row on purpose: "installed" and "actually ran"
+    // are different claims, and reading them next to each other is the point
+    ['capture', () => checkCapture(cwd)],
     ['claudemd', () => checkMemoryBlock(cwd)],
     ['mcp', () => checkMcp(cwd)],
     ['key', () => checkSigningKey()],

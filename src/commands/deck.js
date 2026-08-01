@@ -21,9 +21,29 @@ function openBrowser(url) {
 }
 
 export async function deck(argv = []) {
+  // Every other command answers --help. This one used to ignore it, bind a
+  // port, open a browser window, and then block forever on a promise that never
+  // settles — so asking what the deck does handed you a running server and a
+  // terminal you had to Ctrl+C. Help must never be a side effect.
+  if (argv.includes('--help') || argv.includes('-h')) {
+    console.log(`
+  ${bold('praxis deck')} ${grey('— Mission Control in your browser')}
+
+  Give the Governor a goal, watch the fleet, approve or deny drafts, open
+  sealed receipts. Binds 127.0.0.1 only, with a fresh token per launch.
+
+  ${bold('--port <n>')}    ${grey('listen somewhere other than 4517')}
+  ${bold('--no-open')}     ${grey('print the URL instead of opening a browser')}
+
+  ${grey('Runs until you stop it with Ctrl+C. Nothing leaves this machine.')}
+`);
+    return;
+  }
+
   const p = projectPaths();
   const portArg = argv.indexOf('--port');
-  const wantPort = portArg > -1 ? Number(argv[portArg + 1]) : 4517;
+  const parsedPort = Number(argv[argv.indexOf('--port') + 1]);
+  const wantPort = portArg > -1 && Number.isInteger(parsedPort) && parsedPort >= 0 && parsedPort <= 65535 ? parsedPort : 4517;
 
   const { server, token } = createDeckServer({
     cwd: p.root,

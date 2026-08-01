@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { transcriptDir, newestTranscript } from './transcript.js';
+import { transcriptDir, newestTranscript, asLines } from './transcript.js';
 import { TOOLS, ALTERNATES_FOR_CLAUDE } from './tools.js';
 
 export const DEFAULT_CONTEXT_LIMIT = 200000;
@@ -28,7 +28,7 @@ export function analyzeTranscript(text) {
     lastTs: null,
     lines: 0,
   };
-  for (const line of String(text || '').split('\n')) {
+  for (const line of asLines(text)) {
     if (!line) continue;
     out.lines++;
     const ti = line.indexOf('"timestamp":"');

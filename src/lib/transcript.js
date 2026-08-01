@@ -6,6 +6,47 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline';
+
+/**
+ * Accept a transcript as either raw JSONL text or lines already split.
+ *
+ * Six things reduce a transcript line by line — the memory summary, recent
+ * asks, session commits, essence extraction, session health, and receipt
+ * evidence — and every one of them used to do its own `split('\n')` over the
+ * same string. That is five redundant copies of the whole transcript per hook
+ * fire, measured at 455 ms and 153 MB RSS on a 40 MB session.
+ *
+ * Taking lines instead lets the caller split ONCE (or never — see
+ * readTranscriptLines) while every one of these functions stays callable with a
+ * plain string, which is what the tests and the retro-capture paths pass.
+ */
+export function asLines(input) {
+  if (Array.isArray(input)) return input;
+  return String(input || '').split('\n');
+}
+
+/**
+ * Read a transcript as lines without ever building the whole-file string.
+ *
+ * V8 refuses any string over 512 MiB, so `readFileSync(f, 'utf8')` throws
+ * ERR_STRING_TOO_LONG on a big enough session — and on the hook path that throw
+ * was swallowed, so the heaviest users (the ones with the most worth
+ * remembering) silently got no memory at all. Streaming has no such ceiling:
+ * the limit is per-string, and individual JSONL lines are small.
+ */
+export async function readTranscriptLines(file) {
+  const lines = [];
+  const rl = readline.createInterface({
+    input: fs.createReadStream(file, { encoding: 'utf8' }),
+    crlfDelay: Infinity,
+  });
+  for await (const line of rl) lines.push(line);
+  // A BOM survives the stream on the first line, where every JSON.parse below
+  // would choke on it exactly as it would have on the whole-file read.
+  if (lines.length && lines[0].charCodeAt(0) === 0xfeff) lines[0] = lines[0].slice(1);
+  return lines;
+}
 
 /** Claude Code stores transcripts under ~/.claude/projects/<sanitized cwd>/ */
 export function transcriptDir(cwd = process.cwd(), home = os.homedir()) {
@@ -13,26 +54,36 @@ export function transcriptDir(cwd = process.cwd(), home = os.homedir()) {
   return path.join(home, '.claude', 'projects', sanitized);
 }
 
-/** Newest main-session transcript in a project dir (agent sidechains excluded). */
-export function newestTranscript(dir) {
-  let best = null;
+/**
+ * Every main-session transcript in a project dir, newest first (agent
+ * sidechains excluded). One walk, so the doctor's liveness check and the
+ * health report cannot disagree about which sessions exist.
+ *
+ * @returns {{file: string, mtimeMs: number}[]}
+ */
+export function listTranscripts(dir) {
   let files;
   try {
     files = fs.readdirSync(dir);
   } catch {
-    return null;
+    return [];
   }
+  const out = [];
   for (const f of files) {
     if (!f.endsWith('.jsonl') || f.startsWith('agent-')) continue;
-    let m;
     try {
-      m = fs.statSync(path.join(dir, f)).mtimeMs;
+      out.push({ file: path.join(dir, f), mtimeMs: fs.statSync(path.join(dir, f)).mtimeMs });
     } catch {
-      continue;
+      /* vanished between readdir and stat — not a session we can read */
     }
-    if (!best || m > best.mtimeMs) best = { file: path.join(dir, f), mtimeMs: m };
   }
-  return best && best.file;
+  return out.sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
+
+/** Newest main-session transcript in a project dir (agent sidechains excluded). */
+export function newestTranscript(dir) {
+  const all = listTranscripts(dir);
+  return all.length ? all[0].file : null;
 }
 
 export function freshHudState() {
