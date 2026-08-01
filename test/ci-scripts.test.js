@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 import { checkBudget, parsePackJson, BUDGET_MB } from '../scripts/ci/tarball-budget.mjs';
+import { checkTrackedPaths, RULES } from '../scripts/ci/leak-guard.mjs';
+import { parseCoverage, checkFloor, readFloor } from '../scripts/ci/coverage-floor.mjs';
 import { runWithConcurrency, summarize, DEFAULT_CONCURRENCY } from '../scripts/ci/run-live-evals.mjs';
 import { sections, notesFor } from '../scripts/ci/changelog.mjs';
 
@@ -34,6 +37,122 @@ test('tarball budget: reads npm pack --json, refuses to guess when the field is 
 
   assert.throws(() => parsePackJson('[{"name":"x"}]'), /unpackedSize/);
   assert.throws(() => parsePackJson('not json'), SyntaxError);
+});
+
+// ── the leak guard ───────────────────────────────────────────────────────────
+// A personal Obsidian vault sits inside this working tree. The .gitignore that
+// keeps it out has failed twice, both times on a rename — so these tests are
+// about the rename case specifically: the guard has to catch a vault it has
+// never seen the name of.
+
+test('the guard catches every private shape, whatever it got renamed to', () => {
+  const r = checkTrackedPaths(
+    [
+      'Praxis Intelligence/01 Identity/me.md', // today's name
+      'Personal Intelligence/notes.md', // the name before that
+      'PraxisIntelligence/x.md', // no space
+      'Praxis iIntelligence/.obsidian/app.json', // the typo'd one
+      'some/nested/.obsidian/workspace.json', // a vault anywhere at all
+      'assets/source/mascot.mov',
+      'DESIGN.md',
+      '.praxis/memory.md',
+      '.claude/settings.local.json',
+      'CLAUDE.md',
+    ],
+    { branch: 'main' },
+  );
+  assert.equal(r.ok, false);
+  assert.equal(r.violations.length, 10, 'every one of them, not just the ones we thought of');
+  const rules = new Set(r.violations.map((v) => v.rule));
+  for (const id of ['vault', 'obsidian', 'brand-vault', 'internal-docs', 'local-memory', 'personal-config']) {
+    assert.ok(rules.has(id), `${id} fired`);
+  }
+  for (const v of r.violations) assert.ok(v.why.length > 20, 'and each one says WHY, not just "blocked"');
+});
+
+test('the guard does not cry wolf on ordinary source', () => {
+  const r = checkTrackedPaths(
+    [
+      'src/cli.js',
+      'src/lib/intelligence-helper.js', // the word, but not a vault
+      'docs/mascot.gif',
+      'README.md',
+      'test/smoke.test.js',
+      'web/index.html',
+      '.github/workflows/ci.yml',
+    ],
+    { branch: 'main' },
+  );
+  assert.equal(r.ok, true, `false positives: ${r.violations.map((v) => v.path).join(', ')}`);
+});
+
+test('on the confidential branch the brand vault is allowed — the personal one never is', () => {
+  // assets/ and DESIGN.md are tracked on `confidential` on purpose. A guard
+  // that failed there would get switched off, and a switched-off guard protects
+  // nothing. The personal vault is private on EVERY branch.
+  const r = checkTrackedPaths(['assets/source/x.mov', 'DESIGN.md', 'Praxis Intelligence/a.md'], {
+    branch: 'confidential',
+  });
+  assert.equal(r.violations.length, 1);
+  assert.equal(r.violations[0].rule, 'vault');
+  assert.ok(r.skipped > 0, 'and it says how many rules it stood down');
+
+  const onMain = checkTrackedPaths(['assets/source/x.mov'], { branch: 'main' });
+  assert.equal(onMain.ok, false, 'the same file on main is a leak');
+});
+
+test('this repo is clean right now', () => {
+  // Not a unit test — a fact about the working tree, checked on every run, which
+  // is the whole point. If this ever fails, something private is in the index.
+  const tracked = execFileSync('git', ['ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    .split('\n')
+    .filter(Boolean);
+  const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim();
+  const r = checkTrackedPaths(tracked, { branch });
+  assert.equal(r.ok, true, `private paths tracked: ${r.violations.map((v) => v.path).join(', ')}`);
+  assert.ok(r.checked > 100, 'and it actually looked at the repo');
+});
+
+test('every rule carries a reason a human can act on', () => {
+  assert.ok(RULES.length >= 6);
+  for (const rule of RULES) {
+    assert.ok(rule.id && rule.why && typeof rule.test === 'function');
+    assert.equal(typeof rule.publicOnly, 'boolean', `${rule.id} states whether confidential tracks it`);
+  }
+});
+
+// ── the coverage ratchet ─────────────────────────────────────────────────────
+
+test('the ratchet reads node coverage output, including the colour codes', () => {
+  const real =
+    'ℹ ------------------------------------------------\n' +
+    'ℹ file        | line % | branch % | funcs % | uncovered\n' +
+    'ℹ [32mall files[0m   |  82.04 |    73.54 |   86.21 |\n' +
+    'ℹ end of coverage report\n';
+  assert.deepEqual(parseCoverage(real), { line: 82.04, branch: 73.54, funcs: 86.21 });
+  assert.throws(() => parseCoverage('no summary here'), /all files/);
+  assert.throws(() => parseCoverage('ℹ all files | x | y | z |'), /three percentages/);
+});
+
+test('the ratchet fails on any metric, not on an average', () => {
+  // Branch coverage is the one that slips when new code lands faster than its
+  // tests. Averaging would let a good line number hide it.
+  const floor = { line: 81, branch: 72, funcs: 85 };
+  assert.equal(checkFloor({ line: 82.04, branch: 73.54, funcs: 86.21 }, floor).ok, true);
+  assert.equal(checkFloor({ line: 81, branch: 72, funcs: 85 }, floor).ok, true, 'exactly at the floor is on the floor');
+
+  const slipped = checkFloor({ line: 95, branch: 71.9, funcs: 99 }, floor);
+  assert.equal(slipped.ok, false, 'excellent lines do not buy a branch regression');
+  assert.deepEqual(slipped.results.filter((r) => !r.ok).map((r) => r.metric), ['branch']);
+});
+
+test('the committed floor is real, and below what the suite actually does', () => {
+  const floor = readFloor();
+  for (const k of ['line', 'branch', 'funcs']) {
+    assert.ok(typeof floor[k] === 'number' && floor[k] > 50, `${k} floor is a real number`);
+  }
+  assert.match(floor.updated, /^\d{4}-\d{2}-\d{2}$/, 'and it records when it was agreed');
+  assert.ok(floor.why && floor.why.length > 40, 'and why, so raising or lowering it is a decision');
 });
 
 test('live-eval runner: bounded concurrency, order preserved', async () => {

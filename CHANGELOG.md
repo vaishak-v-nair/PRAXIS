@@ -16,6 +16,71 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ### Added
 
+- **PRAXIS notices when PRAXIS breaks.** `capture` runs on the Stop hook of
+  every session on every install, and it swallows every error so it can never
+  take a session down with it. That part was right. What was missing was the
+  other half: a swallowed error left no trace anywhere, so a broken capture and
+  a working one looked identical — memory quietly stopped growing and the first
+  person to find out was you, weeks later, asking Claude about last month.
+  `praxis doctor` could only ever check that the hook *string* was present in a
+  settings file, which proves it was installed, not that it ran.
+  Failures now land in `.praxis/last-error.json` with the phase that broke, and
+  `doctor` gained a **Capture ran** row directly under **Capture hooks** —
+  because "installed" and "actually ran" are two different claims and reading
+  them next to each other is the point. It also catches the quieter failure: the
+  `state.json` breadcrumb is written at both ends of the capture loop, so an old
+  `switching` means capture started and died in the middle, and finished
+  sessions piling up past the last completed capture means the hook is wired but
+  not firing. `status` shows the row only when something is wrong, and
+  `status --json` carries `capture.ok` for scripts. A later clean run clears the
+  fault — an alarm that can never clear is one people learn to ignore.
+- **A leak guard in CI.** The `.gitignore` rule keeping the personal vault out
+  of this repo has failed twice, both times because the folder was renamed and
+  the pattern silently stopped matching. A filter can only fail open, so CI now
+  asks the checkable question instead: is anything we *know* is private in the
+  index right now. Matches on shape rather than spelling, so no rename dodges
+  it, and stands down the confidential-branch rules when it runs there.
+- **A coverage floor in CI.** Coverage was never measured, so it could only
+  drift one way with nobody the wiser — and it had: fifteen of twenty-seven
+  commands sat at 0% *function* coverage, their entry points never called by a
+  test even once, while the libraries underneath were at 90-100%. Raising the
+  floor is a deliberate commit; lowering it quietly is what this prevents.
+- **The Windows tray host is finally gated.** `src/tray/tray.ps1` is the largest
+  file in the product and shipped to every Windows user with no CI at all, while
+  the macOS host — which there is no Mac here to run — had five checks. It now
+  gets the same treatment: parses under Windows PowerShell 5.1, passes
+  PSScriptAnalyzer, is verified pure ASCII (PS 5.1 reads a BOM-less file as ANSI,
+  and four em dashes had already crept into comments), reports a state through
+  `tray --once`, and has every icon present at both glow intensities.
+
+### Fixed
+
+- **`praxis deck --help` started a server instead of printing help** — it bound
+  a port, opened a browser window, and then blocked forever on a promise that
+  never settles, so asking what the deck does left you with a running server and
+  a terminal needing Ctrl+C. A bad `--port` value also became `NaN`; it now
+  falls back to the default.
+- **`praxis uninstal` got no suggestion.** The `COMMANDS` list behind
+  did-you-mean carries a comment promising it stays in sync with the switch, and
+  it went stale in the very commit that added `uninstall`.
+
+### Changed
+
+- **The Stop hook reads the transcript once instead of six times.** Six things
+  reduce a session line by line — the memory summary, recent asks, session
+  commits, essence, health, receipt evidence — and every one re-split the same
+  string. Measured on a real 39 MB session: 2801 ms before, 2235 ms after, and
+  8 MB less resident. The bigger change is that `readFileSync(…, 'utf8')` throws
+  above V8's 512 MiB string limit and that throw was swallowed, so the longest
+  sessions produced no memory at all and said nothing. Streaming has no such
+  ceiling. Every consumer still accepts plain text, so nothing else changes.
+- **`ifMissing()` and `swallow()`** now say which kind of failure a `catch` is
+  hiding. An audit found 81 silent catches across 30 files: 33 expected absences
+  (no config yet, a half-flushed transcript line), 12 deliberate degradations,
+  and the rest impossible to classify from the code. Real failures that are
+  correct to survive — the vault mirror on an unmounted drive, a receipt that
+  could not be sealed — are now recorded rather than discarded.
+
 - **`praxis uninstall`** — takes PRAXIS out of a project, properly. Until now
   there was no answer to "I want this out of here", so the thing people reach
   for is `rm -rf .praxis` — which leaves the hooks firing `npx -y praxis-memory`

@@ -1,0 +1,7 @@
+{
+  "line": 81,
+  "branch": 72,
+  "funcs": 85,
+  "updated": "2026-08-01",
+  "why": "Set a point under the 2026-08-01 measurement (82.04 / 73.54 / 86.21) so ordinary cross-platform variance does not turn the build red for nothing. Raise it with --update when a real jump lands; never lower it quietly."
+}

@@ -48,6 +48,42 @@ jobs:
       - name: npm test
         run: node scripts/ci/run-tests.mjs
 
+  leak-guard:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    name: nothing private is tracked
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # The personal Obsidian vault lives inside this working tree, and the only
+      # thing keeping it out of the repo is a .gitignore pattern — which has
+      # already failed twice, both times on a rename. A filter can only fail
+      # open. This asks the checkable question instead: is anything we KNOW is
+      # private in the index right now? Runs first and finishes in seconds,
+      # because the one failure here is the one that cannot be undone.
+      - name: leak guard
+        run: node scripts/ci/leak-guard.mjs
+
+  coverage-floor:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    name: coverage does not go backwards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # Coverage was never measured here, so it could only drift one way with
+      # nobody the wiser — and it had: fifteen commands sat at 0% FUNCTION
+      # coverage while the libraries under them were at 90-100%. This is a
+      # floor, not a target. Raising it is a deliberate commit
+      # (`node scripts/ci/coverage-floor.mjs --update`); lowering it quietly is
+      # the thing it exists to prevent.
+      - name: coverage floor
+        run: node scripts/ci/coverage-floor.mjs
+
   judge-fixture:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
     name: judge scorecard discriminates (zero tokens)
@@ -143,6 +179,108 @@ jobs:
             }
             if (bad) process.exit(1);
             console.log(TRAY_STATES.length * 2 + ' menu bar icons present and valid');
+          "
+
+  tray-windows:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    name: Windows tray host parses and reports
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      # The macOS tray — which there is no Mac here to run — had five CI gates.
+      # The Windows tray, which is the one that actually ships to users today,
+      # had none: a syntax error in 845 lines of PowerShell passed every test
+      # and published, and the first person to find out was somebody whose
+      # axolotl silently never appeared. Every check below is a failure this
+      # file has actually had.
+
+      # 1. Does it parse? ParseFile reports syntax errors WITHOUT executing —
+      #    the same trick osacompile plays for the macOS host. Deliberately
+      #    Windows PowerShell 5.1, because that is the interpreter tray.js
+      #    launches, not pwsh 7.
+      - name: the host parses under Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD\src\tray\tray.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors -and $errors.Count -gt 0) {
+            foreach ($e in $errors) {
+              Write-Host "::error file=src/tray/tray.ps1,line=$($e.Extent.StartLineNumber)::$($e.Message)"
+            }
+            exit 1
+          }
+          Write-Host "tray.ps1 parses clean ($((Get-Content src\tray\tray.ps1).Count) lines)"
+
+      # 2. Pure ASCII. PowerShell 5.1 reads a file with no BOM as ANSI, so a
+      #    stray em dash becomes mojibake in a tooltip somebody reads every day.
+      #    Four had already crept into comments before this check existed.
+      - name: the host is pure ASCII
+        shell: powershell
+        run: |
+          $bytes = [System.IO.File]::ReadAllBytes("$PWD\src\tray\tray.ps1")
+          $bad = @($bytes | Where-Object { $_ -gt 127 })
+          if ($bad.Count -gt 0) {
+            Write-Host "::error file=src/tray/tray.ps1::$($bad.Count) non-ASCII bytes - PS 5.1 decodes these as ANSI"
+            exit 1
+          }
+          Write-Host "pure ASCII ($($bytes.Count) bytes)"
+
+      # 3. Static analysis, errors only. Warnings are style; an Error is a bug.
+      - name: PSScriptAnalyzer finds no errors
+        shell: powershell
+        run: |
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+            Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck | Out-Null
+          }
+          Import-Module PSScriptAnalyzer
+          $found = Invoke-ScriptAnalyzer -Path src\tray\tray.ps1 -Severity Error
+          if ($found) {
+            $found | ForEach-Object {
+              Write-Host "::error file=src/tray/tray.ps1,line=$($_.Line)::$($_.RuleName): $($_.Message)"
+            }
+            exit 1
+          }
+          Write-Host "no analyzer errors"
+
+      # 4. The whole win32 branch of the tray command, headless. `--once`
+      #    computes the state in the foreground and prints it — no WinForms
+      #    window, so it runs on a machine with no interactive desktop.
+      - name: praxis tray --once reports a state
+        shell: bash
+        run: |
+          mkdir -p /tmp/praxis-proj/.praxis
+          printf '# Memory\n### 2026-07-30T09:05:00.000Z - a decision\n' > /tmp/praxis-proj/.praxis/memory.md
+          printf '{"tray":true}' > /tmp/praxis-proj/.praxis/config.json
+          cd /tmp/praxis-proj
+          out=$(node "$GITHUB_WORKSPACE/src/cli.js" tray --once)
+          echo "$out"
+          case "$out" in
+            *state=*) echo "win32 --once ok" ;;
+            *) echo "::error::tray --once did not report a state on Windows"; exit 1 ;;
+          esac
+
+      # 5. Every state the host can ask for must exist as an .ico at both glow
+      #    intensities. A missing icon is an invisible tray with no error.
+      - name: every state has a tray icon
+        shell: bash
+        run: |
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            import { TRAY_STATES } from './src/lib/tray-state.js';
+            let bad = 0;
+            for (const s of TRAY_STATES) for (const suf of ['', '2']) {
+              const f = 'src/tray/icons/' + s + suf + '.ico';
+              if (!fs.existsSync(f)) { console.error('::error::missing ' + f); bad++; continue; }
+              const b = fs.readFileSync(f);
+              if (b[0] !== 0 || b[1] !== 0 || b[2] !== 1) { console.error('::error::not an ICO: ' + f); bad++; }
+            }
+            if (bad) process.exit(1);
+            console.log(TRAY_STATES.length * 2 + ' tray icons present and valid');
           "
 
   pack-smoke:
