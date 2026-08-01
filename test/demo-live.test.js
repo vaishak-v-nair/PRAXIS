@@ -164,13 +164,13 @@ test('live leaves the provenance mark behind it, not on the whole process', asyn
 test('an unauthenticated CLI is named as that, not as a crash', async () => {
   const res = await liveRun({ mode: 'auth' });
   assert.equal(res.ok, false);
-  assert.equal(res.reason, 'cli-unauthenticated', 'the difference is a two-minute fix versus a bug report');
+  assert.equal(res.reason, 'cli-unauthenticated', [res.detail, res.status].filter(Boolean).join(' | ') || 'the difference is a two-minute fix versus a bug report');
 });
 
 test('an adapter that yields no session gets no invented receipt', async () => {
   const res = await liveRun({ mode: 'no-session' });
   assert.equal(res.ok, false);
-  assert.equal(res.reason, 'nothing-sealed');
+  assert.equal(res.reason, 'nothing-sealed', [res.detail, res.status].filter(Boolean).join(' | '));
 });
 
 test('a judge that cannot be reached does NOT throw away a real receipt', async () => {
@@ -189,7 +189,7 @@ test('live gives up rather than waiting forever, and kills what it started', asy
   // as a broken timeout rather than a slow runner.
   const res = await liveRun({ mode: 'hang', timeoutMs: 2500 * SLOW });
   assert.equal(res.ok, false);
-  assert.equal(res.reason, 'timed-out');
+  assert.equal(res.reason, 'timed-out', [res.detail, res.status].filter(Boolean).join(' | '));
 });
 
 // ── the command itself, not just the library ─────────────────────────────────

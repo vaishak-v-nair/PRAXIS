@@ -346,12 +346,21 @@ export async function runLive({
     // Failure is classified from the job's own words; there is no point waiting
     // on a receipt for a run that never got far enough to have one.
     if (waited.status !== 'done' && waited.status !== 'draft') {
-      const cls = classifyLiveFailure({
-        status: waited.status,
-        meta: waited.meta || readMeta(p.praxisDir, job.id) || {},
-        output: jobOutput(p.praxisDir, job.id),
-      });
-      return done({ ok: false, reason: cls, jobId: job.id });
+      const meta = waited.meta || readMeta(p.praxisDir, job.id) || {};
+      const output = jobOutput(p.praxisDir, job.id);
+      const cls = classifyLiveFailure({ status: waited.status, meta, output });
+      // Carry the agent's OWN WORDS out with the classification. This read
+      // err.log to decide the reason and then dropped it, so every failure
+      // arrived as a bare word — `spawn-failed` with nothing behind it. That is
+      // the difference between a user knowing what to fix and filing a bug
+      // report, and it cost an afternoon of guessing at a CI failure that had
+      // been describing itself the whole time.
+      const detail =
+        [meta.exitSource, String(output || '').trim().split('\n').slice(-4).join(' · ')]
+          .filter(Boolean)
+          .join(' | ')
+          .slice(0, 400) || undefined;
+      return done({ ok: false, reason: cls, detail, status: waited.status, jobId: job.id });
     }
 
     const meta = (await awaitReceiptLink(p.praxisDir, job.id)) || waited.meta || {};
