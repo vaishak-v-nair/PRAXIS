@@ -25,14 +25,26 @@ function sandbox() {
 // and generous on CI; unchanged locally.
 const SLOW = process.env.CI ? 4 : 1;
 
-async function settled(p, id, budgetMs = 8000 * SLOW) {
+/**
+ * Wait for a job to stop running — and, when the caller is about to read its
+ * output, for that output to actually be there.
+ *
+ * Those are two different conditions and conflating them is what made this
+ * flake: the runner records the exit code and the child's stdout lands in
+ * out.log through a separate stream, so a job can be `done` a beat before
+ * anything is readable. The assertion then compared against '' and failed with
+ * no clue why.
+ */
+async function settled(p, id, { budgetMs = 8000 * SLOW, wantOutput = false } = {}) {
   const deadline = Date.now() + budgetMs;
+  let meta = null;
   while (Date.now() < deadline) {
-    const m = readMeta(p, id);
-    if (m && jobStatus(m) !== 'running') return m;
+    meta = readMeta(p, id);
+    const stopped = meta && jobStatus(meta) !== 'running';
+    if (stopped && (!wantOutput || tailOutput(p, id, 5).length)) return meta;
     await new Promise((r) => setTimeout(r, 200));
   }
-  return readMeta(p, id);
+  return meta || readMeta(p, id);
 }
 
 /** A finished safe-draft job, hand-built — no spawn needed. */
@@ -93,7 +105,9 @@ test('approve executes a draft: twin job spawns, both sides linked', async () =>
     assert.equal(parent.approval, 'approved');
     assert.ok(parent.approvedTo, 'parent points at the execution twin');
 
-    const child = await settled(p, parent.approvedTo);
+    // this one goes on to read out.log, so wait for the output too — a job can
+    // be `done` a beat before its stdout has landed in the file
+    const child = await settled(p, parent.approvedTo, { wantOutput: true });
     assert.equal(child.approvedFrom, id);
     assert.equal(child.mode, 'acceptEdits');
     const out = tailOutput(p, child.id, 5).join(' ');
