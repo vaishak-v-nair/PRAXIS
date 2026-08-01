@@ -160,11 +160,32 @@ test('vault with no argument reports rather than guessing a path', async () => {
   assert.equal(cfg.vault, undefined, 'reading is not writing');
 });
 
-test('vault accepts a real directory and records it', async () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-vault-'));
-  const { root } = await inProject(async () => vault([target]));
-  const cfg = JSON.parse(fs.readFileSync(path.join(root, '.praxis', 'config.json'), 'utf8'));
-  assert.ok(cfg.vault, 'the choice is persisted, not just printed');
+test('vault records a directory inside the project, and refuses one outside home', async () => {
+  // Both halves of the confinement rule (vaultPathAllowed): a vault must live
+  // under $HOME or inside the repo. Anything else is a typo or a hostile repo
+  // pointing PRAXIS at somewhere it should not write.
+  //
+  // The first version of this test used os.tmpdir() and passed on Windows only
+  // — there tmpdir is C:\Users\<you>\AppData\Local\Temp, which IS under home,
+  // so the vault was accepted. On Linux and macOS /tmp is not, so it was
+  // correctly refused and the assertion failed. The rule was right; the test
+  // was reading one platform's filesystem layout as if it were universal.
+  const inside = await inProject(async (root) => {
+    const target = path.join(root, 'notes');
+    fs.mkdirSync(target, { recursive: true });
+    vault([target]);
+  });
+  const cfgIn = JSON.parse(fs.readFileSync(path.join(inside.root, '.praxis', 'config.json'), 'utf8'));
+  assert.ok(cfgIn.vault, 'a vault inside the repo is persisted, not just printed');
+
+  // Somewhere that is neither home nor this repo. On Windows tmpdir lives under
+  // home, so build the outside path from the filesystem root instead — the
+  // point is "outside", and that has to mean outside on every platform.
+  const outside = path.join(path.parse(process.cwd()).root, 'praxis-not-my-vault');
+  const refused = await inProject(async () => vault([outside]));
+  const cfgOut = JSON.parse(fs.readFileSync(path.join(refused.root, '.praxis', 'config.json'), 'utf8'));
+  assert.equal(cfgOut.vault, undefined, 'a path outside home and the repo is refused, not written');
+  assert.ok(strip(refused.out).length > 0, 'and it says why rather than failing silently');
 });
 
 test('switch with no target lists what it could switch to', async () => {
