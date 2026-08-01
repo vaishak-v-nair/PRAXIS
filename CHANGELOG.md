@@ -18,6 +18,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ### Added
 
+- **`praxis update`** and **`/praxis-update`** — for people who installed PRAXIS
+  a while ago. The honest headline is how little needs updating: hooks and the
+  MCP server are wired as `npx -y praxis-memory`, so they resolve the newest
+  release every session and most people need to do nothing at all. Saying that
+  plainly is most of what this command is for — being told to run something you
+  did not need to run is its own kind of failure.
+  What genuinely goes stale is narrow. A global `praxis` shim is pinned on PATH
+  the day it was installed and never moves again. The `/praxis-*` slash commands
+  are **copied** into a project at init time, so a release that ADDS a command
+  never reaches projects that already exist — those users simply never learn it
+  is there. And commands retired in a later release leave their template behind,
+  because `init` copies what it ships and has never deleted anything: that is
+  how `praxis-cost`, `praxis-roi` and `praxis-hud` outlived the 0.11.0 release
+  that removed them.
+  So it reports per surface rather than printing one reassuring number, refreshes
+  the slash commands in the project and user-wide (adding the new, removing the
+  retired, and rewriting ones whose content changed), and leaves the global
+  install to you with the exact command — `--global` runs it if you want.
+  `--check` looks and changes nothing. An unreachable registry degrades to doing
+  the local half rather than failing; running a version newer than the registry
+  is not an error, which is what a maintainer sees between tagging and
+  publishing.
+
 - **PRAXIS notices when PRAXIS breaks.** `capture` runs on the Stop hook of
   every session on every install, and it swallows every error so it can never
   take a session down with it. That part was right. What was missing was the

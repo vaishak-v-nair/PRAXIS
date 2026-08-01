@@ -27,6 +27,7 @@ import { deck } from './commands/deck.js';
 import { mcp } from './commands/mcp.js';
 import { doctor } from './commands/doctor.js';
 import { uninstall } from './commands/uninstall.js';
+import { update } from './commands/update.js';
 import { demo } from './commands/demo.js';
 import { warnDeprecated, removalNotice } from './lib/deprecate.js';
 import { didYouMean } from './lib/suggest.js';
@@ -81,6 +82,7 @@ function help() {
       [`${c} remember "<f>"`, `save a fact into memory now ${grey(`· ${c} forget "<t>" removes it`)}`],
       [`${c} health`, 'how full is this Claude session, really — and where to go next'],
       [`${c} doctor`, `what is set up, what broke, and the fix for each ${grey('(local read only)')}`],
+      [`${c} update`, `bring an existing install current ${grey('· --check looks, changes nothing')}`],
       [`${c} uninstall`, `take PRAXIS out of this project ${grey('· your memory is archived, never deleted')}`],
     ]],
   ];
@@ -144,7 +146,7 @@ const COMMANDS = [
   'init', 'status', 'capture', 'feedback', 'tray', 'switch', 'health',
   'telemetry', 'trace', 'vault', 'checkpoint', 'remember', 'recap',
   'forget', 'save', 'explain', 'gate', 'receipt', 'run', 'jobs',
-  'approve', 'gov', 'deck', 'mcp', 'doctor', 'uninstall', 'demo', 'help',
+  'approve', 'gov', 'deck', 'mcp', 'doctor', 'update', 'uninstall', 'demo', 'help',
 ];
 switch (cmd) {
   case 'init':
@@ -222,6 +224,9 @@ switch (cmd) {
     break;
   case 'doctor':
     process.exitCode = doctor(process.argv.slice(3));
+    break;
+  case 'update':
+    process.exitCode = await update(process.argv.slice(3));
     break;
   case 'uninstall':
     await uninstall(process.argv.slice(3));
