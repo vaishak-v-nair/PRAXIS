@@ -37,7 +37,21 @@ const tmp = (n) => fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-live-t-' + n + 
  * One live run, entirely on fixtures. Everything the real command does happens
  * here except spending tokens.
  */
-async function liveRun({ mode = 'ok', timeoutMs = 30000, judgeFn, session } = {}) {
+/**
+ * Every test in this file spawns a real node fixture agent, and most spawn a
+ * judge fixture too — while `node --test` is running the other test files in
+ * parallel. On a 2-core CI runner that contention makes process startup an
+ * order of magnitude slower than it is locally, and these timeouts were
+ * calibrated on a fast machine. The result was a suite that went red on a
+ * different test each run and passed on a rerun with no code change, which
+ * trains everyone to ignore a red build.
+ *
+ * The waits below are therefore generous ON CI ONLY: local runs keep their
+ * original speed, and a genuine hang still fails, just later.
+ */
+export const SLOW = process.env.CI ? 4 : 1;
+
+async function liveRun({ mode = 'ok', timeoutMs = 30000 * SLOW, judgeFn, session } = {}) {
   const home = tmp('home');
   const keys = tmp('keys');
   const keep = path.join(tmp('keep'), 'receipts');
@@ -169,7 +183,11 @@ test('a judge that cannot be reached does NOT throw away a real receipt', async 
 });
 
 test('live gives up rather than waiting forever, and kills what it started', async () => {
-  const res = await liveRun({ mode: 'hang', timeoutMs: 2500 });
+  // The one test that WANTS a short timeout — it is asserting the give-up path.
+  // It still needs CI headroom: if the fixture cannot even start inside the
+  // budget, the run fails for a different reason and the assertion below reads
+  // as a broken timeout rather than a slow runner.
+  const res = await liveRun({ mode: 'hang', timeoutMs: 2500 * SLOW });
   assert.equal(res.ok, false);
   assert.equal(res.reason, 'timed-out');
 });

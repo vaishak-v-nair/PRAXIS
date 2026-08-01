@@ -62,18 +62,71 @@ export function createJob(praxisDir, { id, task, tool, argv, cwd, now }) {
   return { dir, metaFile: path.join(dir, 'meta.json'), outFile: path.join(dir, 'out.log'), errFile: path.join(dir, 'err.log') };
 }
 
-export function readMeta(praxisDir, id) {
-  const file = path.join(jobDir(praxisDir, id), 'meta.json');
-  // One retry: on Windows a rename can briefly deny the reader (EPERM/EBUSY),
-  // and a null meta reads to the deck as a job that never existed.
+/**
+ * Sleep, synchronously, for a couple of milliseconds.
+ *
+ * readMeta is sync and called from sync render paths, so the usual answer
+ * (await a timer) is not available. Atomics.wait on a throwaway buffer is the
+ * one honest way to pause a synchronous function in Node.
+ */
+function pauseSync(ms) {
+  try {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  } catch {
+    /* SharedArrayBuffer unavailable: fall through and just retry immediately */
+  }
+}
+
+/**
+ * The retry policy, separated from the filesystem so it can be tested for what
+ * it actually promises rather than by racing a real process.
+ *
+ * Proving "the second read wins" against a live detached child is not something
+ * a test can do honestly: Node's own startup is tens of milliseconds, longer
+ * than the window being tested, so such a test measures process boot and calls
+ * it a race. Injecting the read makes the contract checkable in microseconds.
+ *
+ * @param {() => string} readFn returns the file's contents, or throws
+ * @param {(ms: number) => void} pauseFn
+ */
+export function readMetaWith(readFn, pauseFn = pauseSync) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return JSON.parse(fs.readFileSync(file, 'utf8'));
+      const meta = JSON.parse(readFn());
+      // Valid JSON without an id is a partial write that happened to parse.
+      // Treat it as not-yet-there rather than as truth.
+      if (meta && typeof meta === 'object' && meta.id) return meta;
     } catch {
-      if (attempt) return null;
+      /* mid-write, denied, or genuinely absent — the retry decides which */
     }
+    if (!attempt) pauseFn(5);
   }
   return null;
+}
+
+export function readMeta(praxisDir, id) {
+  const file = path.join(jobDir(praxisDir, id), 'meta.json');
+  // Two processes own this file — the CLI that starts a job and the detached
+  // runner it spawns — and writeMeta is a plain writeFileSync, because the
+  // rename-based fix was tried and reverted (see above: on Windows it turned a
+  // rare read race into a constant write failure).
+  //
+  // So the reader has to absorb the race, and the previous version could not:
+  // it retried TWICE IN A TIGHT LOOP, microseconds apart, which is no wait at
+  // all. A file caught mid-write failed both attempts and returned null — and
+  // listJobs turns a null into `{ id, status: 'unknown' }`, a row with no task
+  // name, no mode and no goal. The deck then shows a job that looks like it
+  // never existed, for no reason other than having been glanced at while it was
+  // being written. Backing off across a few attempts costs ~15 ms in the worst
+  // case and nothing at all in the common one, because the first read wins.
+  // ONE retry, after a real pause. The write window is a single writeFileSync
+  // of a few hundred bytes — sub-millisecond — so one wait clears it. More
+  // attempts would not help: Windows timer granularity is ~15.6 ms, so every
+  // pause costs at least that whatever you ask for, and listJobs calls this
+  // once PER JOB. Four retries measured 62 ms on a file that was never going to
+  // become readable, which would make `praxis jobs` crawl for anyone holding a
+  // single corrupt job directory. Bounded at one.
+  return readMetaWith(() => fs.readFileSync(file, 'utf8'));
 }
 
 export function updateMeta(praxisDir, id, patch) {
