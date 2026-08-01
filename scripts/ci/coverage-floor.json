@@ -1,7 +1,8 @@
 {
-  "line": 81,
+  "line": 80,
   "branch": 72,
   "funcs": 85,
   "updated": "2026-08-01",
-  "why": "Set a point under the 2026-08-01 measurement (82.04 / 73.54 / 86.21) so ordinary cross-platform variance does not turn the build red for nothing. Raise it with --update when a real jump lands; never lower it quietly."
+  "platform": "linux",
+  "why": "Calibrated on ubuntu, because that is where the gate runs. Coverage is platform-dependent: src/commands/tray.js has win32-only branches that execute on Windows and not on Linux, so a local Windows run reads about a point HIGHER (81.8 line vs 80.7). The first version of this file was set from a Windows measurement and failed CI on the platform it was meant to guard. Measured 80.70 / 73.23 / 86.01; floors sit just under. Raise with --update on a Linux run; never lower quietly."
 }

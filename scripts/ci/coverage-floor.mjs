@@ -82,20 +82,38 @@ function main() {
   }
 
   if (update) {
-    const next = { ...actual, updated: new Date().toISOString().slice(0, 10) };
+    const prev = ifReadable(FLOOR_FILE);
+    const next = {
+      ...actual,
+      updated: new Date().toISOString().slice(0, 10),
+      platform: process.platform,
+      why: (prev && prev.why) || 'Raised with --update.',
+    };
     fs.writeFileSync(FLOOR_FILE, JSON.stringify(next, null, 2) + '\n');
-    console.log(`floor raised to line ${next.line} / branch ${next.branch} / funcs ${next.funcs}`);
+    console.log(`floor raised to line ${next.line} / branch ${next.branch} / funcs ${next.funcs} (measured on ${next.platform})`);
     console.log('commit scripts/ci/coverage-floor.json so the new standard is the agreed one');
     return;
   }
 
   const floor = readFloor();
   const res = checkFloor(actual, floor);
+  console.log(`  measured on ${process.platform}; floor calibrated on ${floor.platform || 'unrecorded'}\n`);
   for (const m of res.results) {
     const mark = m.ok ? 'ok  ' : 'FAIL';
     console.log(`  ${mark} ${m.metric.padEnd(7)} ${m.actual.toFixed(2).padStart(6)}%  floor ${m.floor.toFixed(2)}%`);
   }
   if (!res.ok) {
+    // Coverage is platform-dependent — src/commands/tray.js alone has win32-only
+    // branches — so a floor calibrated on one OS and enforced on another fails
+    // for reasons that have nothing to do with anybody's tests. Say so here,
+    // because the first version of this gate did exactly that.
+    if (floor.platform && floor.platform !== process.platform) {
+      console.error(
+        `\nNote: this floor was calibrated on ${floor.platform} and you are on ${process.platform}. ` +
+          'Platform-specific branches make those numbers differ by about a point. ' +
+          'Compare like with like before concluding coverage dropped.',
+      );
+    }
     console.error(
       '\nCoverage fell below the floor. Either add the tests, or raise the floor on purpose:\n' +
         '    node scripts/ci/coverage-floor.mjs --update\n' +
@@ -104,6 +122,14 @@ function main() {
     process.exit(1);
   }
   console.log(`\nPASS  at or above the floor set ${floor.updated}`);
+}
+
+function ifReadable(f) {
+  try {
+    return JSON.parse(fs.readFileSync(f, 'utf8'));
+  } catch {
+    return null;
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('coverage-floor.mjs')) main();
