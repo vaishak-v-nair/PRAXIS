@@ -61,7 +61,14 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
-      - run: npm test
+      # The SAME runner ci.yml uses, not a bare `npm test`. It caps how many
+      # test files run at once on CI, and 17 of the 39 spawn node children of
+      # their own — uncapped on a two-core runner they compete to fork and one
+      # fails outright. This job blocks a publish, so a flake here fails a
+      # release AFTER the tag is pushed, and npm versions are immutable.
+      # Two runners of one suite must not disagree about how to run it.
+      - name: npm test
+        run: node scripts/ci/run-tests.mjs
 
   pack-smoke:
     if: github.repository == 'vaishak-v-nair/PRAXIS'

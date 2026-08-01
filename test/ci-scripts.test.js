@@ -168,6 +168,30 @@ test('nothing PRAXIS spawns may flash a console window', () => {
   assert.deepEqual(offenders, [], 'every spawn must pass windowsHide: true');
 });
 
+test('every workflow runs the suite through the same runner', () => {
+  // This drifted three separate times in one day: coverage-floor.mjs ran the
+  // suite itself uncapped, release.yml ran a bare `npm test`, and both went red
+  // while ci.yml went green on identical code. A bare `npm test` skips the
+  // concurrency cap, and 17 of 39 test files spawn node children — uncapped on
+  // a two-core runner they compete to fork and one fails outright.
+  //
+  // The release job is the one that matters: it blocks a publish, so a flake
+  // there fails a release AFTER the tag is pushed, and npm versions are
+  // immutable.
+  const workflows = fs.readdirSync('.github/workflows').filter((f) => f.endsWith('.yml'));
+  const offenders = [];
+  for (const w of workflows) {
+    const src = fs.readFileSync(`.github/workflows/${w}`, 'utf8');
+    for (const [i, line] of src.split('\n').entries()) {
+      // a step that runs the suite must go through run-tests.mjs
+      if (/^\s*(-\s*)?run:\s*(npm\s+test|node\s+--test)\b/.test(line)) {
+        offenders.push(`${w}:${i + 1} ${line.trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'run the suite via scripts/ci/run-tests.mjs, not a bare npm test');
+});
+
 test('test files run capped on CI and uncapped locally', () => {
   // 17 of 39 test files spawn real child processes. node --test defaults to one
   // file per CPU, so on a two-core runner several spawn-heavy files competed for
