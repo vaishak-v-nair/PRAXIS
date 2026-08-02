@@ -119,3 +119,20 @@ test('renderMarkdown with no judged claims says evidence-only', async () => {
   const md = renderMarkdown(loadReceipt(dir, r.id));
   assert.match(md, /Evidence only — no claims judged yet/);
 });
+
+test('renderMarkdown escapes a claim so it cannot break out of its list item', async () => {
+  const dir = sandbox();
+  // a hostile/careless judge output: newlines plus markdown control chars —
+  // must not be able to inject a heading, checkbox, table or mention into
+  // whatever PR body this markdown gets pasted into.
+  const hostileClaim = 'fine\n\n# pwned\n\n- [ ] not a real checkbox\n| a | table |';
+  const judge = async () => ({ ok: true, verdicts: [{ claim: hostileClaim, verdict: 'TRUE' }] });
+  const r = await recordReceipt(dir, TR, { verify: true, judge });
+  const md = renderMarkdown(loadReceipt(dir, r.id, r.version));
+  const claimsSection = md.slice(md.indexOf('**Claims**'));
+  assert.doesNotMatch(claimsSection, /\n# pwned/);
+  assert.doesNotMatch(claimsSection, /\n- \[ \]/);
+  assert.doesNotMatch(claimsSection, /\n\|/);
+  // the claim still shows up, just as inert single-line text
+  assert.match(claimsSection, /fine.*pwned.*not a real checkbox/s);
+});

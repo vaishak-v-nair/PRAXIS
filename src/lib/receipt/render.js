@@ -167,10 +167,21 @@ function mdIntegrityLine(chain) {
   return 'chain intact · not yet sealed';
 }
 
+// Claim text comes from the judge — a model — not from us. A newline or stray
+// markdown control character in a claim must not be able to break out of its
+// list item and inject headings, tables, checkboxes or mentions into the PR
+// body this gets pasted into.
+function mdEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/\r\n|\r|\n/g, ' ')
+    .replace(/[\\`*_{}[\]()#+!|>~]/g, (c) => '\\' + c);
+}
+
 function mdClaimLine(v) {
-  if (v.verdict === 'TRUE') return `- ✅ ${v.claim}`;
-  if (v.verdict === 'FALSE') return `- ❌ ${v.claim} — **FALSE**`;
-  return `- ❔ ${v.claim} _(unverifiable)_`;
+  const claim = mdEsc(v.claim);
+  if (v.verdict === 'TRUE') return `- ✅ ${claim}`;
+  if (v.verdict === 'FALSE') return `- ❌ ${claim} — **FALSE**`;
+  return `- ❔ ${claim} _(unverifiable)_`;
 }
 
 /** Render a loaded receipt as GitHub-flavored markdown — meant to be pasted or
