@@ -13,7 +13,7 @@ import { projectPaths } from '../lib/paths.js';
 import { transcriptDir, newestTranscript } from '../lib/transcript.js';
 import { recordReceipt } from '../lib/receipt/record.js';
 import { judge as realJudge } from '../lib/receipt/judge.js';
-import { loadReceipt, listReceipts, renderTerminal, renderHtml } from '../lib/receipt/render.js';
+import { loadReceipt, listReceipts, renderTerminal, renderHtml, renderMarkdown } from '../lib/receipt/render.js';
 import { verifyFile } from '../lib/receipt/store.js';
 import { wantsJson, emitJson } from '../lib/jsonout.js';
 import { bold, grey, sage, rose, amber, dim } from '../lib/ui.js';
@@ -254,10 +254,22 @@ export async function receipt(argv = []) {
     return;
   }
 
-  if (json && !flags.has('--html') && !flags.has('--open')) {
+  if (json && !flags.has('--html') && !flags.has('--open') && !flags.has('--md')) {
     // loadReceipt already carries the chain check; a reader gets the receipt
     // AND whether to believe it in one document.
     emitJson({ ok: true, receipt: loaded });
+    return;
+  }
+
+  // --md — GitHub-flavored markdown on stdout, meant to be pasted or piped
+  // straight into a PR body (`praxis receipt --md >> body.md`).
+  if (flags.has('--md')) {
+    const md = renderMarkdown(loaded);
+    if (json) {
+      emitJson({ ok: true, markdown: md });
+      return;
+    }
+    console.log(md);
     return;
   }
 

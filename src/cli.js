@@ -65,7 +65,7 @@ function help() {
     ]],
     [bold('The daily four') + ' ' + grey('— most days you need nothing else (and the hooks run these for you)'), [
       [`${c} status`, 'memory, session health, latest receipt verdict'],
-      [`${c} receipt`, `proof of what the AI did ${grey('· --html share card · --list')}`],
+      [`${c} receipt`, `proof of what the AI did ${grey('· --html share card · --md for PRs · --list')}`],
       [`${c} receipt verify <file>`, grey('offline proof — chain + signature, free'), 'sub'],
       [`${c} receipt --verify`, grey('judge this session — one paid model call'), 'sub'],
       [`${c} recap`, 'catch me up on this project, right in the terminal'],

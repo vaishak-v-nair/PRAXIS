@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { recordReceipt } from '../src/lib/receipt/record.js';
-import { loadReceipt, listReceipts, renderTerminal, renderHtml } from '../src/lib/receipt/render.js';
+import { loadReceipt, listReceipts, renderTerminal, renderHtml, renderMarkdown } from '../src/lib/receipt/render.js';
 
 function sandbox() {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-ren-'));
@@ -77,4 +77,45 @@ test('claims render with per-verdict markers, terminal and HTML', async () => {
   assert.match(out, /did a real thing/);
   assert.match(out, /FALSE/);
   assert.match(renderHtml(loadReceipt(dir, r.id, r.version)), /did a real thing/);
+});
+
+test('renderMarkdown on a missing receipt says so, does not throw', () => {
+  assert.match(renderMarkdown(null), /No such receipt/);
+});
+
+test('renderMarkdown includes id, verdict, and a work/integrity table', async () => {
+  const dir = sandbox();
+  const r = await recordReceipt(dir, TR, { verify: false });
+  const md = renderMarkdown(loadReceipt(dir, r.id));
+  assert.match(md, new RegExp(r.id));
+  assert.match(md, /UNVERIFIED/);
+  assert.match(md, /\| work \|/);
+  assert.match(md, /1 command/);
+  assert.match(md, /1 file/);
+  assert.match(md, /\| integrity \|/);
+});
+
+test('renderMarkdown renders claims as a GFM list with per-verdict markers', async () => {
+  const dir = sandbox();
+  const judge = async () => ({
+    ok: true,
+    verdicts: [
+      { claim: 'did a real thing', verdict: 'TRUE' },
+      { claim: 'did a fake thing', verdict: 'FALSE' },
+      { claim: 'did an unclear thing', verdict: 'UNVERIFIABLE' },
+    ],
+  });
+  const r = await recordReceipt(dir, TR, { verify: true, judge });
+  const md = renderMarkdown(loadReceipt(dir, r.id, r.version));
+  assert.match(md, /1 TRUE · 1 FALSE · 1 UNVERIFIABLE/);
+  assert.match(md, /- ✅ did a real thing/);
+  assert.match(md, /- ❌ did a fake thing — \*\*FALSE\*\*/);
+  assert.match(md, /- ❔ did an unclear thing _\(unverifiable\)_/);
+});
+
+test('renderMarkdown with no judged claims says evidence-only', async () => {
+  const dir = sandbox();
+  const r = await recordReceipt(dir, TR, { verify: false });
+  const md = renderMarkdown(loadReceipt(dir, r.id));
+  assert.match(md, /Evidence only — no claims judged yet/);
 });

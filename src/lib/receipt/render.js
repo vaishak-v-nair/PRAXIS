@@ -144,6 +144,67 @@ export function renderTerminal(r, { suggestVerify = true } = {}) {
   return L.join('\n');
 }
 
+// ── Markdown render (GitHub-flavored, for PR bodies) ─────────────────────────
+
+function mdVerdictBadge(v) {
+  switch (v) {
+    case 'VERIFIED':
+      return '✅ **VERIFIED**';
+    case 'CLAIMS_FAILED':
+      return '❌ **CLAIMS FAILED**';
+    case 'PARTIAL':
+      return '⚠️ **PARTIAL**';
+    case 'NO_CLAIMS':
+      return '· NO CLAIMS';
+    default:
+      return '· UNVERIFIED';
+  }
+}
+
+function mdIntegrityLine(chain) {
+  if (!chain || !chain.ok) return '🔴 chain broken' + (chain && chain.at != null ? ` at line ${chain.at}` : '');
+  if (chain.finalized) return '🟢 chain intact · signature valid';
+  return 'chain intact · not yet sealed';
+}
+
+function mdClaimLine(v) {
+  if (v.verdict === 'TRUE') return `- ✅ ${v.claim}`;
+  if (v.verdict === 'FALSE') return `- ❌ ${v.claim} — **FALSE**`;
+  return `- ❔ ${v.claim} _(unverifiable)_`;
+}
+
+/** Render a loaded receipt as GitHub-flavored markdown — meant to be pasted or
+ *  piped straight into a PR body. Pass renderMarkdown(loadReceipt(...)). */
+export function renderMarkdown(r) {
+  if (!r) return 'No such receipt.\n';
+  const ev = r.evidence || {};
+  const L = [];
+  L.push(`### PRAXIS receipt \`${r.id}${r.version > 1 ? `.v${r.version}` : ''}\` — ${mdVerdictBadge(r.verdict)}`);
+  L.push('');
+  L.push('| | |');
+  L.push('|---|---|');
+  L.push(`| session | \`${shortId(r.sessionId)}\` |`);
+  L.push(`| work | ${workBits(ev.counts).join(', ') || '_no recorded activity_'} |`);
+  if (ev.channels_harvested && ev.channels_harvested.length) L.push(`| channels | ${ev.channels_harvested.join(', ')} |`);
+  L.push(`| integrity | ${mdIntegrityLine(r.chain)} |`);
+  if (r.sealed && r.finalizedAt) L.push(`| sealed | ${r.finalizedAt} |`);
+  L.push('');
+
+  const claims = (r.claims || []).filter((v) => v.verdict !== 'NOT_A_CLAIM');
+  if (claims.length) {
+    const t = claims.filter((v) => v.verdict === 'TRUE').length;
+    const f = claims.filter((v) => v.verdict === 'FALSE').length;
+    const u = claims.filter((v) => v.verdict === 'UNVERIFIABLE').length;
+    L.push(`**Claims** — ${t} TRUE · ${f} FALSE · ${u} UNVERIFIABLE`);
+    L.push('');
+    for (const v of claims) L.push(mdClaimLine(v));
+  } else {
+    L.push('_Evidence only — no claims judged yet._');
+  }
+  L.push('');
+  return L.join('\n');
+}
+
 // ── HTML render (self-contained, shareable) ──────────────────────────────────
 
 function esc(s) {
