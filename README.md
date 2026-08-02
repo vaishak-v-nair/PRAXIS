@@ -164,7 +164,7 @@ praxis switch <tool>  # pack a handoff brief and move to gemini / codex / claude
 praxis checkpoint     # save the whole session to md files, then /compact and keep going
 praxis trace          # the AI context behind a commit (on · off · log · <hash>)
 praxis gate [ref]     # slop-risk score for a commit — triage before you review
-praxis receipt        # proof of what the AI did this session (--html · --list)
+praxis receipt        # proof of what the AI did this session (--html · --md · --list)
 praxis receipt verify <file>   # offline proof: chain + signature, free
 praxis receipt --verify        # judge this session's claims (one model call)
 praxis doctor         # what's set up, what broke, and the fix for each — a local read
@@ -322,6 +322,9 @@ silently by the same Stop hook, zero model calls, zero seconds added.
   `UNVERIFIED`, honestly.
 - **`praxis receipt --html`** — a self-contained card you can attach to a PR
   or send to whoever asked "is it actually done?". Opens offline, no tracking.
+- **`praxis receipt --md`** — the same receipt as GitHub-flavored markdown on
+  stdout, for pasting or piping straight into a PR body: `praxis receipt --md
+  >> body.md`.
 
 Receipts are tamper-*evident*, not tamper-proof: the final line signs the
 whole chain, so nothing can be quietly rewritten after sealing. The format is
