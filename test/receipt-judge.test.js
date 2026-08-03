@@ -116,8 +116,9 @@ test.after(() => {
   delete process.env.PRAXIS_JUDGE_FIXTURE_MODE;
 });
 
-test('rule 5: the judge is told commands are attempts, not outcomes', () => {
+test('rule 5: the judge is told commands are attempts, and how to use paired outcomes', () => {
   const p = buildJudgePrompt({ commands_run: [] }, []);
-  assert.match(p, /ATTEMPTS, not outcomes/);
+  assert.match(p, /commands_run records ATTEMPTS/);
+  assert.match(p, /'ok'.*'error'.*'unknown'/s);
   assert.match(p, /blocked\/failed/);
 });

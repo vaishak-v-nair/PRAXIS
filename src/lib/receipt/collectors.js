@@ -27,9 +27,11 @@
 //      record harvests tool INVOCATIONS; a command denied by permissions or
 //      failed at runtime looks identical to one that ran. The judge once ruled
 //      "npm publish was blocked" FALSE because `npm publish` appeared in the
-//      record — but that line was the DENIED attempt itself. Until outcomes are
-//      paired in (roadmap), the record must say so and the judge must treat
-//      presence as attempt-only.
+//      record — but that line was the DENIED attempt itself. Each command is now
+//      paired with the outcome of its matching tool_result ('ok' | 'error'), but
+//      pairing is itself best-effort: no matching tool_result in this transcript
+//      means 'unknown', and 'unknown' must still be treated as attempt-only —
+//      never proof the command succeeded or failed.
 
 import { redact } from '../redact.js';
 import { asLines } from '../transcript.js';
@@ -61,6 +63,34 @@ function walk(text, onTool) {
 }
 
 /**
+ * Pair tool_use invocations with their outcome. A tool_result lives in a
+ * `type: 'user'` transcript entry, carrying the `tool_use_id` it answers and
+ * an `is_error` flag. Returns a Map from tool_use id to 'ok' | 'error' — an id
+ * with no entry means no matching tool_result was found in this transcript.
+ */
+function collectToolOutcomes(text) {
+  const outcomes = new Map();
+  for (const line of asLines(text)) {
+    if (!line.trim()) continue;
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!e || e.isSidechain || e.type !== 'user' || !e.message) continue;
+    const content = e.message.content;
+    const items = Array.isArray(content) ? content : [];
+    for (const item of items) {
+      if (item && item.type === 'tool_result' && typeof item.tool_use_id === 'string') {
+        outcomes.set(item.tool_use_id, item.is_error === true ? 'error' : 'ok');
+      }
+    }
+  }
+  return outcomes;
+}
+
+/**
  * Collect deterministic evidence from a session transcript (raw JSONL text).
  * Pure and side-effect free — the same input always yields the same record, so
  * retro capture, the Stop hook, and finalize all produce identical evidence.
@@ -70,21 +100,26 @@ function walk(text, onTool) {
  */
 export function collectEvidence(transcriptText) {
   const channels = new Set(); // tool names that carried a command (rule 1)
-  const commands = []; // { channel, command } — redacted, never truncated (rule 3)
+  const commands = []; // { channel, command, outcome } — redacted, never truncated (rule 3)
   const filesEdited = new Set();
   const gitActivity = [];
   const testActivity = [];
   const buildActivity = [];
+  const outcomes = collectToolOutcomes(transcriptText);
+  const outcomeCounts = { ok: 0, error: 0, unknown: 0 };
 
   const turns = walk(transcriptText, (item) => {
     const input = item.input || {};
     if (typeof input.command === 'string' && input.command.trim()) {
       channels.add(item.name);
       const command = redact(input.command); // secrets out, length intact (rule 3)
-      commands.push({ channel: item.name, command });
-      if (GIT_RE.test(input.command)) gitActivity.push({ channel: item.name, command });
-      if (TEST_RE.test(input.command)) testActivity.push({ channel: item.name, command });
-      if (BUILD_RE.test(input.command)) buildActivity.push({ channel: item.name, command });
+      const outcome = (typeof item.id === 'string' && outcomes.get(item.id)) || 'unknown';
+      outcomeCounts[outcome]++;
+      const entry = { channel: item.name, command, outcome };
+      commands.push(entry);
+      if (GIT_RE.test(input.command)) gitActivity.push(entry);
+      if (TEST_RE.test(input.command)) testActivity.push(entry);
+      if (BUILD_RE.test(input.command)) buildActivity.push(entry);
     }
     if ((item.name === 'Edit' || item.name === 'Write' || item.name === 'NotebookEdit') && typeof input.file_path === 'string') {
       filesEdited.add(input.file_path);
@@ -96,7 +131,8 @@ export function collectEvidence(transcriptText) {
     channels_harvested: [...channels].sort(),
     completeness_note:
       'commands_run covers the harvested channels only. Channels not listed are unknown to this record; within harvested channels the list is complete. Absence of an action here means UNVERIFIABLE, never FALSE. ' +
-      'IMPORTANT: commands_run records tool INVOCATIONS (attempts) — it does not record whether a command succeeded, failed, or was denied by a permission system. The presence of a command proves it was attempted, never that it executed successfully; a claim that a command was blocked or failed cannot be ruled FALSE by its presence alone.',
+      'IMPORTANT: commands_run records tool INVOCATIONS (attempts). The presence of a command proves it was attempted, never that it executed successfully; a claim that a command was blocked or failed cannot be ruled FALSE by its presence alone. ' +
+      `Each command now carries a paired outcome ('ok' | 'error' | 'unknown') from its matching tool_result in this transcript: ${outcomeCounts.ok} ok, ${outcomeCounts.error} error, ${outcomeCounts.unknown} unknown (no matching tool_result found). Treat 'unknown' exactly like presence-only evidence — never proof of success or failure; 'ok'/'error' are real outcome evidence and may be cited directly.`,
     commands_run: commands,
     files_edited: [...filesEdited].sort(),
     git_activity: gitActivity,
