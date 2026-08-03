@@ -185,6 +185,34 @@ test('a sidechain tool_result is not attributed to the main session (rule 4)', (
   assert.equal(ev.commands_run[0].outcome, 'unknown');
 });
 
+test('a piped command reporting ok is downgraded to unknown (pipefail masking, P1 review fix)', () => {
+  // without `set -o pipefail`, this exit status is tail's alone — npm publish
+  // itself could have failed and the tool_result would still say is_error:false
+  const text = [
+    asst([toolWithId('t1', 'Bash', { command: 'npm publish 2>&1 | tail -15' })]),
+    toolResult('t1', { isError: false }),
+  ].join('\n');
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'unknown');
+});
+
+test('a piped command reporting error is NOT downgraded — the last command failing is real either way', () => {
+  const text = [
+    asst([toolWithId('t1', 'Bash', { command: 'npm publish 2>&1 | tail -15' })]),
+    toolResult('t1', { isError: true }),
+  ].join('\n');
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'error');
+});
+
+test('an OR chain (||) is not mistaken for a masking pipe', () => {
+  const text = [asst([toolWithId('t1', 'Bash', { command: 'npm test || echo failed' })]), toolResult('t1', { isError: false })].join(
+    '\n',
+  );
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'ok');
+});
+
 test('completeness_note reports outcome coverage: ok, error, and unknown counts', () => {
   const text = [
     asst([

@@ -43,6 +43,15 @@ const GIT_RE = /\bgit\s+(commit|push|tag|merge|rebase|cherry-pick|revert)\b/;
 const TEST_RE = /\b(npm\s+(?:run\s+)?test|npx\s+(?:vitest|jest|playwright)|vitest|jest|pytest|go\s+test|cargo\s+test|node\s+--test|rspec|phpunit)\b/;
 const BUILD_RE = /\b(npm\s+run\s+build|next\s+build|vite\s+build|tsc\b|go\s+build|cargo\s+build|make\b)\b/;
 
+// Without `set -o pipefail`, a shell pipeline's exit status is the LAST
+// command's alone — `npm publish 2>&1 | tail -15` can report success even
+// when `npm publish` itself failed, because `tail` succeeded. An 'ok' outcome
+// on a piped command is therefore not trustworthy evidence the whole pipeline
+// succeeded and must not be treated as real evidence (rule 5). An 'error'
+// outcome has no such masking problem — a failing last command is real either
+// way — so only 'ok' is downgraded.
+const UNMASKED_PIPE_RE = /(?<!\|)\|(?!\|)/;
+
 function walk(text, onTool) {
   let turns = 0;
   for (const line of asLines(text)) {
@@ -113,7 +122,8 @@ export function collectEvidence(transcriptText) {
     if (typeof input.command === 'string' && input.command.trim()) {
       channels.add(item.name);
       const command = redact(input.command); // secrets out, length intact (rule 3)
-      const outcome = (typeof item.id === 'string' && outcomes.get(item.id)) || 'unknown';
+      let outcome = (typeof item.id === 'string' && outcomes.get(item.id)) || 'unknown';
+      if (outcome === 'ok' && UNMASKED_PIPE_RE.test(input.command)) outcome = 'unknown'; // pipefail masking (rule 5)
       outcomeCounts[outcome]++;
       const entry = { channel: item.name, command, outcome };
       commands.push(entry);
