@@ -72,7 +72,7 @@ The deterministic record of what the agent did, harvested from the session
 transcript:
 
 ```json
-{"t":"evidence","channels_harvested":["Bash","PowerShell"],"completeness_note":"…","commands_run":[{"channel":"Bash","command":"npm test"}],"files_edited":["src/auth.js"],"git_activity":[…],"test_activity":[…],"build_activity":[…],"counts":{…},"hash":"…"}
+{"t":"evidence","channels_harvested":["Bash","PowerShell"],"completeness_note":"…","commands_run":[{"channel":"Bash","command":"npm test","outcome":"ok"}],"files_edited":["src/auth.js"],"git_activity":[…],"test_activity":[…],"build_activity":[…],"counts":{…},"hash":"…"}
 ```
 
 Iron rules the collector obeys (each learned from a real false accusation):
@@ -89,6 +89,12 @@ Iron rules the collector obeys (each learned from a real false accusation):
 - **Session-scoped attribution.** Evidence is this session's tool calls only.
   Repo-global state (git log) may appear only marked `"shared": true`, and may
   not be cited as proof against a session-scoped claim.
+- **Presence is an attempt, an outcome is evidence.** Each `commands_run` entry
+  carries an `outcome` of `"ok"`, `"error"`, or `"unknown"`, paired from that
+  invocation's `tool_result` in the transcript. `"unknown"` (no matching
+  `tool_result` found) must still be treated as attempt-only — never proof of
+  success or failure. A real `"ok"`/`"error"` outcome is genuine evidence and
+  may be cited directly.
 
 ### 3. `final` — always the last line of a sealed receipt
 
@@ -215,9 +221,10 @@ node test/fixtures/eval-run.mjs        # grades whatever PRAXIS_JUDGE_CMD points
 The bar is asymmetric on purpose: **zero false accusations** (every forbid
 rule at 100%) is non-negotiable — a verifier that falsely accuses once is
 worse than no verifier — while the allowed-set rate tolerates reasonable
-strictness differences (TRUE vs UNVERIFIABLE while command outcomes are
-unpaired). Judge-prompt changes must show a before/after scorecard and may
-never regress the false-accusation floor.
+strictness differences (TRUE vs UNVERIFIABLE when a command's outcome is
+`"unknown"` — no matching `tool_result` was found for that invocation).
+Judge-prompt changes must show a before/after scorecard and may never regress
+the false-accusation floor.
 
 ## How receipts get written
 

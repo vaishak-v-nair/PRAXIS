@@ -10,6 +10,14 @@ function asst(content) {
 function tool(name, input) {
   return { type: 'tool_use', name, input };
 }
+function toolWithId(id, name, input) {
+  return { type: 'tool_use', id, name, input };
+}
+function toolResult(toolUseId, { isError = false, content = 'ok', isSidechain = false } = {}) {
+  const line = { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: toolUseId, is_error: isError, content }] } };
+  if (isSidechain) line.isSidechain = true;
+  return JSON.stringify(line);
+}
 
 test('harvests commands from EVERY channel, not just Bash (the spike bug)', () => {
   const text = [
@@ -138,4 +146,84 @@ test('rule 5: the record says presence = attempt, never proof of success', () =>
   const ev = collectEvidence('');
   assert.match(ev.completeness_note, /INVOCATIONS \(attempts\)/);
   assert.match(ev.completeness_note, /cannot be ruled FALSE by its presence alone/);
+});
+
+test('pairs a command with an ok outcome from its matching tool_result', () => {
+  const text = [asst([toolWithId('t1', 'Bash', { command: 'npm test' })]), toolResult('t1', { isError: false })].join('\n');
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'ok');
+});
+
+test('pairs a command with an error outcome from its matching tool_result', () => {
+  const text = [
+    asst([toolWithId('t1', 'Bash', { command: 'npm publish' })]),
+    toolResult('t1', { isError: true, content: 'EACCES: permission denied' }),
+  ].join('\n');
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'error');
+});
+
+test('a command with no matching tool_result is unknown, never assumed ok or error', () => {
+  const ev = collectEvidence(asst([toolWithId('t1', 'Bash', { command: 'git push' })]));
+  assert.equal(ev.commands_run[0].outcome, 'unknown');
+});
+
+test('a tool_use with no id (older/synthetic transcript) is unknown, never crashes', () => {
+  const ev = collectEvidence(asst([tool('Bash', { command: 'ls' })]));
+  assert.equal(ev.commands_run[0].outcome, 'unknown');
+});
+
+test('outcome propagates into git/test/build activity, not just commands_run', () => {
+  const text = [asst([toolWithId('t1', 'Bash', { command: 'npm test' })]), toolResult('t1', { isError: true })].join('\n');
+  const ev = collectEvidence(text);
+  assert.equal(ev.test_activity[0].outcome, 'error');
+});
+
+test('a sidechain tool_result is not attributed to the main session (rule 4)', () => {
+  const text = [asst([toolWithId('t1', 'Bash', { command: 'npm test' })]), toolResult('t1', { isError: false, isSidechain: true })].join('\n');
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'unknown');
+});
+
+test('a piped command reporting ok is downgraded to unknown (pipefail masking, P1 review fix)', () => {
+  // without `set -o pipefail`, this exit status is tail's alone — npm publish
+  // itself could have failed and the tool_result would still say is_error:false
+  const text = [
+    asst([toolWithId('t1', 'Bash', { command: 'npm publish 2>&1 | tail -15' })]),
+    toolResult('t1', { isError: false }),
+  ].join('\n');
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'unknown');
+});
+
+test('a piped command reporting error is NOT downgraded — the last command failing is real either way', () => {
+  const text = [
+    asst([toolWithId('t1', 'Bash', { command: 'npm publish 2>&1 | tail -15' })]),
+    toolResult('t1', { isError: true }),
+  ].join('\n');
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'error');
+});
+
+test('an OR chain (||) is not mistaken for a masking pipe', () => {
+  const text = [asst([toolWithId('t1', 'Bash', { command: 'npm test || echo failed' })]), toolResult('t1', { isError: false })].join(
+    '\n',
+  );
+  const ev = collectEvidence(text);
+  assert.equal(ev.commands_run[0].outcome, 'ok');
+});
+
+test('completeness_note reports outcome coverage: ok, error, and unknown counts', () => {
+  const text = [
+    asst([
+      toolWithId('t1', 'Bash', { command: 'npm test' }),
+      toolWithId('t2', 'Bash', { command: 'npm publish' }),
+      toolWithId('t3', 'Bash', { command: 'git push' }),
+    ]),
+    toolResult('t1', { isError: false }),
+    toolResult('t2', { isError: true }),
+  ].join('\n');
+  const ev = collectEvidence(text);
+  assert.match(ev.completeness_note, /1 ok, 1 error, 1 unknown/);
+  assert.match(ev.completeness_note, /unknown.*presence-only|Treat 'unknown' exactly like presence-only/);
 });
