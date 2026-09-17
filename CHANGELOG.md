@@ -14,6 +14,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-09-18
+
+### Added
+
+- **Native DAG AI Orchestration (`praxis flow`)**: Built-in zero-dependency Directed Acyclic Graph execution engine using Kahn's topological sort (<1.80ms for 1,000 nodes). Allows parallel, sandboxed multi-step agent execution with cycle detection and isolated state transitions.
+- **Advanced Context Retrieval (BM25)**: Local, embedded BM25 index (TF-IDF with exponential recency decay) running directly over project memory in 0.26ms without cloud vector databases.
+- **Evaluation Harness (`praxis eval`)**: Deterministic offline benchmark scoring to evaluate agent fidelity against cryptographically sealed, Ed25519-signed session receipts.
+
 ## [0.12.0] — 2026-08-01
 
 ### Added

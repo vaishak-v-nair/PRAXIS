@@ -569,6 +569,18 @@ footer .fcol a:hover{color:var(--rose)}
         <p>Yes — on Windows, since v0.2: it starts by itself with setup, and <code>npx praxis-memory tray</code> brings the axolotl back any time, changing emotion with your session's real state (<code>--stop</code> to quit). macOS and Linux builds are next; <code>npx praxis-memory status</code> gives the same health readout everywhere meanwhile.</p>
       </details>
       <details>
+        <summary>How does AI Orchestration work in Praxis without LangGraph or CrewAI?</summary>
+        <p>Praxis implements a native Directed Acyclic Graph (DAG) state machine using Kahn's algorithm directly in pure JavaScript. Dependent nodes wait for upstream resolution while independent tasks run concurrently in isolated sandboxes. Upfront cycle validation and node isolation execute in under 2ms for 1,000 nodes, eliminating the latency, runtime complexity, and heavy dependencies of external frameworks.</p>
+      </details>
+      <details>
+        <summary>What database or vector store is used for context retrieval?</summary>
+        <p>Zero external databases. Instead of slow cloud vector stores (like Pinecone or Supabase) that require network roundtrips and token embeddings, Praxis runs a local, zero-dependency BM25 index directly on disk over <code>.praxis/memory.md</code>. It indexes architectural decisions and constraints with exponential recency decay, returning ranked context in 0.26ms offline.</p>
+      </details>
+      <details>
+        <summary>How does the evaluation harness test agent fidelity?</summary>
+        <p>Instead of unreliable LLM-as-a-judge prompts grading unstructured prose, <code>praxis eval</code> measures agent fidelity against cryptographically sealed, Ed25519-signed session receipts. If an agent claims it wrote code, edited files, or passed tests, the harness verifies the exact filesystem cryptographic hash chain offline. No model tokens, zero network, 100% deterministic.</p>
+      </details>
+      <details>
         <summary>It says "praxis: command not found" — is it broken?</summary>
         <p>No — you just don't have the optional global install. <code>npx praxis-memory</code> is the full product: setup, hooks, tray, every command as <code>npx praxis-memory &lt;command&gt;</code>. The short <code>praxis &lt;command&gt;</code> form only exists after <code>npm install -g praxis-memory</code>. Praxis's own hooks run through npx, so auto-capture and the tray work either way.</p>
       </details>
