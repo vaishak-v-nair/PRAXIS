@@ -356,6 +356,14 @@ work. Obsidian is where you write what *you* think; praxis fills in what the
 redacted like everything else, and `praxis vault off` disconnects any time
 (your notes stay).
 
+## AI Orchestration & Evaluation
+
+PRAXIS brings true agentic orchestration without the bloat of frameworks like LangChain or LangGraph. The core engine remains 100% native, zero-dependency, and strictly `<10ms` in overhead.
+
+- **Native DAG Engine (`praxis flow`)**: Orchestrate complex, multi-step agentic workflows where nodes are executed in parallel (topologically sorted). Each node is sandboxed, generating its own immutable receipts.
+- **Advanced Context Retrieval (BM25)**: PRAXIS doesn't just pass static context. It builds a sub-millisecond local BM25 index with recency weighting to intelligently feed the exact historical project decisions to the agent.
+- **Evaluation Harness (`praxis eval`)**: Built-in deterministic benchmark scoring to test agent fidelity against rigorous, off-line assertions.
+
 ## Safety
 
 - **Redaction** — before writing, Praxis strips common secrets (API keys, tokens,
@@ -385,6 +393,9 @@ version (0.x.y) just counts releases inside v0; the milestone that matters is v1
 - Checkpoint: save the whole session to markdown (+ Obsidian), `/compact`, continue in the same session — `praxis checkpoint`.
 - Receipts v0: a signed, tamper-evident record of what the AI did every session, with an opt-in adversarial judge for its claims — `praxis receipt` · [RECEIPT-SPEC.md](RECEIPT-SPEC.md).
 - MCP server: the praxis tools (receipt · verify · recall) live inside Claude Code automatically — registered at init, no command typed.
+- **Native AI Orchestration:** Run complex, multi-step Agentic workflows using the built-in, zero-dependency Directed Acyclic Graph (DAG) execution engine (`praxis flow`).
+- **Advanced Context Retrieval:** Sub-millisecond BM25 local index to accurately feed historical project memory into ongoing agent sessions with recency weighting.
+- **Evaluation Harness:** Offline, deterministic benchmark scoring for agent fidelity tests using `praxis eval`.
 
 **Still inside v0**
 - Tray companion for macOS and Linux.
