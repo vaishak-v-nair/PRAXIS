@@ -22,6 +22,8 @@ import { receipt } from './commands/receipt.js';
 import { run } from './commands/run.js';
 import { jobs } from './commands/jobs.js';
 import { approve } from './commands/approve.js';
+import { flow } from './commands/flow.js';
+import { evalCmd } from './commands/eval.js';
 import { gov } from './commands/gov.js';
 import { deck } from './commands/deck.js';
 import { mcp } from './commands/mcp.js';
@@ -74,6 +76,8 @@ function help() {
     [bold('The deck') + ' ' + grey('— Mission Control (new): agents working for you in the background'), [
       [`${c} deck`, 'Mission Control in your BROWSER — goal bar, fleet, approve buttons'],
       [`${c} gov "<goal>"`, `the Governor staffs the deck from one goal ${grey('· gov alone = the report')}`],
+      [`${c} flow`, `orchestrate multi-agent DAG pipelines ${grey('· flow run <spec>')}`],
+      [`${c} eval`, `offline agent benchmark harness ${grey('· eval <suite>')}`],
       [`${c} run "<task>"`, `hand a task to an agent, keep your terminal ${grey('· safe draft by default')}`],
       [`${c} jobs`, `every background job, honest status, last words ${grey('· jobs <id>')}`],
       [`${c} approve`, `the inbox: drafts wait for you ${grey('· approve <id> executes · --deny closes')}`],
@@ -100,7 +104,7 @@ function help() {
     console.log('');
   }
   console.log(`  ${bold('Also included')}
-  ${grey(`${c} switch <tool> · ${c} checkpoint · ${c} trace · ${c} gate · ${c} vault <path> · ${c} tray · ${c} telemetry · ${c} feedback`)}
+  ${grey(`${c} flow · ${c} eval · ${c} switch <tool> · ${c} checkpoint · ${c} trace · ${c} gate · ${c} vault <path> · ${c} tray · ${c} telemetry · ${c} feedback`)}
   ${grey(`${c} init · ${c} capture — setup and the (internal) Stop-hook entry`)}
   ${grey(`--json on status · receipt · jobs · doctor — one document on stdout, stable keys, same exit codes`)}
 
@@ -146,7 +150,7 @@ const COMMANDS = [
   'init', 'status', 'capture', 'feedback', 'tray', 'switch', 'health',
   'telemetry', 'trace', 'vault', 'checkpoint', 'remember', 'recap',
   'forget', 'save', 'explain', 'gate', 'receipt', 'run', 'jobs',
-  'approve', 'gov', 'deck', 'mcp', 'doctor', 'update', 'uninstall', 'demo', 'help',
+  'approve', 'gov', 'deck', 'flow', 'eval', 'mcp', 'doctor', 'update', 'uninstall', 'demo', 'help',
 ];
 switch (cmd) {
   case 'init':
@@ -218,6 +222,12 @@ switch (cmd) {
     break;
   case 'deck':
     await deck(process.argv.slice(3));
+    break;
+  case 'flow':
+    await flow(process.argv.slice(3));
+    break;
+  case 'eval':
+    await evalCmd(process.argv.slice(3));
     break;
   case 'mcp':
     await mcp();

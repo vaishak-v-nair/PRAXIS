@@ -29,10 +29,11 @@ export function resolveRunCmd(tool = 'claude') {
       return inj.trim().split(/\s+/);
     }
   }
-  // one adapter today; codex/gemini adapters are the roadmap, same shape.
-  // json output carries session_id — how a job finds its own transcript and
+  // claude and codex adapters today; gemini adapter is on the roadmap, same shape.
+  // json output carries session_id/thread_id — how a job finds its own transcript and
   // seals its receipt (the deck's "done" vs "proven" columns).
   if (tool === 'claude') return ['claude', '-p', '--output-format', 'json'];
+  if (tool === 'codex') return ['codex', 'exec', '--json'];
   return null;
 }
 
@@ -46,6 +47,15 @@ export function resolveRunCmd(tool = 'claude') {
  */
 export function buildAgentArgv(base, { mode = 'plan', extraArgs = [], injected = false } = {}) {
   if (injected) return [...base];
+  if (base[0] === 'codex') {
+    const sandboxMap = {
+      plan: 'read-only',
+      acceptEdits: 'workspace-write',
+      bypassPermissions: 'danger-full-access',
+    };
+    const sandbox = sandboxMap[mode] || 'read-only';
+    return [...base, ...extraArgs, '--sandbox', sandbox, '-'];
+  }
   return [...base, ...extraArgs, '--permission-mode', mode];
 }
 
@@ -106,6 +116,7 @@ export async function run(argv = []) {
     console.log('\n  ' + bold('praxis run "<task>"') + grey(' — hand a task to an agent, keep your terminal.'));
     console.log('  ' + grey('default  ') + 'SAFE DRAFT — questions get answered; write tasks produce a plan, nothing is touched');
     console.log('  ' + grey('flags    ') + '--allow-edits' + grey(' (file edits pre-approved) · ') + '--full-auto' + grey(' (everything allowed — trusted repos only)'));
+    console.log('  ' + grey('tools    ') + 'claude (default) · ' + '--codex' + grey(' (run via OpenAI Codex)'));
     console.log('  ' + grey('then     ') + `${c} jobs` + grey(' — the deck · ') + `${c} approve <id>` + grey(' — execute a draft') + '\n');
     return;
   }
@@ -119,7 +130,7 @@ export async function run(argv = []) {
 
   const r = await startJob({ task, tool, mode });
   if (r.error === 'no-adapter') {
-    console.log('\n  ' + rose('No adapter for ' + tool + ' yet') + grey(' — claude runs today; codex and gemini adapters are on the roadmap.') + '\n');
+    console.log('\n  ' + rose('No adapter for ' + tool + ' yet') + grey(' — claude and codex run today; gemini adapter is on the roadmap.') + '\n');
     process.exitCode = 1;
     return;
   }

@@ -36,5 +36,6 @@ export function projectPaths(cwd = process.cwd()) {
     settingsLocalFile: path.join(cwd, '.claude', 'settings.local.json'),
     commandsDir: path.join(cwd, '.claude', 'commands'),
     claudeMd: path.join(cwd, 'CLAUDE.md'),
+    agentsMd: path.join(cwd, 'AGENTS.md'),
   };
 }

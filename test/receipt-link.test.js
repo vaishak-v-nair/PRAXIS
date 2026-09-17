@@ -67,3 +67,52 @@ test('sealJobReceipt: no envelope session -> result tail only, no receipt, no th
   assert.equal(linked.receiptId, undefined);
   assert.equal(linked.resultTail, 'plain text output only');
 });
+
+test('parseEnvelope: a codex jsonl stream yields agent message result + thread id', () => {
+  const codexRaw = [
+    JSON.stringify({ type: 'thread.started', thread_id: 'th-codex-123' }),
+    JSON.stringify({ type: 'turn.started' }),
+    JSON.stringify({ type: 'item.completed', item: { id: 'it-1', type: 'agent_message', text: 'Implemented codex adapter.' } }),
+    JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 100, output_tokens: 50 } }),
+  ].join('\n');
+  const p = parseEnvelope(codexRaw);
+  assert.equal(p.sessionId, 'th-codex-123');
+  assert.equal(p.resultText, 'Implemented codex adapter.');
+});
+
+test('parseEnvelope: a codex jsonl error stream yields error message + thread id', () => {
+  const codexRaw = [
+    JSON.stringify({ type: 'thread.started', thread_id: 'th-err-456' }),
+    JSON.stringify({ type: 'turn.started' }),
+    JSON.stringify({ type: 'turn.failed', error: { message: 'Usage limit reached.' } }),
+  ].join('\n');
+  const p = parseEnvelope(codexRaw);
+  assert.equal(p.sessionId, 'th-err-456');
+  assert.equal(p.resultText, 'Usage limit reached.');
+});
+
+test('sealJobReceipt: seals receipt from out.log when tFile does not exist (Codex adapter)', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-link-codex-'));
+  const cwd = path.join(root, 'proj');
+  const home = path.join(root, 'home');
+  const praxisDir = path.join(cwd, '.praxis');
+  fs.mkdirSync(praxisDir, { recursive: true });
+  process.env.PRAXIS_KEY_DIR = path.join(root, 'keys');
+
+  const codexLog = [
+    JSON.stringify({ type: 'thread.started', thread_id: 'th-codex-sealed' }),
+    JSON.stringify({ type: 'item.completed', item: { type: 'command_execution', command: 'npm test' } }),
+    JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'Codex completed successfully.' } }),
+  ].join('\n');
+
+  const { dir } = createJob(praxisDir, { id: 'j-codex1', task: 'run codex', tool: 'codex', argv: [], cwd });
+  fs.writeFileSync(path.join(dir, 'out.log'), codexLog);
+
+  const linked = await sealJobReceipt(praxisDir, { id: 'j-codex1', cwd }, { home });
+  assert.ok(linked.receiptId, 'receipt sealed');
+  assert.equal(linked.sessionId, 'th-codex-sealed');
+  assert.equal(linked.receiptVerdict, 'UNVERIFIED');
+  assert.equal(linked.resultTail, 'Codex completed successfully.');
+  const v = verify(path.join(praxisDir, 'receipts'), linked.receiptId);
+  assert.ok(v.ok && v.finalized, 'chain intact and sealed');
+});

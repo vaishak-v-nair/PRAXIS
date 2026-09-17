@@ -139,3 +139,22 @@ test('rule 5: the record says presence = attempt, never proof of success', () =>
   assert.match(ev.completeness_note, /INVOCATIONS \(attempts\)/);
   assert.match(ev.completeness_note, /cannot be ruled FALSE by its presence alone/);
 });
+
+test('harvests commands, edited files, and claim prose from Codex JSONL events', () => {
+  const codexTranscript = [
+    JSON.stringify({ type: 'thread.started', thread_id: 'th-test' }),
+    JSON.stringify({ type: 'item.completed', item: { type: 'command_execution', command: 'npm test' } }),
+    JSON.stringify({ type: 'item.completed', item: { type: 'file_edit', path: 'src/adapter.js' } }),
+    JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'All tests pass and the adapter was updated.' } }),
+  ].join('\n');
+
+  const ev = collectEvidence(codexTranscript);
+  assert.equal(ev.commands_run.length, 1);
+  assert.equal(ev.commands_run[0].command, 'npm test');
+  assert.deepEqual(ev.files_edited, ['src/adapter.js']);
+  assert.equal(ev.test_activity.length, 1);
+
+  const claims = collectClaimProse(codexTranscript, { claimSignalOnly: true });
+  assert.equal(claims.length, 1);
+  assert.match(claims[0].text, /All tests pass/);
+});

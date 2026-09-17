@@ -86,6 +86,15 @@ export function claudeMdHasBlock(claudeMdFile) {
   }
 }
 
+export function agentsMdHasBlock(agentsMdFile) {
+  try {
+    const c = fs.readFileSync(agentsMdFile, 'utf8');
+    return c.includes(CLAUDEMD_START) || c.includes('This project uses PRAXIS so AI agents');
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Strip PRAXIS's hooks from a settings file, from every event, leaving every
  * other hook exactly where it was.
@@ -176,6 +185,35 @@ export function removeClaudeMdBlock(claudeMdFile) {
     return { changed: true, deleted: true };
   }
   fs.writeFileSync(claudeMdFile, without.replace(/^\n+/, '').trimEnd() + '\n');
+  return { changed: true, deleted: false };
+}
+
+/**
+ * Remove the managed block from AGENTS.md, and the file itself only if PRAXIS
+ * wrote every word of it.
+ */
+export function removeAgentsMdBlock(agentsMdFile) {
+  let content;
+  try {
+    content = fs.readFileSync(agentsMdFile, 'utf8');
+  } catch {
+    return { changed: false, deleted: false };
+  }
+  const start = content.indexOf(CLAUDEMD_START);
+  const end = content.indexOf(CLAUDEMD_END);
+  if (start === -1 || end === -1 || end < start) return { changed: false, deleted: false };
+
+  const without = (content.slice(0, start) + content.slice(end + CLAUDEMD_END.length))
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('This project uses PRAXIS so AI agents'))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+
+  if (!without.trim() || without.trim() === CLAUDEMD_HEADING) {
+    fs.rmSync(agentsMdFile, { force: true });
+    return { changed: true, deleted: true };
+  }
+  fs.writeFileSync(agentsMdFile, without.replace(/^\n+/, '').trimEnd() + '\n');
   return { changed: true, deleted: false };
 }
 

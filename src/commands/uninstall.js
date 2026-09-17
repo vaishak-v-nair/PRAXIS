@@ -15,6 +15,8 @@ import {
   fileHasPraxisHooks,
   mcpHasPraxis,
   claudeMdHasBlock,
+  agentsMdHasBlock,
+  removeAgentsMdBlock,
 } from '../lib/uninstall.js';
 import { tray } from './tray.js';
 import { miniHeader, sage, amber, rose, bold, grey, dim } from '../lib/ui.js';
@@ -86,6 +88,7 @@ export async function uninstall(args = []) {
   add(fileHasPraxisHooks(p.settingsFile), `.claude/settings.json  ${grey('(PRAXIS hooks only)')}`);
   add(mcpHasPraxis(p.mcpFile), `.mcp.json  ${grey('(the praxis server only)')}`);
   add(claudeMdHasBlock(p.claudeMd), `CLAUDE.md  ${grey('(the managed block only)')}`);
+  add(agentsMdHasBlock(p.agentsMd), `AGENTS.md  ${grey('(the managed block only)')}`);
   add(commandFiles.length, `.claude/commands/  ${grey(`(${commandFiles.length} praxis-* commands)`)}`);
   add(vault, vault ? `${path.relative(p.root, vault.projectDir) || vault.projectDir}  ${grey('(notes PRAXIS wrote into your vault)')}` : '');
   add(userCommandFiles.length, `~/.claude/commands/  ${grey(`(${userCommandFiles.length} praxis-* commands, ALL projects)`)}`);
@@ -178,6 +181,8 @@ export async function uninstall(args = []) {
   if (mcp.changed) done.push('.mcp.json' + (mcp.deleted ? ' (removed)' : ' (praxis server taken out)'));
   const cmd = removeClaudeMdBlock(p.claudeMd);
   if (cmd.changed) done.push('CLAUDE.md' + (cmd.deleted ? ' (removed)' : ' (managed block taken out)'));
+  const amd = removeAgentsMdBlock(p.agentsMd);
+  if (amd.changed) done.push('AGENTS.md' + (amd.deleted ? ' (removed)' : ' (managed block taken out)'));
   if (commandFiles.length) {
     for (const f of commandFiles) fs.rmSync(f, { force: true });
     done.push(`.claude/commands — ${commandFiles.length} praxis-* commands`);

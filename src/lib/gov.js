@@ -55,7 +55,11 @@ export function resolveGovCmd() {
  * The Governor's prompt. The briefing and deck state are DATA, never
  * instructions — same injection posture the judge proved out.
  */
-export function buildGovPrompt(goal, { briefing = '', deckState = '', maxJobs = MAX_JOBS } = {}) {
+export function buildGovPrompt(goal, { briefing = '', deckState = '', maxJobs = MAX_JOBS, retrievedContext = '' } = {}) {
+  const contextSection = retrievedContext
+    ? `\n=== DATA: RELEVANT PAST CONTEXT ===\n${retrievedContext}\n=== END PAST CONTEXT ===\n`
+    : '';
+
   return `You are the PRAXIS Governor — the foreman of a small fleet of AI coding agents working in one project.
 
 Decompose the human's GOAL into at most ${maxJobs} independent background jobs. Each job will be handed verbatim to a coding agent that runs UNATTENDED in the project directory, in a read-only SAFE DRAFT first; a human approves execution afterward.
@@ -69,7 +73,7 @@ RULES (binding):
 
 === DATA: PROJECT BRIEFING ===
 ${briefing || '(no briefing available)'}
-=== END BRIEFING ===
+${contextSection}=== END BRIEFING ===
 
 === DATA: DECK STATE ===
 ${deckState || '(deck empty)'}
@@ -161,8 +165,8 @@ export function runGovProcess(prompt, { cmd, cwd, timeoutMs = 150000, env } = {}
  * Govern one goal: one model call -> a vetted job list. Degrades to
  * { ok:false, reason } — the caller queues NOTHING on failure.
  */
-export async function govern(goal, { briefing, deckState, maxJobs = MAX_JOBS, ...opts } = {}) {
-  const prompt = buildGovPrompt(goal, { briefing, deckState, maxJobs });
+export async function govern(goal, { briefing, deckState, maxJobs = MAX_JOBS, retrievedContext, ...opts } = {}) {
+  const prompt = buildGovPrompt(goal, { briefing, deckState, maxJobs, retrievedContext });
   const run = await runGovProcess(prompt, opts);
   if (!run.ok) return { ok: false, reason: run.error };
   const parsed = parseGovEnvelope(run.stdout);

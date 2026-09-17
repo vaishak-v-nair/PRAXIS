@@ -51,10 +51,25 @@ function walk(text, onTool) {
     } catch {
       continue;
     }
-    if (!e || e.isSidechain || e.type !== 'assistant' || !e.message || !Array.isArray(e.message.content)) continue;
-    turns++;
-    for (const item of e.message.content) {
-      if (item && item.type === 'tool_use') onTool(item, turns);
+    if (!e || e.isSidechain) continue;
+    if (e.type === 'assistant' && e.message && Array.isArray(e.message.content)) {
+      turns++;
+      for (const item of e.message.content) {
+        if (item && item.type === 'tool_use') onTool(item, turns);
+      }
+      continue;
+    }
+    if (e.type === 'item.completed' || e.type === 'item.started') {
+      const item = e.item;
+      if (!item) continue;
+      if (e.type === 'item.completed') turns++;
+      if (item.type === 'command_execution' || item.type === 'shell_command') {
+        onTool({ name: 'command_execution', input: { command: item.command || '' } }, turns);
+      } else if (item.type === 'file_edit' || item.type === 'patch_applied' || item.type === 'file_write') {
+        onTool({ name: 'Edit', input: { file_path: item.path || item.file_path || '' } }, turns);
+      } else if (item.type === 'tool_use' || item.type === 'custom_tool_call') {
+        onTool(item, turns);
+      }
     }
   }
   return turns;
@@ -137,13 +152,28 @@ export function collectClaimProse(transcriptText, { maxBlocks = 200, maxChars = 
     } catch {
       continue;
     }
-    if (!e || e.isSidechain || e.type !== 'assistant' || !e.message || !Array.isArray(e.message.content)) continue;
-    turns++;
-    for (const item of e.message.content) {
-      if (item && item.type === 'text' && typeof item.text === 'string' && item.text.trim()) {
-        if (claimSignalOnly && !CLAIM_SIGNAL.test(item.text)) continue;
-        blocks.push({ turn: turns, text: redact(item.text).slice(0, maxChars) });
-        if (blocks.length >= maxBlocks) return blocks;
+    if (!e || e.isSidechain) continue;
+    if (e.type === 'assistant' && e.message && Array.isArray(e.message.content)) {
+      turns++;
+      for (const item of e.message.content) {
+        if (item && item.type === 'text' && typeof item.text === 'string' && item.text.trim()) {
+          if (claimSignalOnly && !CLAIM_SIGNAL.test(item.text)) continue;
+          blocks.push({ turn: turns, text: redact(item.text).slice(0, maxChars) });
+          if (blocks.length >= maxBlocks) return blocks;
+        }
+      }
+      continue;
+    }
+    if ((e.type === 'item.completed' || e.type === 'item.started') && e.item) {
+      const item = e.item;
+      if (item.type === 'agent_message' || item.type === 'message') {
+        turns++;
+        const rawT = typeof item.text === 'string' ? item.text.trim() : (typeof item.content === 'string' ? item.content.trim() : '');
+        if (rawT) {
+          if (claimSignalOnly && !CLAIM_SIGNAL.test(rawT)) continue;
+          blocks.push({ turn: turns, text: redact(rawT).slice(0, maxChars) });
+          if (blocks.length >= maxBlocks) return blocks;
+        }
       }
     }
   }

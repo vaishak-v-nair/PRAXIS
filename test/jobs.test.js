@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { newJobId, createJob, readMeta, updateMeta, jobStatus, listJobs, tailOutput, readMetaWith } from '../src/lib/jobs/store.js';
 import { withEnvRetry } from './helpers/flaky-env.mjs';
-import { resolveRunCmd, run } from '../src/commands/run.js';
+import { resolveRunCmd, buildAgentArgv, run } from '../src/commands/run.js';
 
 // CI runners spawn processes far more slowly than a dev machine, and this file
 // starts a detached child. Same reasoning as demo-live.test.js: generous on CI,
@@ -88,12 +88,21 @@ test('tailOutput returns the last lines only', () => {
   assert.equal(tail[4], 'line 29');
 });
 
-test('resolveRunCmd: injectable, and claude is the default adapter', () => {
+test('resolveRunCmd: injectable, claude and codex adapters supported', () => {
   process.env.PRAXIS_RUN_CMD = '["node","agent.mjs"]';
   assert.deepEqual(resolveRunCmd('claude'), ['node', 'agent.mjs']);
   delete process.env.PRAXIS_RUN_CMD;
   assert.deepEqual(resolveRunCmd('claude'), ['claude', '-p', '--output-format', 'json']);
-  assert.equal(resolveRunCmd('codex'), null); // roadmap, not pretense
+  assert.deepEqual(resolveRunCmd('codex'), ['codex', 'exec', '--json']);
+  assert.equal(resolveRunCmd('gemini'), null); // roadmap, not pretense
+});
+
+test('buildAgentArgv: maps codex modes to sandbox policies with stdin prompt', () => {
+  const base = ['codex', 'exec', '--json'];
+  assert.deepEqual(buildAgentArgv(base, { mode: 'plan' }), ['codex', 'exec', '--json', '--sandbox', 'read-only', '-']);
+  assert.deepEqual(buildAgentArgv(base, { mode: 'acceptEdits' }), ['codex', 'exec', '--json', '--sandbox', 'workspace-write', '-']);
+  assert.deepEqual(buildAgentArgv(base, { mode: 'bypassPermissions' }), ['codex', 'exec', '--json', '--sandbox', 'danger-full-access', '-']);
+  assert.deepEqual(buildAgentArgv(base, { mode: 'plan', injected: true }), ['codex', 'exec', '--json']);
 });
 
 test('a job read while it is being written is retried, not reported as nameless', () => {

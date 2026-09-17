@@ -7,6 +7,7 @@ import { TELEMETRY_ENDPOINT, telemetryState, setTelemetry } from '../lib/telemet
 import { projectPaths } from '../lib/paths.js';
 import { ensureMemory } from '../lib/memory.js';
 import { patchClaudeMd } from '../lib/claudemd.js';
+import { patchAgentsMd } from '../lib/agentsmd.js';
 import { patchSettings, resolveHookScope, contributorCount, ignoreLocalSettings } from '../lib/settings.js';
 import { patchMcpConfig } from '../lib/mcp/config.js';
 import { masthead, mascotBlock, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
@@ -66,6 +67,10 @@ export async function init() {
   // CLAUDE.md managed block
   const cmd = patchClaudeMd(p.claudeMd);
   done.push(cmd.existed ? 'CLAUDE.md (PRAXIS block refreshed)' : 'CLAUDE.md (created)');
+
+  // AGENTS.md managed block (Codex / agents)
+  const amd = patchAgentsMd(p.agentsMd);
+  done.push(amd.existed ? 'AGENTS.md (PRAXIS block refreshed)' : 'AGENTS.md (created)');
 
   // ── the hooks, and WHOSE machine they run on ────────────────────────────
   // These hooks run `npx -y praxis-memory` at the end of every session. Written

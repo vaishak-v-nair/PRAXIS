@@ -11,6 +11,7 @@ import { projectPaths } from '../lib/paths.js';
 import { readMemory } from '../lib/memory.js';
 import { extractBrief } from '../lib/handoff.js';
 import { govern } from '../lib/gov.js';
+import { retrieveContext } from '../lib/retrieval/bm25.js';
 import { startJob } from './run.js';
 import { listJobs } from '../lib/jobs/store.js';
 import { bold, grey, sage, rose, amber, dim } from '../lib/ui.js';
@@ -71,10 +72,21 @@ export async function gov(argv = []) {
   } catch {
     /* a project with no memory still gets governed */
   }
+
+  let retrievedContext = '';
+  try {
+    const hits = retrieveContext(p.praxisDir, goal, { maxResults: 3 });
+    if (hits && hits.length) {
+      retrievedContext = hits.map((h) => `[${h.path}] (score: ${h.score})\n${h.excerpt}`).join('\n\n');
+    }
+  } catch {
+    /* retrieval error fails gracefully */
+  }
+
   const deckState = deckStateLine(listJobs(p.praxisDir));
 
   console.log('\n  ' + grey('The Governor is studying the goal… (one model call, ~a minute)'));
-  const g = await govern(goal, { briefing, deckState });
+  const g = await govern(goal, { briefing, deckState, retrievedContext });
 
   if (!g.ok) {
     console.log('\n  ' + rose('The Governor could not plan this: ') + g.reason + grey('  — nothing was queued.') + '\n');
