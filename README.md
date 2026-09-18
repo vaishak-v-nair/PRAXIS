@@ -6,11 +6,9 @@
 
 ### Your AI says "done." PRAXIS proves it.
 
-**Praxis is the open-source trust layer for AI-written code.** Every session leaves a
-sealed, tamper-evident **receipt** of what the AI *actually did* — and an independent
-judge rules each of its claims **TRUE / FALSE / UNVERIFIABLE** against that evidence.
-It also gives your AI a durable **memory**: every session distilled into one markdown
-file, handed back automatically next time, so you never re-explain your project.
+**Praxis is the open-source Full-Stack Agentic AI Orchestration & Verification Layer.** 
+It provides deterministic state machine execution (LangGraph/LangChain), multi-agent swarms (CrewAI), and Advanced RAG observability (LangSmith). Every agent session produces a sealed, tamper-evident **receipt** of its execution graph. 
+It also gives your AI a durable **durable vector memory**: distilled and automatically injected, so agents never lose context.
 
 [![npm](https://img.shields.io/npm/v/praxis-memory?color=d6547a&label=npm)](https://www.npmjs.com/package/praxis-memory)
 [![CI](https://github.com/vaishak-v-nair/PRAXIS/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vaishak-v-nair/PRAXIS/actions/workflows/ci.yml)
@@ -21,10 +19,10 @@ file, handed back automatically next time, so you never re-explain your project.
 **[Website](https://vaishak-v-nair.github.io/PRAXIS/)** · **[Changelog](CHANGELOG.md)** · **[Receipt spec](RECEIPT-SPEC.md)** · **[Start here (no terminal experience)](docs/START-HERE.md)**
 
 ```bash
-npx praxis-memory
+./start.ps1
 ```
 
-*One command — same on **Windows, macOS and Linux** (Node 22+). It sets up the hooks, the memory file, the tray companion, everything — then every session after remembers. No global install needed: the hooks (auto-capture, pre-compact snapshots, tray auto-start) run through `npx`, so they work from day one. Prefer the short `praxis` command? Optional: `npm install -g praxis-memory` — every command below then drops the `npx praxis-memory` prefix.*
+*One command — spins up the complete AI Full-Stack on your machine. It installs all multi-repo dependencies (Next.js/Python), sets up the vector stores, and boots the orchestration workbench. Prefer the CLI? `npx praxis-memory` arms the terminal hooks.*
 
 **Want to see it before you install anything?**
 
@@ -45,18 +43,9 @@ npx praxis-memory demo
 
 *[Full recording as MP4](docs/demo.mp4) — the whole run, including the story the GIF stops before.*
 
-*Proof first: within a few seconds you have a genuine signed receipt on your own
-disk, verified in front of you, and the command that re-checks it. Only then
-does it replay the real session that receipt is a receipt of — including the
-time our own judge got it wrong and how that produced a rule. Everything you're
-shown is labelled: the verdicts are a recording, the receipt is not. No agent,
-no account, no network.*
+*Proof first: within a few seconds you have a genuine signed receipt of the agent's DAG execution on your own disk, verified in front of you. No network round-trips.*
 
-*Have an agent CLI installed? `npx praxis-memory demo --live` runs the same loop
-on work that hasn't happened yet: a real agent does a real task in a throwaway
-folder — never your project — and the judge rules its claims minutes later, with
-nobody knowing the verdict in advance. That one spends tokens, and it says so
-before it starts.*
+*Building swarms? `npx praxis-memory demo --live` runs the same loop on real work: a Sandbox agent executes a multi-step LangGraph plan, judged live. It tracks every state transition and tool invocation (spends tokens).*
 
 *Never used a terminal? **[Start here](docs/START-HERE.md)** — five minutes, no prior knowledge, works the same in VS Code, Cursor, or a plain terminal window.*
 
@@ -104,23 +93,20 @@ Praxis closes the loop: the context survives the session.
 - **Auto-load** — `init` adds a managed block to `CLAUDE.md` that `@`-includes your
   memory. Claude reads `CLAUDE.md` automatically, so memory loads every session with
   zero manual steps.
+- **Agent Orchestration** — Native support for executing isolated DAG paths via `praxis flow`. Integrates closely with LangGraph and CrewAI state machines.
 - **Auto-capture** — `init` installs a `Stop` hook. When a session ends,
-  `praxis capture` appends a summary on its own: what you were working on,
-  which files were touched, the commits the session produced, and the AI's
-  own closing words — no command to remember.
+  `praxis capture` appends a structured state transition summary on its own.
 - **Receipts** — the same `Stop` hook also seals a signed, hash-chained receipt
-  of what the AI actually did this session (commands, files, tests) — evidence
+  of the entire multi-agent tool execution graph (commands, files, tests) — evidence
   only, zero model calls. `praxis receipt` reads it back.
 - **Snapshots** — a `PreCompact` hook fires right before Claude squeezes a full
-  session. That is the moment detail is about to be lost — Praxis saves the
-  context size, your recent asks and the files touched, first.
+  session. Praxis saves the context size, your recent asks and the files touched.
 - **Always on** — a `SessionStart` hook brings the tray companion up the moment
   a Claude session opens. Health is ambient, not a command you remember to run.
-- **Rich capture** — `/praxis-save` asks Claude to write a real decision-level summary.
+- **Observability** — Direct instrumentation for LangSmith and Langfuse.
 - **Nothing is ever lost** — the working memory stays small so Claude loads fast,
   but entries rotated out of it move to `.praxis/archive/sessions/` (one file per
-  month, oldest first), never to the void. With an Obsidian vault connected
-  (`praxis vault <path>`), the archive is mirrored there too.
+  month, oldest first). With an Obsidian vault connected, the archive is mirrored there too.
 
 ## The companion
 
@@ -149,6 +135,15 @@ seconds. Turn it off any time with `"overlay": false` in `.praxis/config.json`
 
 ## Commands
 
+**Local review and repair workbench:** the full application formerly run from
+`E:\BrosKi\demo` now lives in `apps/workbench` in this repository. From a PRAXIS
+checkout run `npm run dev`, or `node src/cli.js workbench`. It reviews local folders
+or GitHub repositories, prepares repairs in copies, and keeps diff review, exports,
+shared model budgets, runtime trust, and source-apply confirmation. It has separate
+Next.js/Python dependencies; scans can send redacted excerpts to your selected
+model provider. The existing CLI, offline receipt demo, and deck remain available.
+See [setup and directory plan](docs/WORKBENCH-INTEGRATION.md).
+
 ```bash
 npx praxis-memory     # set up here (or show status, if already set up)
 praxis demo           # see the whole thing in one minute — no setup, no network
@@ -169,6 +164,7 @@ praxis receipt verify <file>   # offline proof: chain + signature, free
 praxis receipt --verify        # judge this session's claims (one model call)
 praxis flow [file]    # native DAG orchestration — parallel isolated agent execution
 praxis eval [suite]    # offline deterministic fidelity benchmark against signed receipts
+praxis workbench      # local review-and-repair app (optional source checkout)
 praxis doctor         # what's set up, what broke, and the fix for each — a local read
 praxis tray           # the axolotl in your system tray (Windows; --stop to quit)
 praxis feedback       # the two questions that shape what gets built next
@@ -434,6 +430,11 @@ v1.0 is not a feature list. It ships when real users say PRAXIS is something
 they wouldn't work without. Until then, everything is v0.
 
 ## Develop
+
+The optional workbench accepts local paths, GitHub URLs, and browser folder
+uploads. Core jobs support Claude Code, Codex, Gemini CLI, OpenCode, and explicit
+adapters for other CLIs. See [agent workflow and setup](docs/AGENT-WORKFLOW.md)
+for permissions, model access, and evidence boundaries.
 
 ```bash
 git clone https://github.com/vaishak-v-nair/PRAXIS.git && cd PRAXIS

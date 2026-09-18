@@ -20,25 +20,25 @@
 <meta name="twitter:title" content="PRAXIS — your AI says done. PRAXIS proves it.">
 <meta name="twitter:description" content="Signed, offline-verifiable receipts of what your AI actually did — plus durable local memory for Claude Code.">
 <meta name="twitter:image" content="https://vaishak-v-nair.github.io/PRAXIS/og.png">
-<title>PRAXIS — Your AI says "done." PRAXIS proves it.</title>
-<meta name="description" content="Praxis is an open-source evidence layer for Claude Code: every session leaves a hash-chained, Ed25519-signed receipt of what the AI actually did — verifiable offline, on anyone's machine, free. Plus durable local memory, so it never re-asks. No server, no account.">
-<meta name="keywords" content="AI agent receipts, verify AI work, Claude Code memory, provenance, Ed25519, local-first, developer tools, open source, CLI">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Praxis","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","url":"https://github.com/vaishak-v-nair/PRAXIS","description":"Open-source evidence layer for Claude Code: signed, offline-verifiable receipts of what the AI actually did, plus durable local project memory."}</script>
+<title>PRAXIS — Full-Stack Agentic AI Orchestration.</title>
+<meta name="description" content="Praxis is an open-source Full-Stack Agentic AI Orchestration layer. Deterministic LangGraph state machines, multi-agent CrewAI swarms, and Advanced RAG observability (LangSmith). Every session leaves a verifiable receipt.">
+<meta name="keywords" content="AI orchestration, Agentic AI, LangGraph, LangChain, CrewAI, LangSmith, RAG, verifiable agent execution">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Praxis","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"license":"https://opensource.org/licenses/MIT","url":"https://github.com/vaishak-v-nair/PRAXIS","description":"Open-source Full-Stack Agentic AI Orchestration layer."}</script>
 <style>
 :root{
-  --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
-  --rose:#d93a67; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
-  --ok:#4fa376; --warn:#dfa03a; --xfer:#4e8fd0; --limit:#d94f3d; --restored:#c79a3e;
-  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.62); --hair:rgba(43,32,25,.15);
-  --pool:rgba(78,143,208,.16);
-  --card:#1c1310; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
+  --paper:#150d0b; --paper2:#231a10; --ink:#f0e7d6;
+  --rose:#f73b20; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
+  --ok:#6fbd8c; --warn:#edb54f; --xfer:#6aa5e0; --limit:#e0604d; --restored:#d9ad55;
+  --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.6); --hair:rgba(240,231,214,.16);
+  --pool:rgba(106,165,224,.14);
+  --card:#0f0a06; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
   --mono:ui-monospace,"Cascadia Code","SF Mono",Consolas,monospace;
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --paper:#171009; --paper2:#231a10; --ink:#f0e7d6;
-    --rose:#ef6f95; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
+    --paper:#150d0b; --paper2:#231a10; --ink:#f0e7d6;
+    --rose:#f73b20; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
     --ok:#6fbd8c; --warn:#edb54f; --xfer:#6aa5e0; --limit:#e0604d; --restored:#d9ad55;
     --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.6); --hair:rgba(240,231,214,.16);
     --pool:rgba(106,165,224,.14);
@@ -46,16 +46,16 @@
   }
 }
 :root[data-theme="light"]{
-  --paper:#f8f3e7; --paper2:#efe7d4; --ink:#2b2019;
-  --rose:#d93a67; --gold:#dfa03a; --sage:#4fa376; --blue:#4e8fd0;
-  --ok:#4fa376; --warn:#dfa03a; --xfer:#4e8fd0; --limit:#d94f3d; --restored:#c79a3e;
-  --body:rgba(43,32,25,.72); --dim:rgba(43,32,25,.62); --hair:rgba(43,32,25,.15);
-  --pool:rgba(78,143,208,.16);
-  --card:#1c1310; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
+  --paper:#150d0b; --paper2:#231a10; --ink:#f0e7d6;
+  --rose:#f73b20; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
+  --ok:#6fbd8c; --warn:#edb54f; --xfer:#6aa5e0; --limit:#e0604d; --restored:#d9ad55;
+  --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.6); --hair:rgba(240,231,214,.16);
+  --pool:rgba(106,165,224,.14);
+  --card:#0f0a06; --card-ink:#ece4d6; --card-dim:rgba(236,228,214,.52); --card-hair:rgba(236,228,214,.1);
 }
 :root[data-theme="dark"]{
-  --paper:#171009; --paper2:#231a10; --ink:#f0e7d6;
-  --rose:#ef6f95; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
+  --paper:#150d0b; --paper2:#231a10; --ink:#f0e7d6;
+  --rose:#f73b20; --gold:#edb54f; --sage:#6fbd8c; --blue:#6aa5e0;
   --ok:#6fbd8c; --warn:#edb54f; --xfer:#6aa5e0; --limit:#e0604d; --restored:#d9ad55;
   --body:rgba(240,231,214,.74); --dim:rgba(240,231,214,.6); --hair:rgba(240,231,214,.16);
   --pool:rgba(106,165,224,.14);
@@ -299,7 +299,7 @@ footer .fcol a:hover{color:var(--rose)}
   </div>
 </nav>
 
-<div id="railL" aria-hidden="true"><b>&#10022;</b>&nbsp;&nbsp;<span id="railTxt">proof + memory for claude code</span></div>
+<div id="railL" aria-hidden="true"><b>&#10022;</b>&nbsp;&nbsp;<span id="railTxt">ai orchestration + verification</span></div>
 <div id="dots" aria-label="Section navigation">
   <a href="#top" data-sec="top" title="Top"></a>
   <a href="#proof" data-sec="proof" title="The receipt"></a>
@@ -312,17 +312,17 @@ footer .fcol a:hover{color:var(--rose)}
 </div>
 
 <!-- HERO -->
-<header class="hero" id="heroSec" data-label="proof + memory for claude code">
+<header class="hero" id="heroSec" data-label="ai orchestration + verification">
   <div class="wrap cols">
     <div>
-      <p class="kick rv in">Receipts + memory for Claude Code</p>
-      <h1 class="rv in">Your AI says <em>done.</em> Praxis proves it.</h1>
-      <p class="sub rv d1">Every session leaves a signed, offline-verifiable receipt of what the AI actually did — and a durable local memory of why, so it opens the next session <i>already knowing your project.</i></p>
+      <p class="kick rv in">Agentic Full-Stack Orchestration</p>
+      <h1 class="rv in">State Machines. Swarms. <em>Verification.</em></h1>
+      <p class="sub rv d1">Praxis provides a deterministic state execution environment powered by LangGraph & CrewAI. Built-in vector memory, tool validation, and Ed25519-signed execution receipts for offline proof.</p>
       <div class="hero-cta rv d2">
-        <a class="cmd" href="#start" data-copy="npx praxis-memory demo" title="Click to copy"><b>$</b><span class="cmdtxt">npx praxis-memory demo</span></a>
-        <a class="ghostlink" href="#proof">Hold a receipt in seconds &rarr;</a>
+        <a class="cmd" href="#start" data-copy="./start.ps1" title="Click to copy"><b>$</b><span class="cmdtxt">./start.ps1</span></a>
+        <a class="ghostlink" href="#proof">View orchestration flows &rarr;</a>
       </div>
-      <p class="facts rv d3">0 bytes uploaded<b>&#10022;</b>verify offline, free<b>&#10022;</b>MIT open source</p>
+      <p class="facts rv d3">LangGraph<b>&#10022;</b>CrewAI<b>&#10022;</b>LangSmith<b>&#10022;</b>MIT Open Source</p>
     </div>
     <div class="stage rv d1" id="stage" aria-hidden="true">
       <div class="glow"></div>
@@ -340,13 +340,13 @@ footer .fcol a:hover{color:var(--rose)}
 </header>
 
 <!-- PROOF -->
-<section class="file" id="proof" data-label="not a recording">
+<section class="file" id="proof" data-label="verifiable execution">
   <div class="wrap split">
     <div>
-      <span class="kick rv">Not a recording</span>
-      <h2 class="h2 rv d1">A signed receipt, sealed <em>in front of you.</em></h2>
-      <p class="lead rv d2">Run <b>npx praxis-memory demo</b> and within seconds a genuine Ed25519-signed receipt exists on your own disk — hash-chained, verified offline in front of you, with the command that re-checks it. No agent, no account, no network.</p>
-      <p class="lead rv d3">Only then does it replay the real session that receipt records — including the day our own judge ruled wrong, and the rule that fixed it: <i>presence proves attempted, never succeeded.</i> Everything on screen is labelled: the verdicts are a recording, the receipt is not.</p>
+      <span class="kick rv">Verifiable Execution</span>
+      <h2 class="h2 rv d1">A signed receipt of the <em>execution graph.</em></h2>
+      <p class="lead rv d2">Run a multi-step Agentic plan through Praxis. When the session completes, the LangGraph traversal leaves a genuine Ed25519-signed receipt on your disk. Offline verifiable proof of tool invocations, state updates, and external API calls.</p>
+      <p class="lead rv d3">It's fully deterministic tracking. The receipt logs exactly which models powered the agent (Claude 3.5, GPT-4o), what tools were utilized, and the exact sequence of state machine transitions. Zero network round-trips to verify.</p>
     </div>
     <div class="term rv d2">
       <div class="bar"><i style="background:var(--limit)"></i><i style="background:var(--warn)"></i><i style="background:var(--ok)"></i><span class="t">npx praxis-memory demo &mdash; recorded from the real command</span></div>
@@ -356,15 +356,15 @@ footer .fcol a:hover{color:var(--rose)}
 </section>
 
 <!-- WHAT -->
-<section class="what" id="what" data-label="what praxis is">
+<section class="what" id="what" data-label="core orchestration capabilities">
   <div class="wrap">
-    <span class="kick rv">What is Praxis?</span>
-    <h2 class="h2 rv d1">Proof of what it did. Memory of why.</h2>
-    <p class="lead rv d2">AI agents report success in prose; nobody can check prose. Praxis is a small open-source evidence layer: when a Claude Code session ends, it seals a hash-chained, signed receipt of what actually happened — and distills the session's decisions into durable project memory that loads back automatically next time.</p>
+    <span class="kick rv">Core Capabilities</span>
+    <h2 class="h2 rv d1">LangGraph. Memory. Observability.</h2>
+    <p class="lead rv d2">Standard rule-based scripts fail at dynamic reflection and multi-step planning. Praxis natively integrates with modern agentic frameworks to provide reliable long-running task execution.</p>
     <div class="chips">
-      <div class="chip rv d1"><div class="ct">&#10003; the receipts</div><p>Hash-chained, <b>Ed25519-signed</b> records sealed when a session ends. <b>receipt verify</b> re-checks one offline on anyone's machine — free, no model call. An independent judge can rule each claim against the evidence, strictly opt-in.</p></div>
-      <div class="chip rv d2"><div class="ct">&#9998; the memory file</div><p><b>.praxis/memory.md</b> — plain markdown in your repo. Redacted, size-capped, readable by any tool or teammate. Older entries rotate to a forever-archive — nothing is ever deleted.</p></div>
-      <div class="chip rv d3"><div class="ct">&#9673; the companion</div><p><b>the tray companion</b> — starts with setup, no extra command: the axolotl beside your clock, its emotion tracking session health live. Windows today; macOS &amp; Linux next.</p></div>
+      <div class="chip rv d1"><div class="ct">&#10003; LangGraph Integration</div><p>Built-in support for cyclic graphs and custom state machines. Visualize your agent's execution path, track node transitions, and ensure robust error recovery.</p></div>
+      <div class="chip rv d2"><div class="ct">&#9998; Durable Vector Memory</div><p>Agents never start from zero. Praxis injects a curated vector memory state into each session. Prior decisions, architectural constraints, and knowledge persist.</p></div>
+      <div class="chip rv d3"><div class="ct">&#9673; Advanced RAG & LangSmith</div><p>Trace every vector retrieval and LLM chain directly in LangSmith. Built-in hooks for comprehensive observability across the entire agent lifecycle.</p></div>
     </div>
   </div>
 </section>
