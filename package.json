@@ -1,6 +1,6 @@
 {
   "name": "praxis-memory",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Your AI says \"done.\" PRAXIS proves it. Signed, tamper-evident receipts of what your coding agent actually did — plus durable project memory. Local-first: no server, no account, your code never leaves your machine.",
   "type": "module",
   "bin": {
@@ -9,6 +9,9 @@
   },
   "files": [
     "src",
+    "scripts/postinstall.js",
+    "apps/workbench",
+    "start.ps1",
     "README.md",
     "LICENSE"
   ],
@@ -16,7 +19,16 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test \"test/*.test.js\""
+    "postinstall": "node scripts/postinstall.js",
+    "test": "node --test \"test/*.test.js\"",
+    "dev": "node src/cli.js workbench",
+    "workbench": "node src/cli.js workbench",
+    "dev:api": "npm --prefix apps/workbench run dev:api",
+    "dev:web": "npm --prefix apps/workbench run dev:web",
+    "typecheck:workbench": "npm --prefix apps/workbench run typecheck",
+    "build:workbench": "npm --prefix apps/workbench run build",
+    "start:workbench": "node src/cli.js workbench --production",
+    "test:workbench": "npm --prefix apps/workbench run test:backend"
   },
   "keywords": [
     "claude-code",
