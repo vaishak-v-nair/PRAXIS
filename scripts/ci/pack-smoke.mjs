@@ -104,6 +104,31 @@ function main() {
     return `${r.out.split('\n').length} lines`;
   });
 
+  step('PRAXIS Live serves and verifies from the installed build', () => {
+    if (!workdir) throw new Error('skipped — nothing installed');
+    const script = `
+      import { createLiveServer, listenLiveLocal } from './node_modules/praxis-memory/src/lib/live/server.js';
+      import { verifyVerifyReceipt } from './node_modules/praxis-memory/src/lib/verify/verify-receipt.js';
+      const { server, token } = createLiveServer({ stageDelayMs: 0 });
+      const port = await listenLiveLocal(server, 0);
+      try {
+        const origin = 'http://127.0.0.1:' + port;
+        const page = await fetch(origin + '/?t=' + token);
+        const html = await page.text();
+        if (!page.ok || !html.includes('PRAXIS Live') || !html.includes('LIVE CLAIM GRAPH')) throw new Error('installed Live page did not render the Tier 2 graph');
+        const response = await fetch(origin + '/api/run', { method: 'POST', headers: { 'content-type': 'application/json', 'x-praxis-token': token }, body: JSON.stringify({ scenario: 'false-claim' }) });
+        const events = (await response.text()).trim().split('\\n').map(JSON.parse);
+        const result = events.at(-1);
+        if (result?.verdict !== 'CONTRADICTED' || !verifyVerifyReceipt(result.receipt)) throw new Error('installed Live pipeline did not issue a valid contradicted receipt');
+        const retrieval = events.find((event) => event.stage === 'retriever' && event.state === 'complete')?.evidence;
+        if (retrieval?.missingClaimPaths !== 2 || !retrieval.snippets?.some((item) => item.path === 'README.md' && item.status === 'context')) throw new Error('installed Live pipeline did not stream Tier 1 evidence snippets');
+      } finally { await new Promise((resolve) => server.close(resolve)); }
+    `;
+    const r = sh(process.execPath, ['--input-type=module', '-e', script], { cwd: workdir, timeout: 30000 });
+    if (r.status !== 0) throw new Error(`exit ${r.status}:\n${r.out}`);
+    return 'page + core pipeline + Ed25519 receipt';
+  });
+
   if (DEMO_SHIPPED) {
     step(`demo replay end-to-end (< ${DEMO_BUDGET_MS / 1000}s)`, () => {
       const started = Date.now();

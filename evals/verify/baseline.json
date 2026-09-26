@@ -1,0 +1,5 @@
+{
+  "schema": "praxis.verify.eval-baseline/v1",
+  "contradictedRecall": 1,
+  "contradictedPrecision": 1
+}

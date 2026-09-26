@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Watch PRAXIS verify an AI coding agent's completion claim and sign the result.">
+  <meta name="praxis-token" content="__PRAXIS_LIVE_TOKEN__">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PRAXIS Live</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <a class="brand" href="/" aria-label="PRAXIS Live home"><span class="brand-mark">P</span><span>PRAXIS <b>LIVE</b></span></a>
+      <div class="local"><span></span>LOCAL ENGINE</div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">AI CLAIM VERIFICATION · LIVE PIPELINE</p>
+        <h1>Your agent said it was done.<br><em>This is the receipt that checks.</em></h1>
+        <p class="lede">Choose a rehearsed scenario. Four specialized stages trace the claim from the agent's report to independent evidence and a public Ed25519 signature.</p>
+      </section>
+
+      <section class="engine-visual">
+        <div>
+          <p class="section-label">00 · ENGINE</p>
+          <p id="engine-state">3D</p>
+        </div>
+        <canvas id="engine-canvas" aria-label="Core"></canvas>
+      </section>
+
+      <section class="scenario-panel" aria-labelledby="scenario-title">
+        <div>
+          <p class="section-label" id="scenario-title">01 · SELECT A SCENARIO</p>
+          <div class="scenario-buttons" role="group" aria-label="Demo scenario">
+            <button class="scenario selected" type="button" data-scenario="truthful"><span>TRUE CLAIM</span><small>Implementation matches report</small></button>
+            <button class="scenario" type="button" data-scenario="false-claim"><span>FALSE CLAIM</span><small>Documentation-only change</small></button>
+          </div>
+        </div>
+        <div class="brief">
+          <span>AGENT REPORT</span>
+          <pre id="report">- Updated src/login.js.
+- Created test/login-rate-limit.test.js.</pre>
+        </div>
+        <button id="run" class="run" type="button"><span>RUN VERIFICATION</span><i aria-hidden="true">→</i></button>
+      </section>
+
+      <section class="pipeline" aria-labelledby="pipeline-title">
+        <div class="section-heading"><p class="section-label" id="pipeline-title">02 · MULTI-AGENT PIPELINE</p><div class="pipeline-meta"><span id="orchestrator">LANGGRAPH · READY</span><p id="status" aria-live="polite">Ready to run</p></div></div>
+        <div class="agents">
+          <article class="agent" data-stage="extractor"><div class="agent-top"><span class="number">01</span><span class="state">WAITING</span></div><h2>EXTRACTOR</h2><p>Turns the completion report into atomic, checkable claims.</p><div class="agent-output">Awaiting report</div></article>
+          <div class="connector" aria-hidden="true"><span></span></div>
+          <article class="agent" data-stage="retriever"><div class="agent-top"><span class="number">02</span><span class="state">WAITING</span></div><h2>RETRIEVER</h2><p>Binds the claims to the exact commit and locates relevant evidence.</p><div class="agent-output">Awaiting claims</div></article>
+          <div class="connector" aria-hidden="true"><span></span></div>
+          <article class="agent" data-stage="verifier"><div class="agent-top"><span class="number">03</span><span class="state">WAITING</span></div><h2>VERIFIER</h2><p>Runs PRAXIS static and false-success checks against the real diff.</p><div class="agent-output">Awaiting evidence</div></article>
+          <div class="connector" aria-hidden="true"><span></span></div>
+          <article class="agent" data-stage="judge"><div class="agent-top"><span class="number">04</span><span class="state">WAITING</span></div><h2>JUDGE</h2><p>Applies the existing four-state verdict policy to every claim.</p><div class="agent-output">Awaiting observations</div></article>
+        </div>
+      </section>
+
+      <section id="graph" class="graph" hidden aria-live="polite">
+        <div class="section-heading"><p class="section-label">03 · LIVE CLAIM GRAPH</p><p id="graph-meta">Awaiting claims</p></div>
+        <div class="graph-frame">
+          <div class="graph-lanes" aria-hidden="true"><span>CLAIMS</span><span>EVIDENCE</span><span>VERDICTS</span></div>
+          <svg id="graph-canvas" role="img" aria-label="Live graph connecting claims to evidence and verdicts"></svg>
+        </div>
+      </section>
+
+      <section id="evidence" class="evidence" hidden aria-live="polite">
+        <div class="section-heading"><p class="section-label">04 · RETRIEVED EVIDENCE</p><p id="evidence-meta">Exact bound diff</p></div>
+        <div id="evidence-list" class="evidence-list"></div>
+      </section>
+
+      <section id="result" class="result" hidden aria-live="polite">
+        <div class="verdict-block"><p class="section-label">05 · FINAL VERDICT</p><h2 id="verdict">—</h2><p id="explanation"></p></div>
+        <div class="signature-block"><div class="signature-head"><span class="seal">✓</span><div><strong id="signature-status">CHECKING SIGNATURE</strong><small>Verified in this browser with WebCrypto</small></div></div><dl><div><dt>SCHEMA</dt><dd id="schema">—</dd></div><div><dt>ALGORITHM</dt><dd id="algorithm">—</dd></div><div><dt>RECEIPT ID</dt><dd id="receipt-id">—</dd></div></dl></div>
+        <details><summary>Inspect signed receipt <span>JSON</span></summary><pre id="receipt"></pre></details>
+      </section>
+    </main>
+    <footer><span>PRAXIS VERIFY v1</span><span>Nothing leaves this machine</span></footer>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

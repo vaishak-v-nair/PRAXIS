@@ -17,9 +17,10 @@ import { projectPaths } from '../lib/paths.js';
 import { newJobId, createJob, updateMeta } from '../lib/jobs/store.js';
 import { bold, grey, sage, rose } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
+import { customAdapter, agentEnvironment, selectedTool } from '../lib/jobs/adapters.js';
 
 /** Resolve the agent argv for a tool name. PRAXIS_RUN_CMD (JSON array) wins. */
-export function resolveRunCmd(tool = 'claude') {
+export function resolveRunCmd(tool = 'claude', mode = 'plan') {
   const inj = process.env.PRAXIS_RUN_CMD;
   if (inj && inj.trim()) {
     try {
@@ -29,11 +30,14 @@ export function resolveRunCmd(tool = 'claude') {
       return inj.trim().split(/\s+/);
     }
   }
-  // claude and codex adapters today; gemini adapter is on the roadmap, same shape.
+  const custom = customAdapter(tool, mode);
+  if (custom) return custom;
   // json output carries session_id/thread_id — how a job finds its own transcript and
   // seals its receipt (the deck's "done" vs "proven" columns).
   if (tool === 'claude') return ['claude', '-p', '--output-format', 'json'];
   if (tool === 'codex') return ['codex', 'exec', '--json'];
+  if (tool === 'gemini') return ['gemini', '-p', 'Complete the task provided on standard input.', '--output-format', 'json'];
+  if (tool === 'opencode') return ['opencode', 'run', '--format', 'json', '--file', '{taskFile}'];
   return null;
 }
 
@@ -56,6 +60,11 @@ export function buildAgentArgv(base, { mode = 'plan', extraArgs = [], injected =
     const sandbox = sandboxMap[mode] || 'read-only';
     return [...base, ...extraArgs, '--sandbox', sandbox, '-'];
   }
+  if (base[0] === 'gemini') {
+    const approval = { plan: 'plan', acceptEdits: 'auto_edit', bypassPermissions: 'yolo' }[mode] || 'plan';
+    return [...base, ...extraArgs, '--approval-mode', approval];
+  }
+  if (base[0] === 'opencode') return [...base, ...extraArgs, '--agent', mode === 'plan' ? 'plan' : 'build', 'Complete the task in the attached task file.'];
   return [...base, ...extraArgs, '--permission-mode', mode];
 }
 
@@ -76,14 +85,20 @@ export function buildAgentArgv(base, { mode = 'plan', extraArgs = [], injected =
  */
 export async function startJob({ task, tool = 'claude', mode = 'plan', approvedFrom = null, goal = null, cwd, extraArgs = [] }) {
   const p = projectPaths(cwd);
-  const base = resolveRunCmd(tool);
+  let base, custom;
+  try {
+    base = resolveRunCmd(tool, mode);
+    custom = !process.env.PRAXIS_RUN_CMD && customAdapter(tool, mode);
+  } catch (error) { return { error: error.message }; }
   if (!base) return { error: 'no-adapter' };
 
-  const argvFull = buildAgentArgv(base, { mode, extraArgs, injected: Boolean(process.env.PRAXIS_RUN_CMD) });
+  const injected = Boolean(process.env.PRAXIS_RUN_CMD || custom);
+  const argvFull = buildAgentArgv(base, { mode, extraArgs, injected });
 
   const id = newJobId();
   const { dir } = createJob(p.praxisDir, { id, task, tool, argv: argvFull, cwd: p.root });
-  updateMeta(p.praxisDir, id, { mode, approval: mode === 'plan' ? 'pending' : 'none', approvedFrom, goal });
+  updateMeta(p.praxisDir, id, { mode, approval: mode === 'plan' ? 'pending' : 'none', approvedFrom, goal,
+    agentEnv: injected ? {} : agentEnvironment(tool, mode) });
   fs.writeFileSync(path.join(dir, 'task.txt'), task); // stdin payload, no quoting minefield
 
   // the RUNNER is the detached survivor; the agent is the runner's own child,
@@ -95,7 +110,8 @@ export async function startJob({ task, tool = 'claude', mode = 'plan', approvedF
     runner = spawn(process.execPath, [runnerPath, dir], {
       detached: true, // survives this CLI and the terminal that called it
       stdio: 'ignore', // the runner owns the job's log files itself
-      env: { windowsHide: true, ...process.env, PRAXIS_JOB_ID: id },
+      windowsHide: true,
+      env: { ...process.env, PRAXIS_JOB_ID: id },
     });
   } catch (e) {
     updateMeta(p.praxisDir, id, { exitCode: -1, endedAt: new Date().toISOString(), exitSource: 'runner-spawn-failed' });
@@ -108,20 +124,23 @@ export async function startJob({ task, tool = 'claude', mode = 'plan', approvedF
 
 export async function run(argv = []) {
   const flags = new Set(argv.filter((a) => a.startsWith('--')));
-  const positional = argv.filter((a) => !a.startsWith('--'));
+  const toolIndex = argv.indexOf('--tool');
+  const positional = argv.filter((a, index) => !a.startsWith('--') && index !== toolIndex + (toolIndex >= 0 ? 1 : 0));
   const task = positional.join(' ').trim();
   const c = praxisCmd();
+  let tool;
+  try { tool = selectedTool(argv); } catch (error) { console.error(error.message); process.exitCode = 1; return; }
 
   if (!task) {
     console.log('\n  ' + bold('praxis run "<task>"') + grey(' — hand a task to an agent, keep your terminal.'));
     console.log('  ' + grey('default  ') + 'SAFE DRAFT — questions get answered; write tasks produce a plan, nothing is touched');
     console.log('  ' + grey('flags    ') + '--allow-edits' + grey(' (file edits pre-approved) · ') + '--full-auto' + grey(' (everything allowed — trusted repos only)'));
-    console.log('  ' + grey('tools    ') + 'claude (default) · ' + '--codex' + grey(' (run via OpenAI Codex)'));
+    console.log('  ' + grey('tools    ') + 'claude (default) · --codex · --gemini · --opencode · --tool <configured-agent>');
+    console.log('  ' + grey('custom   ') + 'PRAXIS_AGENT_ADAPTERS: explicit argv per agent and permission mode');
     console.log('  ' + grey('then     ') + `${c} jobs` + grey(' — the deck · ') + `${c} approve <id>` + grey(' — execute a draft') + '\n');
     return;
   }
 
-  const tool = flags.has('--codex') ? 'codex' : flags.has('--gemini') ? 'gemini' : 'claude';
   const mode = flags.has('--full-auto') ? 'bypassPermissions' : flags.has('--allow-edits') ? 'acceptEdits' : 'plan';
 
   if (mode === 'bypassPermissions') {
@@ -130,7 +149,7 @@ export async function run(argv = []) {
 
   const r = await startJob({ task, tool, mode });
   if (r.error === 'no-adapter') {
-    console.log('\n  ' + rose('No adapter for ' + tool + ' yet') + grey(' — claude and codex run today; gemini adapter is on the roadmap.') + '\n');
+    console.log('\n  ' + rose('No adapter for ' + tool) + grey(' — configure PRAXIS_AGENT_ADAPTERS or use claude, codex, gemini, opencode.') + '\n');
     process.exitCode = 1;
     return;
   }
@@ -148,4 +167,3 @@ export async function run(argv = []) {
   console.log('  ' + grey('watch    ') + `${c} jobs` + grey('   · output: .praxis/jobs/' + r.id + '/out.log'));
   console.log('  ' + grey('Your terminal is yours again. The job survives closing it.') + '\n');
 }
-

@@ -3,6 +3,7 @@ import { existsSync, readFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { init } from './commands/init.js';
+import { connect } from './commands/connect.js';
 import { status } from './commands/status.js';
 import { capture } from './commands/capture.js';
 import { feedback } from './commands/feedback.js';
@@ -31,6 +32,10 @@ import { doctor } from './commands/doctor.js';
 import { uninstall } from './commands/uninstall.js';
 import { update } from './commands/update.js';
 import { demo } from './commands/demo.js';
+import { workbench } from './commands/workbench.js';
+import { verifyCommand } from './commands/verify.js';
+import { githubAppCommand } from './commands/github-app.js';
+import { live } from './commands/live.js';
 import { warnDeprecated, removalNotice } from './lib/deprecate.js';
 import { didYouMean } from './lib/suggest.js';
 import { record, flush } from './lib/telemetry.js';
@@ -70,6 +75,8 @@ function help() {
       [`${c} receipt`, `proof of what the AI did ${grey('· --html share card · --list')}`],
       [`${c} receipt verify <file>`, grey('offline proof — chain + signature, free'), 'sub'],
       [`${c} receipt --verify`, grey('judge this session — one paid model call'), 'sub'],
+      [`${c} verify`, `check agent claims against an exact Git change ${grey('· static and local by default')}`],
+      [`${c} live`, `watch the Verify pipeline issue a signed receipt ${grey('· two rehearsed scenarios')}`],
       [`${c} recap`, 'catch me up on this project, right in the terminal'],
       [`${c} save`, 'log the current session into memory, mid-flight'],
     ]],
@@ -78,7 +85,9 @@ function help() {
       [`${c} gov "<goal>"`, `the Governor staffs the deck from one goal ${grey('· gov alone = the report')}`],
       [`${c} flow`, `orchestrate multi-agent DAG pipelines ${grey('· flow run <spec>')}`],
       [`${c} eval`, `offline agent benchmark harness ${grey('· eval <suite>')}`],
+      [`${c} workbench`, `local project review and repair ${grey('· optional source-checkout app')}`],
       [`${c} run "<task>"`, `hand a task to an agent, keep your terminal ${grey('· safe draft by default')}`],
+      [`${c} connect`, 'discover installed coding agents and link project memory/tools'],
       [`${c} jobs`, `every background job, honest status, last words ${grey('· jobs <id>')}`],
       [`${c} approve`, `the inbox: drafts wait for you ${grey('· approve <id> executes · --deny closes')}`],
     ]],
@@ -104,9 +113,9 @@ function help() {
     console.log('');
   }
   console.log(`  ${bold('Also included')}
-  ${grey(`${c} flow · ${c} eval · ${c} switch <tool> · ${c} checkpoint · ${c} trace · ${c} gate · ${c} vault <path> · ${c} tray · ${c} telemetry · ${c} feedback`)}
+  ${grey(`${c} flow · ${c} eval · ${c} github-app · ${c} switch <tool> · ${c} checkpoint · ${c} trace · ${c} gate · ${c} vault <path> · ${c} tray · ${c} telemetry · ${c} feedback`)}
   ${grey(`${c} init · ${c} capture — setup and the (internal) Stop-hook entry`)}
-  ${grey(`--json on status · receipt · jobs · doctor — one document on stdout, stable keys, same exit codes`)}
+  ${grey(`--json on status · receipt · verify · jobs · doctor — one document on stdout, stable keys, same exit codes`)}
 
   ${dim('Not our lane, and we will not pretend otherwise:')}
   ${dim('token costs → npx ccusage    ·    live session monitoring → npx cctop')}
@@ -147,12 +156,15 @@ async function dispatch(cmd) {
 // Every name the switch below answers to, kept adjacent so a new case lands
 // here in the same diff. A stale list only costs a suggestion, never a command.
 const COMMANDS = [
-  'init', 'status', 'capture', 'feedback', 'tray', 'switch', 'health',
+  'init', 'connect', 'status', 'capture', 'feedback', 'tray', 'switch', 'health',
   'telemetry', 'trace', 'vault', 'checkpoint', 'remember', 'recap',
   'forget', 'save', 'explain', 'gate', 'receipt', 'run', 'jobs',
-  'approve', 'gov', 'deck', 'flow', 'eval', 'mcp', 'doctor', 'update', 'uninstall', 'demo', 'help',
+  'approve', 'gov', 'deck', 'flow', 'eval', 'verify', 'live', 'github-app', 'mcp', 'doctor', 'update', 'uninstall', 'demo', 'workbench', 'help',
 ];
 switch (cmd) {
+  case 'connect':
+    connect(process.argv.slice(3));
+    break;
   case 'init':
     await init();
     break;
@@ -229,6 +241,18 @@ switch (cmd) {
   case 'eval':
     await evalCmd(process.argv.slice(3));
     break;
+  case 'verify':
+    process.exitCode = await verifyCommand(process.argv.slice(3));
+    break;
+  case 'live':
+    process.exitCode = await live(process.argv.slice(3));
+    break;
+  case 'github-app':
+    process.exitCode = await githubAppCommand(process.argv.slice(3));
+    break;
+  case 'workbench':
+    process.exitCode = await workbench(process.argv.slice(3));
+    break;
   case 'mcp':
     await mcp();
     break;
@@ -269,6 +293,7 @@ switch (cmd) {
         /* best-effort; init still covers it */
       }
       status({ welcome: true });
+      connect();
       await tray(['--ensure']); // the companion comes back with every run
     } else {
       await init();

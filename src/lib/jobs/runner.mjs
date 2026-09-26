@@ -10,6 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { agentSpawn } from './spawn.js';
 
 const dir = process.argv[2];
 const metaFile = path.join(dir, 'meta.json');
@@ -44,14 +45,13 @@ const out = fs.openSync(path.join(dir, 'out.log'), 'a');
 const err = fs.openSync(path.join(dir, 'err.log'), 'a');
 
 // Windows can't spawn .cmd/.bat directly without a shell (EINVAL)
-const [cmd, ...args] = meta.argv || [];
-const isCmdShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(cmd || '');
-const file = isCmdShim ? process.env.ComSpec || 'cmd.exe' : cmd;
-const fargs = isCmdShim ? ['/c', cmd, ...args] : args;
+const [cmd, ...args] = (meta.argv || []).map(arg => String(arg).replaceAll('{taskFile}', path.join(dir, 'task.txt')));
 
 let child;
 try {
-  child = spawn(file, fargs, { windowsHide: true, cwd: meta.cwd || undefined, stdio: ['pipe', out, err] });
+  const invocation = agentSpawn([cmd, ...args]);
+  child = spawn(invocation.file, invocation.args, { windowsHide: true, cwd: meta.cwd || undefined, stdio: ['pipe', out, err],
+    env: { ...process.env, ...(meta.agentEnv || {}) } });
 } catch (e) {
   patchMeta({ exitCode: -1, endedAt: new Date().toISOString(), exitSource: 'spawn-failed: ' + (e && e.message) });
   process.exit(0);

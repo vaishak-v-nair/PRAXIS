@@ -10,6 +10,7 @@ import { patchClaudeMd } from '../lib/claudemd.js';
 import { patchAgentsMd } from '../lib/agentsmd.js';
 import { patchSettings, resolveHookScope, contributorCount, ignoreLocalSettings } from '../lib/settings.js';
 import { patchMcpConfig } from '../lib/mcp/config.js';
+import { autoConnect } from '../lib/agent-connect.js';
 import { masthead, mascotBlock, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
 import { readFileSync } from 'node:fs';
@@ -71,6 +72,7 @@ export async function init() {
   // AGENTS.md managed block (Codex / agents)
   const amd = patchAgentsMd(p.agentsMd);
   done.push(amd.existed ? 'AGENTS.md (PRAXIS block refreshed)' : 'AGENTS.md (created)');
+  for (const link of autoConnect(p.root).links) done.push(`${link.name}: ${link.state} — project MCP link`);
 
   // ── the hooks, and WHOSE machine they run on ────────────────────────────
   // These hooks run `npx -y praxis-memory` at the end of every session. Written
@@ -151,7 +153,7 @@ export async function init() {
   // deletion three files away. The templates directory is the list.
   const slashCmds = fs
     .readdirSync(TEMPLATES)
-    .filter((f) => f.startsWith('praxis-') && f.endsWith('.md'))
+    .filter((f) => f.startsWith('praxis') && f.endsWith('.md'))
     .sort();
   for (const name of slashCmds) {
     fs.copyFileSync(path.join(TEMPLATES, name), path.join(p.commandsDir, name));
@@ -168,6 +170,23 @@ export async function init() {
     done.push('~/.claude/commands — the same commands, available in every project');
   } catch {
     /* user scope is best-effort */
+  }
+
+  // antigravity skills: make /praxis-* visible in Google Antigravity
+  try {
+    const antigravitySkills = path.join(os.homedir(), '.gemini', 'config', 'skills');
+    if (fs.existsSync(path.dirname(antigravitySkills))) {
+      fs.mkdirSync(antigravitySkills, { recursive: true });
+      for (const name of slashCmds) {
+        const skillName = name.replace('.md', '');
+        const skillDir = path.join(antigravitySkills, skillName);
+        fs.mkdirSync(skillDir, { recursive: true });
+        fs.copyFileSync(path.join(TEMPLATES, name), path.join(skillDir, 'SKILL.md'));
+      }
+      done.push('~/.gemini/config/skills — slash commands available in Google Antigravity');
+    }
+  } catch {
+    /* antigravity scope is best-effort */
   }
 
   ensureGitignore(p.root);

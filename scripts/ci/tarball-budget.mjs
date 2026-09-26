@@ -10,7 +10,10 @@
 
 import { spawnSync } from 'node:child_process';
 
-export const BUDGET_MB = 3.5;
+// PRAXIS Live adds the complete local UI, browser verifier and two deterministic
+// fixtures to the shipped CLI. The 50 KiB increase is deliberate and keeps the
+// zero-dependency first run self-contained instead of fetching demo assets.
+export const BUDGET_MB = 3.55;
 const MB = 1024 * 1024;
 
 /** Pure: is this size within budget? Separated so the rule is testable. */

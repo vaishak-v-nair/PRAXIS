@@ -25,6 +25,7 @@ export function projectPaths(cwd = process.cwd()) {
     memoryFile: path.join(cwd, '.praxis', 'memory.md'),
     configFile: path.join(cwd, '.praxis', 'config.json'),
     receiptsDir: path.join(cwd, '.praxis', 'receipts'),
+    verifyDir: path.join(cwd, '.praxis', 'verify'),
     mcpFile: path.join(cwd, '.mcp.json'),
     claudeDir: path.join(cwd, '.claude'),
     settingsFile: path.join(cwd, '.claude', 'settings.json'),

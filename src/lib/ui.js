@@ -4,7 +4,10 @@
 import { MASCOT_ART } from './mascot-art.js';
 
 const forceRich = process.env.PRAXIS_RICH === '1';
-const useColor = (forceRich || !!process.stdout.isTTY) && !process.env.NO_COLOR;
+// PRAXIS_RICH is the explicit deterministic render mode used by recordings and
+// visual regressions. It must outrank an inherited NO_COLOR; ordinary terminal
+// detection still honours NO_COLOR exactly as before.
+const useColor = forceRich || (!!process.stdout.isTTY && !process.env.NO_COLOR);
 // Truecolor art needs a terminal that can draw it. The grid needs nothing —
 // which is why the WELCOME no longer falls back, but the mascot still gates:
 // its pixels are pre-painted 24-bit ANSI, and on legacy conhost or a pipe

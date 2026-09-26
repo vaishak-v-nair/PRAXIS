@@ -18,7 +18,7 @@ test('tarball budget: passes under, fails over, and always names the size', () =
   const under = checkBudget(2.8 * MB);
   assert.equal(under.ok, true);
   assert.match(under.message, /2\.80MB/);
-  assert.match(under.message, /3\.50MB/);
+  assert.match(under.message, new RegExp(`${BUDGET_MB.toFixed(2)}MB`));
 
   const over = checkBudget(4 * MB);
   assert.equal(over.ok, false);

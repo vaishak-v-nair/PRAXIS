@@ -14,6 +14,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+### Added
+
+- **`praxis verify`**: static-first verification of an agent completion report
+  against an exact Git commit/tree range. Claims, observations, deterministic
+  policy decisions, and scope completeness are kept separate; the redacted
+  local artifact uses a new separate Ed25519 Verify receipt format.
+  Trusted checks require an explicit argv-based policy and run in a temporary
+  detached worktree with a stripped environment, bounded output, timeouts, and
+  process-tree cleanup. Optional AI claim extraction is provider-neutral,
+  explicit, schema-validated, and has no authority over targets or verdicts.
+- **PRAXIS Verify GitHub App and receipt explorer**: signed pull-request
+  webhooks now drive the same exact-SHA verifier, with a neutral check and one
+  updated comment by default. Repositories can opt into a blocking conclusion
+  only through `.github/praxis-verify.json` on the protected base revision.
+  The plain GitHub Pages explorer verifies the separate Ed25519 Verify receipt
+  locally and can encode one receipt in a URL fragment without uploading it.
+- **PRAXIS Workbench**: the complete local review-and-repair app from `demo`
+  now lives in `apps/workbench`, with its own frontend lockfile and Python
+  environment. `praxis workbench` and `npm run dev` launch its local services;
+  `workbench --check --json` inspects readiness without starting them.
+  Existing memory, receipts, hooks, tray, demo, deck, flow, and eval remain in
+  place. The optional app is outside the core npm tarball and retains explicit
+  runtime trust, shared model budgets, diff exports, and source-apply confirmation.
+- Folder upload intake, with isolated copies, file/size limits, credential
+  exclusions, portable path checks, and download-only application of repairs.
+- Gemini CLI and OpenCode job adapters, `run --tool`, and configurable argv
+  adapters for additional coding agents. `eval --tool` now honors its selector.
+- GitHub failures distinguish network restrictions from authentication and TLS
+  problems; Git retains proxy/certificate routing and normalizes repository URLs.
+- Windows API development reload restarts only the owned Python process tree,
+  preserving the frontend and excluding test-file changes from reload triggers.
+
 ## [0.13.0] — 2026-09-18
 
 ### Added

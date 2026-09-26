@@ -42,19 +42,18 @@ export function connectAgents(root = process.cwd(), agents = discoverAgents()) {
     if (agent.custom) {
       results.push({ name: agent.name, state: 'adapter-ready' }); continue;
     }
-    const relative = { claude: '.mcp.json', codex: '.codex/config.toml', gemini: '.gemini/settings.json', opencode: 'opencode.json', cursor: '.cursor/mcp.json' }[agent.name];
+    if (agent.name === 'codex' || agent.name === 'cursor') {
+      results.push({ name: agent.name, state: 'instructions-linked', detail: 'AGENTS.md shares PRAXIS memory; MCP config is left to the client to avoid untrusted project startup.' });
+      continue;
+    }
+    const relative = { claude: '.mcp.json', gemini: '.gemini/settings.json', opencode: 'opencode.json' }[agent.name];
     if (!relative) continue;
     try {
       const file = writableFile(root, relative);
       let raw = '';
       try { raw = fs.readFileSync(file, 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
       let next;
-      if (agent.name === 'codex') {
-        // Preserve user-owned TOML. Refuse unfamiliar syntax rather than rewrite it.
-        if (/praxis/.test(raw)) { results.push({ name: agent.name, state: 'existing', file: relative }); continue; }
-        if (raw && /mcp_servers\s*=|\[\[|'''|"""/.test(raw)) throw new Error('Complex TOML');
-        next = raw.trimEnd() + '\n\n[mcp_servers.praxis]\ncommand = "npx"\nargs = ["-y", "praxis-memory", "mcp"]\n';
-      } else {
+      {
         const config = raw ? JSON.parse(raw) : {};
         if (!config || typeof config !== 'object' || Array.isArray(config)) throw new Error('Invalid config');
         const key = agent.name === 'opencode' ? 'mcp' : 'mcpServers';

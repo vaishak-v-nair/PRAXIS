@@ -1,0 +1,38 @@
+name: PRAXIS Verify red team
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/lib/verify/policy.js"
+      - "src/lib/verify/mcp-evidence.js"
+      - "src/lib/verify/observers.js"
+      - "src/lib/verify/extract.js"
+      - "src/lib/verify/claims.js"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-redteam-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  false-verified-redteam:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    name: no crafted report produces false VERIFIED
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: install evaluation tooling
+        run: npm ci --ignore-scripts
+      - name: adversarial Promptfoo pass
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PROMPTFOO_DISABLE_TELEMETRY: "1"
+        run: npm run redteam:verify

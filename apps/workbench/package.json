@@ -1,0 +1,28 @@
+{
+  "name": "praxis-workbench",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c green,blue \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:web": "next dev --hostname 127.0.0.1 --port 3000",
+    "dev:api": "node tools/backend.mjs dev",
+    "api": "node tools/backend.mjs",
+    "build": "next build",
+    "start": "concurrently -k -n api,web \"npm:api\" \"next start --hostname 127.0.0.1 --port 3000\"",
+    "typecheck": "tsc --noEmit",
+    "test:backend": "node tools/backend.mjs test"
+  },
+  "dependencies": {
+    "next": "^16.3.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.8.0",
+    "concurrently": "^9.2.0"
+  }
+}

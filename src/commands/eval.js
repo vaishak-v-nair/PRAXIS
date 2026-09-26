@@ -19,12 +19,14 @@ import { loadReceipt } from '../lib/receipt/render.js';
 import { bold, grey, sage, rose, amber, dim } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
 import { wantsJson, emitJson } from '../lib/jsonout.js';
+import { selectedTool } from '../lib/jobs/adapters.js';
 
 export async function evalCmd(argv = []) {
   const p = projectPaths();
   const c = praxisCmd();
   const json = wantsJson(argv);
-  const suiteArg = argv.find((a) => !a.startsWith('--'));
+  const toolIndex = argv.indexOf('--tool');
+  const suiteArg = argv.find((a, i) => !a.startsWith('--') && i !== (toolIndex >= 0 ? toolIndex + 1 : -1));
 
   if (!suiteArg) {
     const suites = listEvalSuites(p.praxisDir);
@@ -75,7 +77,8 @@ export async function evalCmd(argv = []) {
     return;
   }
 
-  const tool = argv.includes('--codex') ? 'codex' : 'claude';
+  let tool;
+  try { tool = selectedTool(argv); } catch (error) { console.error(error.message); process.exitCode = 1; return; }
   const mode = argv.includes('--allow-edits') ? 'acceptEdits' : 'plan';
 
   console.log('\n  ' + bold('RUNNING BENCHMARK SUITE') + grey(`  · ${suite.name} (${suite.cases.length} cases)`));

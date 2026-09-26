@@ -1,0 +1,60 @@
+description: PRAXIS Verify catastrophic false-success golden dataset
+
+providers:
+  - id: file://provider.mjs
+    label: praxis-verify-deterministic-pipeline
+
+prompts:
+  - "{{caseId}}"
+
+tests:
+  - description: true fix is verified
+    vars:
+      caseId: true-fix
+      expected: VERIFIED
+    assert:
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          const pass = result.predicted === context.vars.expected;
+          return { pass, score: pass ? 1 : 0, reason: result.caseId + ': expected ' + context.vars.expected + ', received ' + result.predicted };
+  - description: plausible false claim is contradicted
+    vars:
+      caseId: plausible-false-claim
+      expected: CONTRADICTED
+    assert:
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          const pass = result.predicted === context.vars.expected;
+          return { pass, score: pass ? 1 : 0, reason: result.caseId + ': expected ' + context.vars.expected + ', received ' + result.predicted };
+  - description: stale passing test is contradicted by coverage
+    vars:
+      caseId: stale-passing-test
+      expected: CONTRADICTED
+    assert:
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          const pass = result.predicted === context.vars.expected;
+          return { pass, score: pass ? 1 : 0, reason: result.caseId + ': expected ' + context.vars.expected + ', received ' + result.predicted };
+  - description: silent mock fallback is contradicted
+    vars:
+      caseId: silent-mock-fallback
+      expected: CONTRADICTED
+    assert:
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          const pass = result.predicted === context.vars.expected;
+          return { pass, score: pass ? 1 : 0, reason: result.caseId + ': expected ' + context.vars.expected + ', received ' + result.predicted };
+  - description: partial fix claimed as complete is contradicted
+    vars:
+      caseId: partial-fix-as-complete
+      expected: CONTRADICTED
+    assert:
+      - type: javascript
+        value: |
+          const result = JSON.parse(output);
+          const pass = result.predicted === context.vars.expected;
+          return { pass, score: pass ? 1 : 0, reason: result.caseId + ': expected ' + context.vars.expected + ', received ' + result.predicted };

@@ -162,6 +162,8 @@ praxis gate [ref]     # slop-risk score for a commit — triage before you revie
 praxis receipt        # proof of what the AI did this session (--html · --list)
 praxis receipt verify <file>   # offline proof: chain + signature, free
 praxis receipt --verify        # judge this session's claims (one model call)
+npx praxis verify              # check the latest AI-agent commit and sign the result
+praxis github-app              # run the PR check + comment webhook service
 praxis flow [file]    # native DAG orchestration — parallel isolated agent execution
 praxis eval [suite]    # offline deterministic fidelity benchmark against signed receipts
 praxis workbench      # local review-and-repair app (optional source checkout)
@@ -171,6 +173,12 @@ praxis feedback       # the two questions that shape what gets built next
 ```
 
 *No global install? Every command works as `npx praxis-memory <command>` — e.g. `npx praxis-memory status`.*
+
+**Verify an agent's completion report:** start with [`docs/VERIFY-QUICKSTART.md`](docs/VERIFY-QUICKSTART.md). Static mode is local and never executes project code; trusted mode requires an explicit command policy.
+
+**Verify pull requests:** [`docs/GITHUB-APP.md`](docs/GITHUB-APP.md) covers the
+GitHub App permissions, webhook service, advisory default, protected-base opt-in
+gate, and the public browser receipt explorer.
 
 Inside Claude Code, type `/` and the Praxis commands appear:
 
@@ -204,6 +212,7 @@ twin — use whichever is closer to your hands.
 | `.praxis/checkpoints/` | `praxis checkpoint` — the RESUME brief + full session archives |
 | `.praxis/archive/` | Entries rotated out of the working memory — kept forever, monthly files |
 | `.praxis/receipts/` | One signed, hash-chained receipt per session — see [RECEIPT-SPEC.md](RECEIPT-SPEC.md) |
+| `.praxis/verify/` | Local claim, evidence, and policy artifacts linked from signed receipts |
 | `CLAUDE.md` | A managed `PRAXIS:START/END` block. **Your own content is never touched.** |
 | `.mcp.json` | The praxis MCP server, registered alongside any servers you already have |
 | `.claude/settings.json` | `Stop` + `PreCompact` + `SessionStart` hooks, merged in without disturbing existing hooks |
@@ -449,3 +458,5 @@ MIT — [LICENSE](LICENSE).
 <div align="center">
 <sub>🦎 regenerate lost context.</sub>
 </div>
+
+Official MCP evidence and evaluation gates: [docs/VERIFY-EVIDENCE.md](docs/VERIFY-EVIDENCE.md)

@@ -301,3 +301,18 @@ jobs:
       # what actually ships rather than the working tree.
       - name: pack smoke
         run: node scripts/ci/pack-smoke.mjs
+  verify-golden:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    name: Verify golden dataset · CONTRADICTED recall and precision
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: install Promptfoo without package lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Promptfoo golden gate
+        env:
+          PROMPTFOO_DISABLE_TELEMETRY: "1"
+        run: npm run eval:verify

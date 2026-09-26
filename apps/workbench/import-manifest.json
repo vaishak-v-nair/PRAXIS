@@ -1,0 +1,337 @@
+{
+  "source": "E:/BrosKi/demo",
+  "imported_at": "2026-09-18",
+  "scope": "Application source, tests, tools, and Zentara source. Private runtime state is migrated separately and never included in this manifest.",
+  "files": [
+    {
+      "path": ".env.example",
+      "sha256": "210283e190e9470d221b02e8bcee8b2a341bdff558d3f81988fb9bc4b2f33e23",
+      "bytes": 483
+    },
+    {
+      "path": ".github/workflows/quality.yml",
+      "sha256": "46503fbb76962fca39eeeb81e4aa51b92370b21c09a963675332e01737969053",
+      "bytes": 867
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "8a6d4d3f7242e59d5c3ec3c6ee95336edd44ab0a325340e4c07fba729d4d0291",
+      "bytes": 109
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "9ef8957d24d2a36d80b20da09365657721a600e28a6e087b498d8671ccafc364",
+      "bytes": 2496
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "336cc4fbf19beaada7ccf9986414fa91851a8d7a07dfb3ccbe800a69eed0ab49",
+      "bytes": 11
+    },
+    {
+      "path": "README.md",
+      "sha256": "10e3f6732e79dbe4dd05af51b4cee5f4aa42c01fa6b634797cd623442cc9dbdb",
+      "bytes": 7162
+    },
+    {
+      "path": "app/globals.css",
+      "sha256": "f0dfcbb87e05af515f52eb010d71e0cf9ee770eca855d1ba60fce5aef4270e31",
+      "bytes": 26457
+    },
+    {
+      "path": "app/layout.tsx",
+      "sha256": "e357238d663f6e84bc618bf06ade1e8457a60eb1b8e074a728bf007f7a39fe1f",
+      "bytes": 404
+    },
+    {
+      "path": "app/page.tsx",
+      "sha256": "97be486907476e0197d98ac53e5f9d3cb59f8f210088566852d7ad70a3894621",
+      "bytes": 11227
+    },
+    {
+      "path": "backend/regen/__init__.py",
+      "sha256": "ba4e29105ca27e0d619868b0f935b1e93ef842ed7bd7820c9014961b3f56e82d",
+      "bytes": 49
+    },
+    {
+      "path": "backend/regen/app.py",
+      "sha256": "8fb69fe0a97b86d7a30b4ee7a2458b9329a21062992aa692bfc53678d0ee42af",
+      "bytes": 19442
+    },
+    {
+      "path": "backend/regen/context.py",
+      "sha256": "965cf361f73b4dc519cfdd219d67a83b022605b25eaa51b804170f2eca54757b",
+      "bytes": 3376
+    },
+    {
+      "path": "backend/regen/harness.py",
+      "sha256": "0890bd26a54c6bde09d99577a6507de960644245782ec5a70f06b578050eef28",
+      "bytes": 4255
+    },
+    {
+      "path": "backend/regen/provider.py",
+      "sha256": "b88ece7072107f7dd683a9a8d84b3931a79684ce981af3a4d84a96a668cb00c1",
+      "bytes": 49474
+    },
+    {
+      "path": "backend/regen/reality.py",
+      "sha256": "424663d77b788714478f283fdd519f833e1eac7bf56ade914b176296b8f621c9",
+      "bytes": 10020
+    },
+    {
+      "path": "backend/regen/scanner.py",
+      "sha256": "8f97abd3c60142a5cae9733d6302e8aa594373219f1db0df34f52bf5ca2703d1",
+      "bytes": 37590
+    },
+    {
+      "path": "backend/regen/store.py",
+      "sha256": "0a11833ce30cf8d79a7f78cadd98e77fcb1e9b57ac0ff2dad90908ff03887f81",
+      "bytes": 1441
+    },
+    {
+      "path": "backend/requirements.txt",
+      "sha256": "c7a2448be5e8b7dce31d89984dd4694239fcd00585e4c118b538a888cf5831d7",
+      "bytes": 110
+    },
+    {
+      "path": "backend/tests/test_api.py",
+      "sha256": "ff8fd5dc9c19fa81d276e9aff1c5271f6e66d0491747915b54c87131ca39b8d5",
+      "bytes": 15245
+    },
+    {
+      "path": "backend/tests/test_context.py",
+      "sha256": "9043cff9796a7f90ec4c6dc640c7b9e7af5ac24d4f77584972c40d36b1eaaa45",
+      "bytes": 2494
+    },
+    {
+      "path": "backend/tests/test_harness.py",
+      "sha256": "4221bf90f9c838f0d75693d9ab310740faa651ebed544bbab433f90708bec658",
+      "bytes": 3610
+    },
+    {
+      "path": "backend/tests/test_provider.py",
+      "sha256": "41a3f80bd626b0fa8abd092b6207b19c1e5cb9044011c197d679d8a0e27960f0",
+      "bytes": 37742
+    },
+    {
+      "path": "backend/tests/test_scanner.py",
+      "sha256": "bc021f43d9de7effede570c776732554cc007a0e4b0a795e1a5a2cf17df21b7a",
+      "bytes": 13077
+    },
+    {
+      "path": "components/ActionDialog.tsx",
+      "sha256": "28ace0914c29475a84a7ffc6642318a51e8f145c7836566f073b279ee4807f77",
+      "bytes": 3019
+    },
+    {
+      "path": "components/FixReview.tsx",
+      "sha256": "750ca9fab57818ba939061aa0db35e9e7d25b2b00b81ddf2abc90ccd1fcb9328",
+      "bytes": 3904
+    },
+    {
+      "path": "components/JobReport.tsx",
+      "sha256": "ffbf0ac79c03d5aa09e309b0c4df6ed06a39611fad4bc5b1067cf7e3a174a8ce",
+      "bytes": 9115
+    },
+    {
+      "path": "components/ModelSettings.tsx",
+      "sha256": "88a286699e42c66635fce3b9f2b3cbdc101796f3134c760a3f18c5bdf01099f7",
+      "bytes": 4910
+    },
+    {
+      "path": "components/ProjectInput.tsx",
+      "sha256": "5d204b6660330614f7a553e1024048d8cfbaefead2c69df25a0df85788a5eacf",
+      "bytes": 2323
+    },
+    {
+      "path": "components/types.ts",
+      "sha256": "cc7f88eb4e2b0780ae32816c8f817bca9c4f9870a111983a379ae8b2d5c2464c",
+      "bytes": 1999
+    },
+    {
+      "path": "next.config.ts",
+      "sha256": "a067c880966f2678d1b6727866f7a6f006f34f445c6f26be0ac34ed7695c4aec",
+      "bytes": 273
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "7c72c8cd342b1bd671e92aa42ac43bb5cdd10639acef54ec6549af908528f7b6",
+      "bytes": 45173
+    },
+    {
+      "path": "package.json",
+      "sha256": "6a62fc85e227d08331679f9f6757eae6b06b2376b3df2daf2e5d9ccdcab97565",
+      "bytes": 813
+    },
+    {
+      "path": "repos/Zentara/.env.example",
+      "sha256": "18e4badfe2178dfbfccf41abc9bf63a4d609f56e4ba5fed90c04f5210fa0d4fd",
+      "bytes": 523
+    },
+    {
+      "path": "repos/Zentara/.github/workflows/quality.yml",
+      "sha256": "98f5fed13fbd596e5a14a960bc6e4d568b94c42876f2152a8512c1616a59c732",
+      "bytes": 521
+    },
+    {
+      "path": "repos/Zentara/.gitignore",
+      "sha256": "d6b7aeb1dda054f6fbf5302052b90e83286b6cb48c05a4d2f63d0f550dc91c28",
+      "bytes": 148
+    },
+    {
+      "path": "repos/Zentara/AGENTS.md",
+      "sha256": "64ff4ab57fabdf5e0760ae76f97b3227ac8d4225d908bdb829a908f88fb69571",
+      "bytes": 1953
+    },
+    {
+      "path": "repos/Zentara/README.md",
+      "sha256": "60bd98441177c07dbb46583693da1c7619512f2352b274aa89ddac8689bb6918",
+      "bytes": 4522
+    },
+    {
+      "path": "repos/Zentara/app.py",
+      "sha256": "9b7c3d63a948dc9fd7ebb3462a50270676c5d700219767ada9a9dbf49fb20c08",
+      "bytes": 6481
+    },
+    {
+      "path": "repos/Zentara/config.py",
+      "sha256": "d10520d6fed226f6164ff0256b5a129af53127857d6f5fd8da59ed867db11ecb",
+      "bytes": 4294
+    },
+    {
+      "path": "repos/Zentara/handson.md",
+      "sha256": "c5bb603002d41a9e0741a86da20cee1dc0b2838a533b1e80f364168a425657b7",
+      "bytes": 5975
+    },
+    {
+      "path": "repos/Zentara/ingest.py",
+      "sha256": "9cfa7c6769c23b144df705794be56fcb9d1d23da6e90bb40cdb134d63b44e252",
+      "bytes": 11623
+    },
+    {
+      "path": "repos/Zentara/llm.py",
+      "sha256": "b9d5bb652f4283f345290ce14fdcb811213611e1dd1ede3b88aa837e19fc1a55",
+      "bytes": 6342
+    },
+    {
+      "path": "repos/Zentara/pyproject.toml",
+      "sha256": "17aab76b9ea9de0236c5d2d51402fcd7d8b5c31cadd82ec2880faa3dc460c9b0",
+      "bytes": 200
+    },
+    {
+      "path": "repos/Zentara/rag.py",
+      "sha256": "e262530507e416cd11d67a2f6d5c638e041b39c4cab116153ac61ce4f8ec6def",
+      "bytes": 10682
+    },
+    {
+      "path": "repos/Zentara/requirements-dev.txt",
+      "sha256": "b6c7e6f1a9964e68a2dba59df2117648f94c205ca512a8a2b4a61fb2e4a75599",
+      "bytes": 47
+    },
+    {
+      "path": "repos/Zentara/requirements-resolved.txt",
+      "sha256": "da438f7ff4c5be30991ea1831881cdcdf8ff3b12f03aa6e838dcf0a6cd1540ef",
+      "bytes": 1583
+    },
+    {
+      "path": "repos/Zentara/requirements.txt",
+      "sha256": "e856f5c36bd7071cd6dd3eec5ed6794394716762406e9945f755cd5bdc5cdef4",
+      "bytes": 229
+    },
+    {
+      "path": "repos/Zentara/tests/test_app.py",
+      "sha256": "b4244baa724d95f39e96ef5ff684230613e787f76fdfc43d97c02a30fb5e319f",
+      "bytes": 4374
+    },
+    {
+      "path": "repos/Zentara/tests/test_core.py",
+      "sha256": "158bb63605fb5450221772bf76f35941cd2043ec8f2f1569be1b1cf9b767546e",
+      "bytes": 15517
+    },
+    {
+      "path": "repos/Zentara/tests/test_rag.py",
+      "sha256": "d8087cf4f7996dff95012238554f098b250be9a01e1dc040de1adf046ebafb64",
+      "bytes": 9426
+    },
+    {
+      "path": "repos/Zentara/tests/test_vector_store.py",
+      "sha256": "4da82cffbc258c563e61bcd1a59d92947b38700b23dd14444b565ab67cf93d6d",
+      "bytes": 6265
+    },
+    {
+      "path": "repos/Zentara/vector_store.py",
+      "sha256": "5749d34b87067874ef68e5feb38964313aeae6ba2912c1ea734f8b0730ed40a9",
+      "bytes": 11045
+    },
+    {
+      "path": "tools/backend.mjs",
+      "sha256": "54c6d2d4a553053eed39dd3a309167f10a1e634aa342a98830bfcab6e37b5e95",
+      "bytes": 988
+    },
+    {
+      "path": "tools/browser_check.py",
+      "sha256": "745a80d79cca4329c94839d5fcf26a35483c49dd3305d9452e6ec04f1c16d40f",
+      "bytes": 1941
+    },
+    {
+      "path": "tools/check_providers.py",
+      "sha256": "83cee2b95cd818c7c4f629010df6fd7aee1eb2f5b76968a3757af3fc6ae50e90",
+      "bytes": 1220
+    },
+    {
+      "path": "tools/dependency_check.py",
+      "sha256": "26a207bd1b80d9be2f43224ec71bac55a5026734a6ace8197e69e2bf7156b2ee",
+      "bytes": 1694
+    },
+    {
+      "path": "tools/export_zentara.py",
+      "sha256": "126a31e83c712f19a6472c3883f06032f72ecb019db7bae2556fbfb7f4352232",
+      "bytes": 2205
+    },
+    {
+      "path": "tools/live_workflow.py",
+      "sha256": "d22020763667818fa0f5818bfc9611da17ecf9ad8a6a737039539558bf6e6ca2",
+      "bytes": 3640
+    },
+    {
+      "path": "tools/pressure_fix.py",
+      "sha256": "8ce99b49933bf485dc3379f3be8a03acc341ebc54edc512deaf712b515b5454d",
+      "bytes": 2494
+    },
+    {
+      "path": "tools/pressure_models.py",
+      "sha256": "643c082f9d318c16d3f6755c7b3c6e1702fac9f6ca2c18a5ac9617c4d25938dd",
+      "bytes": 4649
+    },
+    {
+      "path": "tools/pressure_web.py",
+      "sha256": "631310835fa97a1971d3deb421a96808b5f3926a44d86a12a14aa2baab38b939",
+      "bytes": 2978
+    },
+    {
+      "path": "tools/run_zentara.py",
+      "sha256": "855c3ef2c102b65ab27cb3abe00c88ae4a57d616bf62f104b5332da548ba0718",
+      "bytes": 1029
+    },
+    {
+      "path": "tools/smoke_provider.py",
+      "sha256": "feffea8ddb21408ed57bb9e5799cd781d2005083ba7b4307594f02b5a33494a5",
+      "bytes": 998
+    },
+    {
+      "path": "tools/zentara_browser.py",
+      "sha256": "54fefe5e4a2a98a59a9fb5a60410e922d4dcfabcfc05898e30bc47d7e7faa70e",
+      "bytes": 4547
+    },
+    {
+      "path": "tools/zentara_live_check.py",
+      "sha256": "0c0f759c4ea65fe0f9174aff4ab4649a1648d5bd0f6973106fea440a78fc5305",
+      "bytes": 2660
+    },
+    {
+      "path": "tsconfig.json",
+      "sha256": "54f592ec1598dcf250c69e42f9682f32f7e0a1278c37e95b9e0714f5e0b469b6",
+      "bytes": 699
+    }
+  ]
+}

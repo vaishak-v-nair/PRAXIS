@@ -11,8 +11,15 @@
     "src",
     "scripts/postinstall.js",
     "apps/workbench",
+    "web/live/app.js",
+    "web/live/graph.js",
+    "web/live/index.html",
+    "web/live/style.css",
+    "web/receipt/verify.js",
     "start.ps1",
     "README.md",
+    "docs/VERIFY-QUICKSTART.md",
+    "docs/GITHUB-APP.md",
     "LICENSE"
   ],
   "engines": {
@@ -28,7 +35,9 @@
     "typecheck:workbench": "npm --prefix apps/workbench run typecheck",
     "build:workbench": "npm --prefix apps/workbench run build",
     "start:workbench": "node src/cli.js workbench --production",
-    "test:workbench": "npm --prefix apps/workbench run test:backend"
+    "test:workbench": "npm --prefix apps/workbench run test:backend",
+    "eval:verify": "promptfoo eval -c evals/verify/promptfooconfig.yaml --no-cache && node evals/verify/metrics.mjs",
+    "redteam:verify": "promptfoo redteam run -c evals/verify/redteam-config.yaml -o evals/verify/redteam-cases.yaml --no-cache --strict --remote"
   },
   "keywords": [
     "claude-code",
@@ -48,8 +57,14 @@
   "license": "MIT",
   "author": "Vaishak V Nair (https://github.com/vaishak-v-nair)",
   "devDependencies": {
+    "@langchain/core": "1.2.12",
+    "@langchain/langgraph": "1.4.17",
+    "@libsql/client": "0.17.4",
     "ffmpeg-static": "^5.3.0",
-    "sharp": "^0.35.3"
+    "promptfoo": "0.122.1",
+    "sharp": "^0.35.3",
+    "three": "0.181.2",
+    "zod": "4.6.5"
   },
   "repository": {
     "type": "git",

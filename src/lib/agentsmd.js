@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 const START = '<!-- PRAXIS:START (managed - do not edit) -->';
 const END = '<!-- PRAXIS:END -->';
-const BLOCK = `${START}\n@.praxis/memory.md\n${END}`;
+const BLOCK = `${START}\n@.praxis/memory.md\nRead .praxis/memory.md before working; it contains project decisions and prior mistakes.\nUse available praxis_* MCP tools for memory and execution evidence. Claims require evidence.\n${END}`;
 
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

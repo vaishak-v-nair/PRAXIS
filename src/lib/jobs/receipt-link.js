@@ -32,7 +32,7 @@ export function parseEnvelope(raw) {
       const env = JSON.parse(c);
       if (env && typeof env === 'object' && typeof env.session_id === 'string') {
         return {
-          resultText: typeof env.result === 'string' ? env.result : text,
+          resultText: typeof env.result === 'string' ? env.result : typeof env.response === 'string' ? env.response : text,
           sessionId: env.session_id,
           costUsd: typeof env.total_cost_usd === 'number' ? env.total_cost_usd : null,
         };
@@ -56,6 +56,8 @@ export function parseEnvelope(raw) {
 
       if (typeof ev.thread_id === 'string') threadId = ev.thread_id;
       if (typeof ev.session_id === 'string') threadId = ev.session_id;
+      if (typeof ev.sessionID === 'string') threadId = ev.sessionID;
+      if (ev.type === 'text' && typeof ev.part?.text === 'string') agentMessageText = ev.part.text;
 
       if (ev.type === 'item.completed' && ev.item) {
         const item = ev.item;
@@ -97,7 +99,7 @@ export function parseEnvelope(raw) {
       const env = JSON.parse(c);
       if (env && typeof env === 'object') {
         return {
-          resultText: typeof env.result === 'string' ? env.result : text,
+          resultText: typeof env.result === 'string' ? env.result : typeof env.response === 'string' ? env.response : text,
           sessionId: null,
           costUsd: typeof env.total_cost_usd === 'number' ? env.total_cost_usd : null,
         };

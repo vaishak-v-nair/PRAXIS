@@ -94,7 +94,9 @@ test('resolveRunCmd: injectable, claude and codex adapters supported', () => {
   delete process.env.PRAXIS_RUN_CMD;
   assert.deepEqual(resolveRunCmd('claude'), ['claude', '-p', '--output-format', 'json']);
   assert.deepEqual(resolveRunCmd('codex'), ['codex', 'exec', '--json']);
-  assert.equal(resolveRunCmd('gemini'), null); // roadmap, not pretense
+  assert.equal(resolveRunCmd('gemini')[0], 'gemini');
+  assert.equal(resolveRunCmd('opencode')[0], 'opencode');
+  assert.equal(resolveRunCmd('unknown-agent'), null);
 });
 
 test('buildAgentArgv: maps codex modes to sandbox policies with stdin prompt', () => {

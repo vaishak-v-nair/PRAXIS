@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Open and verify a PRAXIS Ed25519 receipt locally in your browser.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>PRAXIS Receipt Explorer</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header><a href="../">PRAXIS</a><span>Receipt Explorer</span></header>
+  <main>
+    <section class="intro">
+      <p class="eyebrow">PUBLIC PROOF, VERIFIED LOCALLY</p>
+      <h1>Your agent said it was done.<br>This is the receipt that checks.</h1>
+      <p>Open one PRAXIS Verify receipt. Its Ed25519 signature is checked in this browser; the file is not uploaded.</p>
+      <label class="open">Open receipt <input id="file" type="file" accept="application/json,.json"></label>
+      <button id="share" type="button" hidden>Copy this receipt link</button>
+      <p id="error" role="alert"></p>
+    </section>
+    <section id="empty"><span>01</span><p>Choose a signed <code>praxis.verify.receipt/v1</code> JSON file to inspect its claims, evidence state, commit range, and signature.</p></section>
+    <div id="receipt" hidden></div>
+  </main>
+  <footer>Verification happens on this device. A valid signature proves the receipt has not changed since its keyholder signed it.</footer>
+  <script type="module" src="./explorer.js"></script>
+</body>
+</html>

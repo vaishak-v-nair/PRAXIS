@@ -43,3 +43,21 @@ Personal Intelligence/
 # hyperframes clone (local tool, not part of praxis)
 hyperframes/
 videos/
+
+# Optional local workbench: credentials, jobs, backups, and generated files.
+apps/workbench/.env
+apps/workbench/.env.*
+!apps/workbench/.env.example
+apps/workbench/.regen/
+apps/workbench/.venv*/
+apps/workbench/.next/
+apps/workbench/**/*.tsbuildinfo
+apps/workbench/next-env.d.ts
+apps/workbench/**/__pycache__/
+apps/workbench/**/*.pyc
+apps/workbench/**/.pytest_cache/
+apps/workbench/**/.ruff_cache/
+apps/workbench/repos/*/data/
+apps/workbench/repos/*/chroma_db/
+apps/workbench/repos/*/index_db/
+evals/verify/redteam-cases.yaml
