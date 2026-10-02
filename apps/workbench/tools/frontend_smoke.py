@@ -188,7 +188,7 @@ with sync_playwright() as runtime:
     page.get_by_role('heading', name='UI contract fixture', exact=True).wait_for()
     assert actions[-1]['path'] == '/scans'
     assert actions[-1]['body'] == {'source': 'C:/synthetic/project', 'budget': 5, 'ai_review': True,
-                                  'review_mode': 'ultra', 'run_checks': True,
+                                  'review_mode': 'team', 'review_goal': '', 'run_checks': True,
                                   'trust_confirmed': True, 'allow_network': False}
     page.goto(BASE, wait_until='networkidle')
     page.get_by_role('button', name='GitHub URL', exact=True).click()
@@ -221,11 +221,34 @@ with sync_playwright() as runtime:
     page.get_by_text('2 displayed evidence records', exact=True).wait_for()
     page.get_by_text('Inspect evidence', exact=True).first.click()
     page.get_by_text('Reviewable source inventory', exact=True).wait_for()
-    for view in ('overview', 'findings', 'execution', 'changes', 'source map', 'activity'):
+    fixture['team'] = {'status': 'partial', 'phase': 'finished', 'goal': 'Synthetic collaborative UI contract',
+        'max_parallel': 4, 'agents': [{'id': f'agent-{i}', 'agent': item['agent'],
+            'provider': item.get('provider', 'fixture'), 'model': item.get('model', 'fixture'),
+            'status': 'complete' if i < 3 else 'unavailable', 'peer_status': 'complete' if i < 3 else 'skipped',
+            'findings_added': item['findings_added']} for i, item in enumerate(fixture['pressure_tests'])],
+        'discussions': [{'agent_id': 'agent-0', 'agent': 'Security agent', 'finding_id': 'f1',
+            'position': 'challenges', 'reason': 'Synthetic source-backed disagreement for layout testing.',
+            'location': {'file': long_token, 'line': 1}, 'evidence': long_token}]}
+    page.reload(wait_until='networkidle')
+    page.get_by_role('heading', name='Specialists working together').wait_for()
+    page.get_by_text('Inspect 1 peer comments', exact=False).click()
+    page.get_by_text('Challenges finding', exact=True).wait_for()
+    assert page.locator('.team-agent-state').count() == 4
+    fixture['collaboration'] = {'revision': 2, 'participants': [{'session_id': 'fixture-owner', 'name': 'Owner'}, {'session_id': 'fixture-reviewer', 'name': 'Reviewer'}],
+        'notes': [{'id': 'note-1', 'author': 'Owner', 'kind': 'goal', 'text': long_token, 'assigned_to': 'team',
+                   'share_with_agents': True, 'created_at': '2026-10-02T00:00:00Z'},
+                  {'id': 'note-2', 'author': 'Reviewer', 'kind': 'decision', 'text': 'Synthetic private note', 'assigned_to': 'agent-2',
+                   'share_with_agents': False, 'created_at': '2026-10-02T00:00:01Z'}]}
+    page.reload(wait_until='networkidle')
+    for view in ('overview', 'findings', 'execution', 'changes', 'workspace', 'source map', 'activity'):
         page.get_by_role('navigation', name='Review sections').get_by_role('button', name=view, exact=(view != 'findings')).click()
         if view == 'overview':
             page.locator('.perspective-body details, .perspective-gaps, .dimension-limits').evaluate_all('(nodes) => nodes.forEach(node => node.open = true)')
         audit(page, view)
+        if view == 'workspace':
+            page.get_by_role('heading', name='One project. A shared review.').wait_for()
+            assert page.locator('.shared-discussion li').count() == 2
+            assert page.get_by_role('button', name='Post contribution').is_disabled()
         if view == 'findings':
             page.get_by_role('heading', name='What PRAXIS found', exact=True).wait_for()
             page.get_by_text('Fix before release', exact=False).first.wait_for()

@@ -21,6 +21,85 @@ api = importlib.import_module('regen.app')
 
 
 class ApiIntegrationTests(unittest.TestCase):
+    def test_team_progress_is_durable_and_keeps_runtime_consent_separate(self):
+        def collaborative(path, scan, emit, cancelled, budget, *, goal, human_context):
+            self.assertEqual(goal, 'Check the setup workflow')
+            self.assertEqual(human_context(), {})
+            self.assertFalse((path / '.env').exists())
+            scan['team'] = {'status': 'running', 'phase': 'inspection', 'agents': [], 'discussions': [], 'goal': goal}
+            emit({'message': 'Team inspecting source', **scan})
+            stored = api.store.all()[0]
+            self.assertEqual(stored['team']['status'], 'running')
+            self.assertTrue(stored['findings'])
+            scan['team']['status'] = 'complete'
+            return scan
+        with patch('regen.team.analyze_team', side_effect=collaborative), patch('regen.sandbox.run_checks') as runtime:
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'team',
+                                                          'review_goal': 'Check the setup workflow'})
+            self.assertEqual(response.status_code, 200)
+            job = self.finish(response.json()['id'])
+            runtime.assert_not_called()
+        self.assertEqual(job['team']['status'], 'complete')
+        self.assertEqual((self.source / 'app.py').read_text(), self.original)
+        self.assertNotIn(self.secret, json.dumps(job))
+
+    def test_team_budget_pause_retains_published_findings_and_peer_state(self):
+        def limited(path, scan, emit, cancelled, budget, **kwargs):
+            scan['team'] = {'status': 'paused', 'phase': 'peer_review', 'agents': [], 'discussions': []}
+            emit({'message': 'Limit reached', **scan})
+            raise provider.BudgetExceeded('Shared limit reached')
+        with patch('regen.team.analyze_team', side_effect=limited):
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'team'})
+            job = self.finish(response.json()['id'])
+        self.assertEqual(job['status'], 'paused')
+        self.assertEqual(job['team']['status'], 'paused')
+        self.assertTrue(job['findings'])
+
+    def test_team_goal_is_bounded_before_work_starts(self):
+        response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'team', 'review_goal': 'x' * 4001})
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(api.store.all(), [])
+
+    def test_two_people_share_durable_notes_without_changing_evidence_or_permissions(self):
+        job = self.scan()
+        evidence = job['findings']
+        for i, name in enumerate(('Alice', 'Bob')):
+            response = self.client.post(f"/api/jobs/{job['id']}/collaboration", json={
+                'session_id': ('a' if i == 0 else 'b') * 36, 'author': name, 'text': f'{name} asks to inspect setup',
+                'kind': 'question', 'assigned_to': 'agent-2', 'share_with_agents': bool(i)})
+            self.assertEqual(response.status_code, 200)
+        updated = self.client.get(f"/api/jobs/{job['id']}").json()
+        self.assertEqual(len(updated['collaboration']['notes']), 2)
+        self.assertEqual(len(updated['collaboration']['participants']), 2)
+        self.assertEqual(updated['findings'], evidence)
+        self.assertEqual(updated['status'], 'complete')
+        self.assertFalse(updated['collaboration']['notes'][0]['share_with_agents'])
+        self.assertEqual((self.source / 'app.py').read_text(), self.original)
+
+    def test_collaboration_limits_host_origin_and_redaction(self):
+        job = self.scan()
+        note = {'session_id': 'a' * 36, 'author': 'Alice', 'text': self.secret}
+        path = f"/api/jobs/{job['id']}/collaboration"
+        response = self.client.post(path, json=note)
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(self.secret, response.text)
+        self.assertEqual(self.client.post(path, json=note, headers={'Origin': 'https://untrusted.example'}).status_code, 403)
+        self.assertEqual(self.client.post(path, json={**note, 'text': 'x' * 2001}).status_code, 422)
+        self.assertEqual(self.client.post(path, json={**note, 'text': '  '}).status_code, 422)
+        self.assertEqual(self.client.post(path, json={**note, 'assigned_to': '../execute'}).status_code, 422)
+
+    def test_explicit_team_rereview_reads_notes_without_running_commands(self):
+        job = self.scan()
+        def rereview(path, scan, emit, cancelled, budget, **options):
+            self.assertIn('human_context', options)
+            return scan
+        with patch('regen.team.analyze_team', side_effect=rereview) as agents, patch('regen.sandbox.run_checks') as runtime:
+            response = self.client.post(f"/api/jobs/{job['id']}/team-review", json={})
+            self.assertEqual(response.status_code, 200)
+            self.finish(job['id'])
+            agents.assert_called_once()
+            runtime.assert_not_called()
+
     def test_public_history_gets_human_actions_without_mutating_saved_evidence(self):
         original = {'id': 'old-job', 'status': 'complete', 'snapshot': 'private-snapshot',
                     'checks_for': 'private-snapshot', 'assessment': {'version': 1},

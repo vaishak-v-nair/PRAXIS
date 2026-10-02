@@ -4,6 +4,12 @@ export interface Finding {
   location?: { file?: string; line?: number }; evidence?: string; fix?: string; fixable: boolean;
 }
 export interface Job {
+  collaboration?: { revision: number; participants: Array<{ session_id: string; name: string }>;
+    notes: Array<{ id: string; author: string; kind: string; text: string; assigned_to: string; share_with_agents: boolean; created_at: string }> };
+  team?: { status: string; phase: string; goal: string; max_parallel: number;
+    agents: Array<{ id: string; agent: string; provider: string; model: string; status: string; peer_status: string; findings_added: number }>;
+    discussions: Array<{ agent_id: string; agent: string; finding_id: string; position: "supports" | "challenges" | "uncertain";
+      reason: string; location: { file: string; line: number }; evidence: string }> };
   revision?: number; id: string; source: string; name?: string; status: string; findings?: Finding[];
   coverage?: Array<{ name?: string; tool?: string; status?: string; detail?: string; message?: string }>;
   languages?: string[]; files_scanned?: number; commands?: Array<string[] | { argv?: string[]; label?: string }>;

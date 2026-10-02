@@ -19,7 +19,8 @@ fs.mkdirSync(destination, {recursive:true});
 const files = [];
 function copy(directory, prefix = '') {
   for (const entry of fs.readdirSync(directory, {withFileTypes:true})) {
-    if (entry.isSymbolicLink() || entry.name.startsWith('.') || entry.name === '_src.html') continue;
+    if (entry.isSymbolicLink() || entry.name.startsWith('.') || entry.name === '_src.html' ||
+        (!prefix && ['dist', 'vercel.json'].includes(entry.name))) continue;
     const relative = prefix + entry.name;
     if (entry.isDirectory()) { copy(path.join(directory,entry.name), relative + '/'); continue; }
     if (!/\.(?:html|js|mjs|css|json|py|png|webp|gif|svg)$/i.test(entry.name) && entry.name !== '_headers') continue;

@@ -570,6 +570,14 @@ def analyze(path, scan, emit, cancelled, budget):
     return scan
 
 
+REVIEW_PERSONAS = [
+    ('User journey agent', 'Act as a skeptical real user. Trace setup, first run, primary workflows, empty/error/loading states, accessibility, and recovery. Find code-backed dead ends or misleading behavior.', r'(?i)(app|page|route|component|view|template|readme|cli)'),
+    ('Reliability agent', 'Act as a production reliability engineer. Trace initialization, concurrency, cancellation, retry, partial failure, resource bounds, persistence, and cleanup. Find only code-backed failure modes.', r'(?i)(server|api|worker|store|queue|job|docker|sandbox|config|main)'),
+    ('Security agent', 'Act as an adversarial security reviewer. Trace untrusted input, credentials, paths, command execution, network access, authorization, and output disclosure. Do not call ordinary fixtures vulnerabilities.', r'(?i)(auth|security|upload|input|route|api|exec|shell|docker|env)'),
+    ('Production architecture agent', 'Act as a principal engineer making a release decision. Trace real integrations, data persistence, deployment configuration, observability, migrations, rollback, and placeholder paths. Separate missing proof from demonstrated failure.', r'(?i)(database|schema|migration|deploy|docker|config|monitor|telemetry|integration|service|worker|api)'),
+]
+
+
 def analyze_deep(path, scan, emit, cancelled, budget):
     """Bounded multi-provider review with independent engineering challenges."""
     path = Path(path).resolve()
@@ -581,12 +589,7 @@ def analyze_deep(path, scan, emit, cancelled, budget):
         scan.setdefault('coverage', []).append({'name': 'AI contextual review', 'status': 'skipped', 'detail': clean(str(exc))})
         emit({'message': 'Primary model unavailable; continuing with independently configured providers.'})
     files = [file.relative_to(path).as_posix() for file in safe_files(path)]
-    personas = [
-        ('User journey agent', 'Act as a skeptical real user. Trace setup, first run, primary workflows, empty/error/loading states, accessibility, and recovery. Find code-backed dead ends or misleading behavior.', r'(?i)(app|page|route|component|view|template|readme|cli)'),
-        ('Reliability agent', 'Act as a production reliability engineer. Trace initialization, concurrency, cancellation, retry, partial failure, resource bounds, persistence, and cleanup. Find only code-backed failure modes.', r'(?i)(server|api|worker|store|queue|job|docker|sandbox|config|main)'),
-        ('Security agent', 'Act as an adversarial security reviewer. Trace untrusted input, credentials, paths, command execution, network access, authorization, and output disclosure. Do not call ordinary fixtures vulnerabilities.', r'(?i)(auth|security|upload|input|route|api|exec|shell|docker|env)'),
-        ('Production architecture agent', 'Act as a principal engineer making a release decision. Trace real integrations, data persistence, deployment configuration, observability, migrations, rollback, and placeholder paths. Separate missing proof from demonstrated failure.', r'(?i)(database|schema|migration|deploy|docker|config|monitor|telemetry|integration|service|worker|api)'),
-    ]
+    personas = REVIEW_PERSONAS
     observed, existing = [], {item.get('id') for item in scan.get('findings', [])}
     selections = configured_provider_selections()
     assignments = [(personas[index % len(personas)], selections[index % len(selections)])

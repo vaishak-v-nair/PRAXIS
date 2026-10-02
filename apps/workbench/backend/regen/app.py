@@ -104,6 +104,8 @@ def emit_for(job_id):
             job["events"] = (job.get("events", []) + [{"time": now(), "message": scanner.redact(message)}])[-500:]
             job["revision"] = job.get("revision", 0) + 1
             store.save(job)
+            if isinstance(event, dict) and 'team' in event:
+                update(job_id, **{key: event[key] for key in ('team', 'pressure_tests', 'findings', 'coverage', 'cost') if key in event})
     return emit
 
 
@@ -135,10 +137,20 @@ class ScanInput(BaseModel):
     source: str = Field(min_length=1, max_length=4096)
     budget: float = Field(default=5, gt=0, le=1000)
     ai_review: bool = True
-    review_mode: Literal['standard', 'deep', 'ultra'] = 'standard'
+    review_mode: Literal['standard', 'deep', 'ultra', 'team'] = 'standard'
+    review_goal: str = Field(default='', max_length=4000)
     run_checks: bool = False
     trust_confirmed: bool = False
     allow_network: bool = False
+
+
+class CollaborationInput(BaseModel):
+    session_id: str = Field(pattern=r'^[a-f0-9-]{36}$')
+    author: str = Field(min_length=1, max_length=80)
+    kind: Literal['goal', 'question', 'decision'] = 'question'
+    text: str = Field(min_length=1, max_length=2000)
+    assigned_to: Literal['team', 'agent-1', 'agent-2', 'agent-3', 'agent-4'] = 'team'
+    share_with_agents: bool = False
 
 
 class FixInput(BaseModel):
@@ -225,8 +237,13 @@ def work(job_id, stage, options, cancelled):
             scan = {key: job.get(key) for key in ("findings", "coverage", "languages", "files_scanned")}
             try:
                 if options.get('ai_review', True):
-                    reviewer = provider.analyze_deep if options.get('review_mode') in {'deep', 'ultra'} else provider.analyze
-                    result = reviewer(Path(job["snapshot"]), scan, emit, cancelled, budget)
+                    if options.get('review_mode') == 'team':
+                        from .team import analyze_team
+                        result = analyze_team(Path(job["snapshot"]), scan, emit, cancelled, budget, goal=options.get('review_goal', ''),
+                                              human_context=lambda: get_job(job_id).get('collaboration', {}))
+                    else:
+                        reviewer = provider.analyze_deep if options.get('review_mode') in {'deep', 'ultra'} else provider.analyze
+                        result = reviewer(Path(job["snapshot"]), scan, emit, cancelled, budget)
                 else:
                     result = {'coverage': job.get('coverage', []) + [{'name': 'AI contextual review', 'status': 'skipped', 'detail': 'Disabled for this scan. No model request was made.'}]}
                 update(job_id, **result)
@@ -445,6 +462,34 @@ async def abandon_upload(token: str):
 @app.get("/api/jobs/{job_id}")
 def job(job_id: str):
     return public_job(get_job(job_id))
+
+
+@app.post('/api/jobs/{job_id}/collaboration')
+def collaborate(job_id: str, body: CollaborationInput):
+    if not body.author.strip() or not body.text.strip():
+        raise HTTPException(422, 'Enter your name and a meaningful note.')
+    with lock:
+        current = get_job(job_id)
+        shared = current.get('collaboration', {'revision': 0, 'notes': [], 'participants': []})
+        if len(shared['notes']) >= 100:
+            raise HTTPException(409, 'This review has reached its 100-note limit. Start a new review.')
+        people = shared['participants']
+        if not any(person['session_id'] == body.session_id for person in people):
+            if len(people) >= 16:
+                raise HTTPException(409, 'This local review supports up to 16 contributor sessions.')
+            people.append({'session_id': body.session_id, 'name': body.author.strip()})
+        shared['notes'].append({'id': uuid.uuid4().hex, 'created_at': now(), **body.model_dump()})
+        shared['revision'] += 1
+        return public_job(update(job_id, collaboration=shared))
+
+
+@app.post('/api/jobs/{job_id}/team-review')
+def review_shared_notes(job_id: str):
+    current = get_job(job_id)
+    if current['status'] not in {'complete', 'error', 'cancelled'} or not current.get('snapshot') or current.get('fix_path'):
+        raise HTTPException(409, 'Finish this review first. Proposed changes require their own fresh review.')
+    return start(job_id, 'analyzing', {'ai_review': True, 'review_mode': 'team', 'run_checks': False,
+                                     'review_goal': current.get('team', {}).get('goal', '')})
 
 
 @app.get("/api/jobs/{job_id}/events")

@@ -6,6 +6,8 @@ export function statusMeta(value) {
   const status = String(value || 'unknown').toLowerCase();
   if (status === 'model says works') return {tone:'positive', icon:'model', label:'Model says works'};
   if (status === 'model flags failure') return {tone:'negative', icon:'model', label:'Model flags failure'};
+  if (status === 'model supports finding') return {tone:'neutral', icon:'model', label:'Supports finding'};
+  if (status === 'model challenges finding') return {tone:'warning', icon:'model', label:'Challenges finding'};
   return {tone:success.has(status) ? 'positive' : danger.has(status) ? 'negative' : warning.has(status) ? 'warning' : 'neutral',
     icon:success.has(status) ? 'check' : danger.has(status) ? 'error' : warning.has(status) ? 'warning' : 'neutral', label:status.replaceAll('_',' ')};
 }

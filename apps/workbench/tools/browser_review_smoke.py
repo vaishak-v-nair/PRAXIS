@@ -60,7 +60,7 @@ def main():
         page.get_by_role('heading', name='Test your project', exact=True).wait_for()
         audit(page, 'empty')
         page.locator('#folder').set_input_files(str(folder))
-        page.get_by_role('button', name='Inspect source').click()
+        page.locator('#run').click()
         try:
             page.locator('#results:not([hidden]), #error:not([hidden])').wait_for(timeout=130000)
             assert page.locator('#error').is_hidden(), page.locator('#error').inner_text()
@@ -83,7 +83,7 @@ def main():
             (folder / 'app.py').write_text('def total(a, b):\n    return a + b\n', encoding='utf-8')
             (folder / 'broken.py').unlink()
             page.locator('#folder').set_input_files(str(folder))
-            page.get_by_role('button', name='Inspect source').click()
+            page.locator('#run').click()
             page.get_by_role('heading', name='No matches in the completed source checks').wait_for(timeout=130000)
             assert 'remains unestablished' in page.locator('#result-summary').inner_text()
             assert page.locator('.finding').count() == 0
@@ -101,7 +101,7 @@ def main():
             assert page.locator('#findings').inner_text() == ''
             # Stop during real initialization; no result is substituted.
             page.locator('#folder').set_input_files(str(folder))
-            page.get_by_role('button', name='Inspect source').click()
+            page.locator('#run').click()
             page.get_by_role('button', name='Stop inspection').click()
             assert page.locator('#results').is_hidden()
             assert 'No result was produced' in page.locator('#progress').inner_text()

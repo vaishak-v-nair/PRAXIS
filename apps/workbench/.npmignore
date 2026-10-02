@@ -2,6 +2,9 @@
 backend/tests/
 tools/*.py
 README.upstream.md
+# Development provenance and duplicate checkout setup docs stay in Git.
+import-manifest.json
+README.md
 repos/
 .env
 .env.*

@@ -3,6 +3,27 @@
 html { color-scheme: light; }
 html[data-theme="dark"] { color-scheme: dark; }
 body { font-size: 15px; line-height: 1.6; }
+.team-summary { border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; background: var(--surface); }
+.team-summary > div, .team-discussions header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.team-summary p { margin: 12px 0; overflow-wrap: anywhere; }
+.team-agent-state { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 0; }
+.team-agent-state > span { display: flex; gap: 8px; align-items: center; font-size: 12px; }
+.team-discussions { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+.team-discussions summary { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; cursor: pointer; }
+.team-discussions > div { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,400px),1fr)); gap: 16px; margin-top: 16px; }
+.team-discussions article { min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 12px; }
+.team-discussions p, .team-discussions .file-path { overflow-wrap: anywhere; }
+.team-discussions .file-path { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.team-discussions pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; }
+.shared-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.3fr); gap: 24px; margin-block: 24px; }
+.shared-composer, .shared-discussion { min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 24px; background: var(--surface); }
+.shared-composer h3, .shared-discussion header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.shared-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.shared-discussion ol { list-style: none; padding: 0; max-height: 480px; overflow-y: auto; margin: 0 0 20px; }
+.shared-discussion li { border-bottom: 1px solid var(--border); padding: 16px 0; overflow-wrap: anywhere; }
+.shared-discussion li header { justify-content: space-between; margin-bottom: 8px; }
+.shared-discussion li p { white-space: pre-wrap; margin-bottom: 8px; }
+@media (max-width: 768px) { .shared-grid, .shared-fields { grid-template-columns: minmax(0,1fr); } .shared-composer, .shared-discussion { padding: 16px; } }
 .lab { min-height: 100dvh; }
 .button, .icon { min-height: 44px; }
 .button { font-size: 14px; font-weight: 600; transition: border-color .15s; }
@@ -38,6 +59,8 @@ body { font-size: 15px; line-height: 1.6; }
 .source-picker button[aria-pressed="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px #00000012; }
 .field { font-size: 14px; gap: var(--space-2); }
 .field input, .field select { font-size: 14px; min-height: 48px; }
+.field textarea { width: 100%; min-width: 0; min-height: 112px; padding: 12px 14px; resize: vertical; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--input); color: var(--text); font: 14px/1.6 var(--sans); }
+.field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .field small { font-size: 12px; }
 .inline-field { padding-block: var(--space-4); margin: 0; border-bottom: 1px solid var(--border); }
 .inline-field small { display: block; margin-top: var(--space-1); font-weight: 400; }
@@ -287,7 +310,7 @@ h1, h2, h3, h4 { font-weight: 600; }
 .perspective-provider code { padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--code); font-size: 10px; overflow-wrap: anywhere; }
 .perspective-body { flex: 1; }
 .perspective-body details { border-top: 1px solid var(--border); }
-.perspective-body summary { display: flex; align-items: start; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; font-size: 12px; cursor: pointer; }
+.perspective-body summary { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; font-size: 12px; cursor: pointer; }
 .perspective-body summary > span:first-child { min-width: 0; overflow-wrap: anywhere; }
 .perspective-body p, .perspective-gaps li { font-size: 12px; color: var(--muted); line-height: 1.65; overflow-wrap: anywhere; }
 .perspective-gaps { border-top: 1px solid var(--border); margin-top: var(--space-3); padding-top: var(--space-3); }

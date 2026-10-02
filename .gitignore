@@ -12,6 +12,7 @@ npm-debug.log*
 .praxis/
 .gstack/
 web/_qa/
+web/dist/
 web/_preview.html
 DESIGN.md
 web/praxis-soft-aurora.html
