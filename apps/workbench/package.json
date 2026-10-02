@@ -13,16 +13,19 @@
     "test:backend": "node tools/backend.mjs test"
   },
   "dependencies": {
-    "next": "^16.3.5",
+    "lucide-react": "^0.468.0",
+    "next": "16.3.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "lucide-react": "^0.468.0"
+    "three": "0.181.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.8.0",
-    "concurrently": "^9.2.0"
+    "@types/three": "0.181.0",
+    "axe-core": "4.13.0",
+    "concurrently": "^9.2.0",
+    "typescript": "^5.8.0"
   }
 }

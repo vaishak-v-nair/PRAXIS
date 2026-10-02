@@ -8,9 +8,11 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import re
+import shlex
 import shutil
 import stat
 import subprocess
@@ -18,6 +20,7 @@ import sys
 import tempfile
 import threading
 import time
+import tokenize
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -26,9 +29,13 @@ from typing import Callable, Iterator
 
 from .reality import inspect_python
 
-EXCLUDED = {'.git', '.hg', '.svn', 'node_modules', '.venv', 'venv', '__pycache__',
-            'dist', 'build', 'target', '.next', '.cache', 'coverage', '.regen', '.regen-runtime'}
-MAX_FILES = 10000
+AGENT_TOOLING_DIRS = {'.agent', '.agents', '.claude', '.codex', '.cursor', '.gemini', '.grok',
+                      '.hermes', '.impeccable', '.kiro', '.opencode', '.pi', '.qoder', '.rovodev',
+                      '.trae', '.trae-cn', '.vibe'}
+EXCLUDED = {'.git', '.hg', '.svn', '.praxis', 'node_modules', '.venv', 'venv', '__pycache__',
+            'dist', 'build', 'target', '.next', '.cache', 'coverage', '.regen', '.regen-runtime',
+            *AGENT_TOOLING_DIRS}
+MAX_FILES = 25000
 MAX_FILE_BYTES = 2 * 1024 * 1024
 MAX_TOTAL_BYTES = 100 * 1024 * 1024
 LANGUAGES = {'.py': 'Python', '.js': 'JavaScript', '.jsx': 'JavaScript', '.mjs': 'JavaScript',
@@ -60,19 +67,39 @@ def _credential_value(value: str) -> bool:
     return True
 
 
-def redact(text: str, limit: int | None = 24000) -> str:
+def _python_reference_starts(text):
+    """Token positions distinguish executable identifiers from credential literals."""
+    offsets, total = [], 0
+    for line in text.splitlines(keepends=True):
+        offsets.append(total)
+        total += len(line)
+    starts = set()
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            if token.type == tokenize.NAME and token.start[0] <= len(offsets):
+                starts.add(offsets[token.start[0] - 1] + token.start[1])
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        pass
+    return starts
+
+
+def redact(text: str, limit: int | None = 24000, *, python_source=False) -> str:
     """Remove recognizable credentials and credential-bearing URLs from output."""
     value = str(text)
     value = re.sub(r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----.*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----', '[REDACTED PRIVATE KEY]', value, flags=re.S)
+    references = set()
     def replace_secret(match):
         if not match.lastindex:
             return '[REDACTED]' if _credential_value(match.group()) else match.group()
         captured = match.group(1)
+        if match.start(1) in references:
+            return match.group(0)
         if not _credential_value(captured):
             return match.group(0)
         start, end = match.span(1)
         return match.group(0)[:start - match.start()] + '[REDACTED]' + match.group(0)[end - match.start():]
     for pattern in SECRET_PATTERNS:
+        references = _python_reference_starts(value) if python_source and pattern.groups else set()
         value = pattern.sub(replace_secret, value)
     value = re.sub(r'(?i)((?:https?|mongodb(?:\+srv)?|postgres(?:ql)?|mysql|redis)://)[^\s/@:]+:[^\s/@]+@', r'\1[REDACTED]@', value)
     # Runtime output may contain arbitrary configured keys without a recognizable prefix.
@@ -107,6 +134,9 @@ def _walk(path: Path, include_sensitive: bool = False, stats: dict | None = None
     count = 0
     total = 0
     for directory, dirs, names in os.walk(root, followlinks=False):
+        excluded_here = [d for d in dirs if d in EXCLUDED]
+        stats['excluded_agent_tooling_dirs'] = stats.get('excluded_agent_tooling_dirs', 0) + sum(
+            d in AGENT_TOOLING_DIRS for d in excluded_here)
         dirs[:] = sorted(d for d in dirs if d not in EXCLUDED
                          and not (praxis_checkout and Path(directory) == root
                                   and (d in private_roots or d.lower().endswith('intelligence')))
@@ -173,10 +203,13 @@ def _finding(category: str, severity: str, title: str, description: str, why: st
 
 def _secret_findings(text: str, relative: str) -> list[dict]:
     findings = []
-    for number, line in enumerate(text.splitlines(), 1):
-        matches = [p.search(line) for p in SECRET_PATTERNS]
-        for match in filter(None, matches):
+    references = _python_reference_starts(text) if relative.lower().endswith('.py') else set()
+    offset = 0
+    for number, line in enumerate(text.splitlines(keepends=True), 1):
+        for match in (match for pattern in SECRET_PATTERNS for match in pattern.finditer(line)):
             captured = match.group(1) if match.lastindex else match.group()
+            if match.lastindex and offset + match.start(1) in references:
+                continue
             if not _credential_value(captured):
                 continue
             # .env is expected to contain credentials: report local exposure, never assert a public leak.
@@ -189,6 +222,7 @@ def _secret_findings(text: str, relative: str) -> list[dict]:
                 'Keep credentials in local environment configuration, exclude them from version control, and rotate any credential that was shared.',
                 fixable=not local_env, confidence='medium' if local_env else 'high'))
             break
+        offset += len(line)
     return findings
 
 
@@ -221,7 +255,14 @@ def _executable(command: list[str], cwd: Path | None = None) -> list[str]:
     if not command:
         raise ValueError('An empty command cannot be executed')
     candidate = Path(command[0])
-    executable = str((cwd / candidate).resolve()) if cwd and not candidate.is_absolute() and len(candidate.parts) > 1 and (cwd / candidate).is_file() else shutil.which(command[0])
+    if cwd and command[0] in {'uv', 'uv.exe'}:
+        runtime_uv = cwd / '.regen-runtime' / ('Scripts/uv.exe' if os.name == 'nt' else 'bin/uv')
+        if runtime_uv.is_file():
+            candidate = runtime_uv.resolve()
+    if candidate.is_absolute() and candidate.is_file():
+        executable = str(candidate)
+    else:
+        executable = str((cwd / candidate).resolve()) if cwd and not candidate.is_absolute() and len(candidate.parts) > 1 and (cwd / candidate).is_file() else shutil.which(command[0])
     if not executable:
         raise FileNotFoundError(f'Executable unavailable: {command[0]}')
     # npm on Windows is a .cmd launcher; explicit argv with cmd avoids shell=True.
@@ -232,11 +273,11 @@ def _executable(command: list[str], cwd: Path | None = None) -> list[str]:
     return [executable, *command[1:]]
 
 
-def _process(command: list[str], cwd: Path, cancelled: threading.Event, timeout: int = 120, *, env: dict | None = None) -> dict:
+def _process(command: list[str], cwd: Path, cancelled: threading.Event, timeout: int = 120, *, env: dict | None = None, input_file=None) -> dict:
     _cancel(cancelled)
     with tempfile.TemporaryFile() as output:
         try:
-            process = subprocess.Popen(_executable(command, cwd), cwd=cwd, env=env if env is not None else child_env(), stdout=output,
+            process = subprocess.Popen(_executable(command, cwd), cwd=cwd, env=env if env is not None else child_env(), stdin=input_file, stdout=output,
                 stderr=subprocess.STDOUT, start_new_session=os.name != 'nt')
         except (OSError, ValueError) as exc:
             return {'status': 'skipped', 'output': redact(str(exc)), 'exit_code': None}
@@ -254,9 +295,14 @@ def _process(command: list[str], cwd: Path, cancelled: threading.Event, timeout:
             time.sleep(.1)
         process.wait(timeout=20)
         output.seek(0)
-        content = output.read(24000).decode('utf-8', errors='replace')
+        # Redact before truncating, then retain the final test/build summary as
+        # well as startup context. Head-only logs lost pytest's failing cases.
+        content = redact(output.read(10 * 1024 * 1024).decode('utf-8', errors='replace'), limit=None)
+        truncated = len(content) > 24000
+        if truncated:
+            content = content[:11800] + '\n[OUTPUT TRUNCATED: middle omitted; final output retained]\n' + content[-11800:]
         return {'status': status or ('passed' if process.returncode == 0 else 'failed'),
-                'output': redact(content), 'exit_code': process.returncode}
+                'output': content, 'output_truncated': truncated, 'exit_code': process.returncode}
 
 
 def _remove_clone(staging: Path, workspace: Path) -> None:
@@ -344,6 +390,7 @@ def prepare_project(source: str, workspace: Path, emit: Callable, cancelled: thr
             raise ValueError('This job workspace already contains a project')
         destination.mkdir()
         original_fingerprint = fingerprint(original)
+        praxis_memory_available = (original / '.praxis' / 'memory.md').is_file()
         _emit(emit, 'Creating an isolated snapshot including local uncommitted files')
         for file in _walk(original, include_sensitive=True):
             _cancel(cancelled)
@@ -362,6 +409,7 @@ def prepare_project(source: str, workspace: Path, emit: Callable, cancelled: thr
         discovered = discover_commands(destination)
         return {'path': str(destination), 'name': github.group(2) if github else original.name,
                 'source': source if github else str(original), 'source_fingerprint': original_fingerprint,
+                'praxis_memory_available': praxis_memory_available,
                 'languages': sorted({LANGUAGES[f.suffix] for f in safe_files(destination) if f.suffix in LANGUAGES}),
                 'findings': intake, **discovered}
     finally:
@@ -369,24 +417,69 @@ def prepare_project(source: str, workspace: Path, emit: Callable, cancelled: thr
             _remove_clone(staging, workspace)
 
 
+def _safe_script_argv(script: object) -> list[str]:
+    if not isinstance(script, str) or re.search(r'[;&|`$<>\r\n]', script):
+        return []
+    try:
+        argv = shlex.split(script, posix=True)
+    except ValueError:
+        return []
+    return argv if argv and all(re.fullmatch(r'[A-Za-z0-9_@%+=:,./\\-]+', arg) for arg in argv) else []
+
+
 def discover_commands(path: Path) -> dict:
-    path = Path(path)
-    commands = []
+    path = Path(path).resolve()
+    setup_commands, check_commands = [], []
+    seen = set()
     start = None
+    uses_uv = (path / 'uv.lock').is_file()
+    scripted_python_test = False
+
+    def add(target, command):
+        key = tuple(command)
+        if key not in seen:
+            seen.add(key)
+            target.append(command)
+
+    def add_npm_setup(prefix: str | None = None):
+        project = path if prefix is None else (path / prefix).resolve()
+        try:
+            project.relative_to(path.resolve())
+        except ValueError:
+            return
+        if not (project / 'package.json').is_file():
+            return
+        argv = ['npm'] + (['--prefix', prefix] if prefix else [])
+        argv += ['ci' if (project / 'package-lock.json').is_file() else 'install',
+                 '--ignore-scripts', '--no-audit', '--no-fund']
+        add(setup_commands, argv)
+
     manifest = path / 'package.json'
     if manifest.is_file():
         try:
             package = json.loads(manifest.read_text(encoding='utf-8'))
             scripts = package.get('scripts', {})
-            if (path / 'package-lock.json').is_file():
-                commands.append(['npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'])
-            else:
-                commands.append(['npm', 'install', '--ignore-scripts', '--no-audit', '--no-fund'])
+            add_npm_setup()
+            for script in scripts.values():
+                if not isinstance(script, str):
+                    continue
+                for match in re.finditer(r'(?<!\S)npm\s+--prefix\s+([A-Za-z0-9_./-]+)\s+run(?=\s|$)', script):
+                    prefix = match.group(1).replace('\\', '/').strip('/')
+                    if prefix and '..' not in Path(prefix).parts:
+                        add_npm_setup(prefix)
             for name in ('lint', 'test', 'build'):
                 if name in scripts:
-                    commands.append(['npm', 'run', name])
+                    script_argv = _safe_script_argv(scripts[name])
+                    if script_argv[:2] == ['uv', 'run'] and uses_uv:
+                        add(check_commands, script_argv)
+                        if name == 'test':
+                            scripted_python_test = True
+                    else:
+                        add(check_commands, ['npm', 'run', name])
             if 'dev' in scripts:
-                start = ['npm', 'run', 'dev']
+                dev_argv = _safe_script_argv(scripts['dev'])
+                start = (['uv', 'run', *dev_argv] if uses_uv and dev_argv[:1] in (['python'], ['python3'])
+                         else ['npm', 'run', 'dev'])
                 deps = {**package.get('dependencies', {}), **package.get('devDependencies', {})}
                 if 'next' in deps:
                     start += ['--', '--port', '4173', '--hostname', '127.0.0.1']
@@ -398,31 +491,38 @@ def discover_commands(path: Path) -> dict:
             pass
     if (path / 'pyproject.toml').exists() or (path / 'requirements.txt').exists():
         python = '.regen-runtime/Scripts/python.exe' if os.name == 'nt' else '.regen-runtime/bin/python'
-        commands.append([sys.executable, '-m', 'venv', '.regen-runtime'])
-        if (path / 'requirements.txt').is_file():
-            commands.append([python, '-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '-r', 'requirements.txt'])
+        add(setup_commands, [sys.executable, '-m', 'venv', '.regen-runtime'])
+        if uses_uv:
+            add(setup_commands, [python, '-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', 'uv'])
+            add(setup_commands, ['uv', 'sync', '--frozen', '--no-progress'])
+        elif (path / 'requirements.txt').is_file():
+            add(setup_commands, [python, '-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '-r', 'requirements.txt'])
         else:
-            commands.append([python, '-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '.'])
+            add(setup_commands, [python, '-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', '.'])
         if (path / 'tests').is_dir() or any(path.glob('test_*.py')):
             test_root = path / 'tests' if (path / 'tests').is_dir() else path
             test_files = list(test_root.glob('test_*.py'))[:30]
             standard_library = bool(test_files) and all('unittest' in file.read_text('utf-8', errors='replace') for file in test_files)
-            if not standard_library:
-                commands.append([python, '-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', 'pytest'])
-            commands.append([python, '-m', 'unittest', 'discover', '-s', str(test_root.relative_to(path)) or '.'] if standard_library else [python, '-m', 'pytest', '-q'])
+            if not standard_library and not uses_uv:
+                add(setup_commands, [python, '-m', 'pip', 'install', '--no-cache-dir', '--disable-pip-version-check', 'pytest'])
+            test_command = ([python, '-m', 'unittest', 'discover', '-s', str(test_root.relative_to(path)) or '.']
+                            if standard_library else ['uv', 'run', 'pytest', '-q'] if uses_uv
+                            else [python, '-m', 'pytest', '-q'])
+            if not (uses_uv and scripted_python_test):
+                add(check_commands, test_command)
         app = path / 'app.py'
         if app.is_file() and re.search(r'(?m)^\s*(?:import streamlit\b|from streamlit\b)', app.read_text('utf-8', errors='replace')):
             start = [python, '-m', 'streamlit', 'run', 'app.py', '--server.port', '4173', '--server.address', '127.0.0.1', '--server.headless', 'true', '--browser.gatherUsageStats', 'false']
     for marker, command in [('go.mod', ['go', 'test', './...']), ('Cargo.toml', ['cargo', 'test'])]:
         if (path / marker).is_file():
-            commands.append(command)
+            add(check_commands, command)
     if (path / 'pom.xml').is_file():
-        commands.append(['mvn', 'test', '--batch-mode'])
+        add(check_commands, ['mvn', 'test', '--batch-mode'])
     elif (path / 'build.gradle').is_file() or (path / 'build.gradle.kts').is_file():
-        commands.append(['gradle', 'test', '--no-daemon'])
+        add(check_commands, ['gradle', 'test', '--no-daemon'])
     if any(path.glob('*.sln')) or any(path.glob('*.csproj')):
-        commands.append(['dotnet', 'test', '--nologo'])
-    return {'commands': commands, 'start_command': start}
+        add(check_commands, ['dotnet', 'test', '--nologo'])
+    return {'commands': [*setup_commands, *check_commands], 'start_command': start}
 
 
 def _text(file: Path) -> str | None:
@@ -482,7 +582,12 @@ def _osv(path: Path, cancelled: threading.Event) -> tuple[list[dict], dict]:
         return findings, {'name': 'OSV dependencies', 'status': 'skipped', 'detail': 'Advisory service unavailable: ' + redact(str(exc))}
 
 
-def scan_project(path: Path, emit: Callable, cancelled: threading.Event) -> dict:
+def scan_project(path: Path, emit: Callable, cancelled: threading.Event, *, external_checks: bool = True) -> dict:
+    """Inspect source. Browser callers disable executable tools and advisory requests.
+
+    The default retains the existing local Workbench coverage contract.
+    ``external_checks=False`` neither launches a process nor sends package metadata.
+    """
     path = Path(path).resolve()
     findings = []
     coverage = []
@@ -537,8 +642,13 @@ def scan_project(path: Path, emit: Callable, cancelled: threading.Event) -> dict
                 findings.append(_finding('ui', 'low', 'A button is permanently disabled',
                     'This button is written with a constant disabled value.', 'Visitors cannot use this control; this may be intentional.',
                     relative, number, line.strip()[:250], 'Connect the disabled state to real loading or validation state if the action should work.', confidence='medium'))
+    agent_scope = limits.get('excluded_agent_tooling_dirs', 0)
     coverage.append({'name': 'Local source inspection', 'status': 'limited' if limits['truncated'] else 'passed',
-        'detail': f'{text_count} UTF-8 text files inspected; symlinks, generated dependencies, local credentials, binary and large files excluded. Limits: {MAX_FILES} files, 2 MiB/file, 100 MiB total.', 'limits': limits})
+        'detail': f'{text_count} UTF-8 project files inspected; symlinks, generated dependencies, local credentials, binary and large files excluded.'
+                  + (f' {agent_scope} AI-agent tooling director{"y" if agent_scope == 1 else "ies"} excluded from product findings.' if agent_scope else '')
+                  + f' Limits: {MAX_FILES} files, 2 MiB/file, 100 MiB total.', 'limits': limits})
+    coverage.append({'name': 'Built-in secret patterns', 'status': 'limited' if limits['truncated'] else 'passed',
+        'detail': f'Credential-pattern checks completed across {text_count} inspected UTF-8 files. Matches are reported separately as findings; completion does not prove the absence of every secret.'})
     coverage.append({'name': 'Python syntax', 'status': 'passed' if python_count else 'skipped',
         'detail': f'{python_count} Python files parsed with AST without imports or execution. This checks syntax only; dependencies and runtime behavior need trusted checks.'})
     coverage.append({'name': 'Python behavioral AST patterns', 'status': 'limited' if python_count else 'skipped',
@@ -546,6 +656,13 @@ def scan_project(path: Path, emit: Callable, cancelled: threading.Event) -> dict
     if unsupported:
         coverage.append({'name': 'Format coverage', 'status': 'limited', 'formats': sorted(unsupported),
             'detail': 'These text formats were checked for credential patterns only; language-specific correctness was not verified.'})
+    if not external_checks:
+        coverage.extend({'name': name, 'status': 'skipped',
+                         'detail': 'Not run in private browser inspection. Use local PRAXIS for this check.'}
+                        for name in ('Semgrep', 'Gitleaks', 'OSV dependencies'))
+        unique = {finding['id']: finding for finding in findings}
+        return {'findings': list(unique.values()), 'coverage': coverage,
+                'languages': sorted({LANGUAGES[f.suffix] for f in files if f.suffix in LANGUAGES}), 'files_scanned': len(files)}
     for tool, command in [('Semgrep', ['semgrep', 'scan', '--config', 'p/security-audit', '--json', '--quiet', '--timeout', '10', '--metrics', 'off', '.']),
                           ('Gitleaks', ['gitleaks', 'dir', '.', '--report-format', 'json', '--report-path', '-', '--redact', '--no-banner'])]:
         _cancel(cancelled)
@@ -590,7 +707,8 @@ def scan_project(path: Path, emit: Callable, cancelled: threading.Event) -> dict
 
 def _browser_check(path: Path, start: list[str], emit: Callable, cancelled: threading.Event) -> dict:
     if importlib.util.find_spec('playwright') is None:
-        return {'name': 'Browser checks', 'status': 'skipped', 'output': 'Playwright is not installed; runtime UI was not verified.'}
+        return {'name': 'Browser checks', 'kind': 'browser', 'evidence_scope': 'homepage_smoke',
+                'status': 'skipped', 'output': 'Playwright is not installed; runtime UI was not verified.'}
     with tempfile.TemporaryFile() as output:
         process = None
         try:
@@ -622,7 +740,8 @@ def _browser_check(path: Path, start: list[str], emit: Callable, cancelled: thre
                     if not ready:
                         output.seek(0)
                         detail = redact(output.read(6000).decode('utf-8', errors='replace'))
-                        return {'name': 'Browser checks', 'status': 'failed', 'output': 'App did not become reachable at http://127.0.0.1:4173. Supply a start command using this port.\n' + detail}
+                        return {'name': 'Browser checks', 'kind': 'browser', 'evidence_scope': 'homepage_smoke',
+                                'status': 'failed', 'output': 'App did not become reachable at http://127.0.0.1:4173. Supply a start command using this port.\n' + detail}
                     page.wait_for_timeout(1000)
                     _cancel(cancelled)
                     exceptions = page.locator('[data-testid="stException"]')
@@ -639,15 +758,28 @@ def _browser_check(path: Path, start: list[str], emit: Callable, cancelled: thre
                         button = page.locator('button').nth(index)
                         if button.is_visible() and not (button.inner_text().strip() or button.get_attribute('aria-label') or button.get_attribute('title')):
                             issues.append('A visible button has no text or accessible label')
-                    return {'name': 'Browser checks', 'status': 'failed' if issues else 'passed',
-                        'output': '\n'.join(issues) if issues else 'Desktop/mobile overflow, browser errors, failed requests and button names checked on the home page. Control behavior and other routes require manual/contextual review.'}
+                    return {'name': 'Browser checks', 'kind': 'browser', 'evidence_scope': 'homepage_smoke',
+                        'observations': ['home_page_reachable', 'browser_errors', 'failed_requests',
+                                         'desktop_mobile_overflow', 'visible_button_names'],
+                        'viewports': [1440, 390], 'status': 'failed' if issues else 'passed',
+                        'output': '\n'.join(issues) if issues else 'Homepage reached at 1440px and 390px. Checked browser errors, failed requests, horizontal overflow and visible button names. No controls, secondary routes or external side effects were exercised.'}
                 finally:
                     browser.close()
         except Exception as exc:
-            return {'name': 'Browser checks', 'status': 'cancelled' if cancelled.is_set() else 'skipped', 'output': redact(str(exc))}
+            return {'name': 'Browser checks', 'kind': 'browser', 'evidence_scope': 'homepage_smoke',
+                    'status': 'cancelled' if cancelled.is_set() else 'skipped', 'output': redact(str(exc))}
         finally:
             if process:
                 _kill(process)
+
+
+def is_setup_command(command):
+    if not command:
+        return False
+    exe = command[0].replace('\\', '/').rsplit('/', 1)[-1].lower()
+    return (('-m' in command and ('pip' in command or 'venv' in command))
+            or (exe in {'uv', 'uv.exe'} and command[1:2] == ['sync'])
+            or (exe in {'npm', 'pnpm', 'yarn', 'bun'} and any(arg in {'ci', 'install'} for arg in command[1:4])))
 
 
 def run_checks(path: Path, commands: list[list[str]], emit: Callable, cancelled: threading.Event,
@@ -660,16 +792,18 @@ def run_checks(path: Path, commands: list[list[str]], emit: Callable, cancelled:
             results.append({'name': 'Invalid command', 'status': 'skipped', 'output': 'Commands must be nonempty argument lists.'})
             continue
         _emit(emit, 'Running trusted project check: ' + ' '.join(command))
-        install = '-m' in command and 'pip' in command and 'install' in command
-        result = {'name': ' '.join(command), **_process(command, Path(path), cancelled, 600 if install else 120)}
+        install = is_setup_command(command)
+        result = {'name': ' '.join(command),
+                  'kind': 'setup' if install else 'command',
+                  **_process(command, Path(path), cancelled, 600 if install else 120)}
         results.append(result)
-        if result['status'] != 'passed' and (install or ('-m' in command and 'venv' in command)):
+        if result['status'] != 'passed' and install:
             results.append({'name': 'Dependent runtime checks', 'status': 'skipped', 'output': 'Isolated Python environment setup failed; dependent checks and app startup were not run.'})
             start_command = None
             break
     if start_command and not cancelled.is_set():
         _emit(emit, 'Checking web interface in desktop and mobile browser viewports')
-        results.append(_browser_check(Path(path), start_command, emit, cancelled))
+        results.append({'kind': 'browser', **_browser_check(Path(path), start_command, emit, cancelled)})
     if not results:
         results.append({'name': 'Project checks', 'status': 'skipped', 'output': 'No supported project checks discovered or approved.'})
     return results

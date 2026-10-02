@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "praxis",
+  "compatibility_date": "2026-10-02",
+  "workers_dev": true,
+  "build": {
+    "command": "node scripts/build-web.mjs && node scripts/build-public-site.mjs"
+  },
+  "assets": {
+    "directory": "./apps/workbench/.regen/artifacts/public-site",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  },
+  "send_metrics": false
+}

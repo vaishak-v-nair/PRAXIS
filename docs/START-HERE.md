@@ -33,7 +33,7 @@ In the terminal, type this and press Enter:
 node --version
 ```
 
-- See something like `v20.11.0`? You're ready — go to Step 2.
+- See `v22` or newer? You're ready — go to Step 2.
 - See an error? Install Node first: <https://nodejs.org> → big green button →
   run the installer → **close and reopen your terminal** → try again.
 

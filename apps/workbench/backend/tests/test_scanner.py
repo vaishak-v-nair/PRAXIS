@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from regen.scanner import (child_env, discover_commands, fingerprint, prepare_project,
-                           redact, run_checks, safe_files, scan_project, _remove_clone)
+                           redact, run_checks, safe_files, scan_project, _remove_clone, _executable, _process)
 
 
 class ScannerSecurityTests(unittest.TestCase):
@@ -56,6 +56,16 @@ class ScannerSecurityTests(unittest.TestCase):
         before = fingerprint(self.project)
         library.write_text('changed generated dependency')
         self.assertEqual(fingerprint(self.project), before)
+
+    def test_private_praxis_memory_is_never_scanned_or_snapshotted(self):
+        (self.project / 'app.py').write_text('print("source")')
+        memory = self.project / '.praxis'
+        memory.mkdir()
+        (memory / 'memory.md').write_text('private conversation and goals')
+        self.assertEqual([file.name for file in safe_files(self.project)], ['app.py'])
+        result = prepare_project(str(self.project), self.root / 'job', lambda event: None, self.cancelled)
+        self.assertTrue(result['praxis_memory_available'])
+        self.assertFalse((Path(result['path']) / '.praxis').exists())
 
     def test_fingerprint_detects_dirty_source_and_environment_changes(self):
         file = self.project / 'app.py'
@@ -158,6 +168,21 @@ def validate_config():
             result = scan_project(self.project, lambda event: None, self.cancelled)
         self.assertFalse(result['findings'])
 
+    def test_python_credential_references_survive_but_literals_and_env_credentials_do_not(self):
+        source = 'groq_key = "example-key"\npayload = dict(api_key=groq_key)\n'
+        self.assertEqual(redact(source, limit=None, python_source=True), source)
+        (self.project / 'llm.py').write_text(source)
+        with patch('regen.scanner.shutil.which', return_value=None):
+            result = scan_project(self.project, lambda _: None, self.cancelled)
+        self.assertFalse(result['findings'])
+        literal = 'api_key="opaquecredential123456"\n'
+        self.assertNotIn('opaquecredential123456', redact(literal, python_source=True))
+        self.assertNotIn('opaquecredential123456', redact('API_KEY=opaquecredential123456'))
+        (self.project / 'llm.py').write_text(source + 'payload = dict(api_key=groq_key, password="opaquecredential123456")\n')
+        with patch('regen.scanner.shutil.which', return_value=None):
+            result = scan_project(self.project, lambda _: None, self.cancelled)
+        self.assertTrue(any(item['category'] == 'secrets' for item in result['findings']))
+
     def test_scan_reports_limits_and_unsupported_formats(self):
         (self.project / 'README.md').write_text('documentation')
         (self.project / 'huge.txt').write_text('x' * 64)
@@ -197,6 +222,13 @@ def validate_config():
         self.assertEqual(process.call_count, 1)
         self.assertEqual(result[-1]['status'], 'skipped')
 
+    def test_host_uv_sync_failure_is_setup_and_stops_test_dispatch(self):
+        with patch('regen.scanner._process', return_value={'status': 'failed', 'output': 'sync failed', 'exit_code': 1}) as process:
+            result = run_checks(self.project, [['uv', 'sync', '--frozen'], ['uv', 'run', 'pytest']], lambda _: None, self.cancelled)
+        self.assertEqual(process.call_count, 1)
+        self.assertEqual(result[0]['kind'], 'setup')
+        self.assertEqual(result[-1]['status'], 'skipped')
+
     def test_intake_rejects_external_urls_and_recursive_workspaces(self):
         with self.assertRaises(ValueError):
             prepare_project('https://evil.example/x/y', self.root / 'job', lambda event: None, self.cancelled)
@@ -213,12 +245,62 @@ def validate_config():
         self.assertIn('4173', discovered['start_command'])
         self.assertIn('127.0.0.1', discovered['start_command'])
 
+    def test_mixed_uv_and_nested_web_dependencies_precede_all_checks(self):
+        (self.project / 'web').mkdir()
+        (self.project / 'web/package.json').write_text('{}')
+        (self.project / 'web/package-lock.json').write_text('{}')
+        (self.project / 'pyproject.toml').write_text('[project]\nname="mixed"')
+        (self.project / 'uv.lock').write_text('version = 1')
+        (self.project / 'tests').mkdir()
+        (self.project / 'tests/test_app.py').write_text('def test_app(): assert True')
+        (self.project / 'package.json').write_text(json.dumps({'scripts': {
+            'test': 'uv run pytest tests', 'build': 'npm --prefix web run build',
+            'dev': 'python start.py', 'unsafe': 'npm --prefix ../outside run test'}}))
+        commands = discover_commands(self.project)['commands']
+        self.assertIn(['npm', '--prefix', 'web', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], commands)
+        self.assertEqual(commands[-2:], [['uv', 'run', 'pytest', 'tests'], ['npm', 'run', 'build']])
+        self.assertIn(['uv', 'sync', '--frozen', '--no-progress'], commands[:-2])
+        self.assertFalse(any('../outside' in command for command in commands))
+        self.assertEqual(discover_commands(self.project)['start_command'], ['uv', 'run', 'python', 'start.py'])
+
+    def test_uv_uses_its_isolated_environment_executable_on_host(self):
+        uv = self.project / '.regen-runtime' / ('Scripts/uv.exe' if os.name == 'nt' else 'bin/uv')
+        uv.parent.mkdir(parents=True)
+        uv.write_text('isolated executable placeholder')
+        with patch('regen.scanner.shutil.which', return_value=None):
+            self.assertEqual(_executable(['uv', 'run', 'pytest'], self.project), [str(uv.resolve()), 'run', 'pytest'])
+
+    def test_agent_plugins_are_excluded_without_losing_project_instructions(self):
+        (self.project / '.agents/impeccable/src').mkdir(parents=True)
+        (self.project / '.agents/impeccable/src/app.py').write_text('raise NotImplementedError')
+        (self.project / 'AGENTS.md').write_text('Project engineering instructions')
+        (self.project / 'app.py').write_text('print("real application")')
+        with patch('regen.scanner.shutil.which', return_value=None):
+            result = scan_project(self.project, lambda _: None, self.cancelled)
+        self.assertFalse(result['findings'])
+        local = next(item for item in result['coverage'] if item['name'] == 'Local source inspection')
+        self.assertEqual(local['limits']['excluded_agent_tooling_dirs'], 1)
+        self.assertEqual({file.name for file in safe_files(self.project)}, {'AGENTS.md', 'app.py'})
+        self.assertTrue((self.project / '.agents/impeccable/src/app.py').exists())
+
     def test_checks_receive_no_api_keys_and_output_is_redacted(self):
         import sys
         with patch.dict(os.environ, {'PRIVATE_API_KEY': 'secret-backend-value'}):
             result = run_checks(self.project, [[sys.executable, '-c', 'import os; print(os.getenv("PRIVATE_API_KEY", "absent"))']], lambda event: None, self.cancelled)
         self.assertEqual(result[0]['status'], 'passed')
         self.assertIn('absent', result[0]['output'])
+
+    def test_long_command_output_keeps_redacted_tail_and_test_summary(self):
+        import sys
+        secret = 'gsk_' + 'a' * 35
+        result = _process([sys.executable, '-c',
+                           'print("START"); print("x" * 30000); print("' + secret + '"); print("2 failed, 8 passed in 1.0s")'],
+                          self.project, self.cancelled)
+        self.assertTrue(result['output_truncated'])
+        self.assertTrue(result['output'].startswith('START'))
+        self.assertIn('2 failed, 8 passed', result['output'])
+        self.assertNotIn(secret, result['output'])
+        self.assertLessEqual(len(result['output']), 24000)
 
     def test_cancellation_prevents_copying(self):
         (self.project / 'app.py').write_text('print(1)')

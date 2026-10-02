@@ -21,6 +21,19 @@ import { praxisCmd } from '../lib/runner.js';
 import { wantsJson, emitJson } from '../lib/jsonout.js';
 import { selectedTool } from '../lib/jobs/adapters.js';
 
+async function waitForCompletion(praxisDir, id, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const meta = readMeta(praxisDir, id);
+    if (meta) {
+      const status = jobStatus(meta);
+      if (meta.receiptLinkedAt || status === 'failed' || status === 'gone') return meta;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return readMeta(praxisDir, id);
+}
+
 export async function evalCmd(argv = []) {
   const p = projectPaths();
   const c = praxisCmd();
@@ -81,8 +94,10 @@ export async function evalCmd(argv = []) {
   try { tool = selectedTool(argv); } catch (error) { console.error(error.message); process.exitCode = 1; return; }
   const mode = argv.includes('--allow-edits') ? 'acceptEdits' : 'plan';
 
-  console.log('\n  ' + bold('RUNNING BENCHMARK SUITE') + grey(`  · ${suite.name} (${suite.cases.length} cases)`));
-  console.log('  ' + grey(`agent: ${tool}  · mode: ${mode}  · local-first offline harness\n`));
+  if (!json) {
+    console.log('\n  ' + bold('RUNNING BENCHMARK SUITE') + grey(`  · ${suite.name} (${suite.cases.length} cases)`));
+    console.log('  ' + grey(`agent: ${tool}  · mode: ${mode}  · local scoring; the selected agent may use its provider\n`));
+  }
 
   const results = [];
   for (const testCase of suite.cases) {
@@ -94,8 +109,6 @@ export async function evalCmd(argv = []) {
       goal: `Benchmark [${suite.name}]: ${testCase.id}`,
     });
 
-    const durationMs = Date.now() - started;
-
     if (res.error) {
       results.push({
         id: testCase.id,
@@ -104,35 +117,41 @@ export async function evalCmd(argv = []) {
         claimFidelity: 0,
         filePrecision: 0,
         forbiddenViolations: 0,
-        durationMs,
+        durationMs: Date.now() - started,
         receiptVerdict: 'SPAWN_ERROR',
         error: res.error,
       });
       continue;
     }
 
-    // Read job meta and receipt if already sealed or synchronous
-    const jobMeta = readMeta(p.praxisDir, res.id);
+    // startJob returns a detached launch, not completed work. Wait for the
+    // actual exit and receipt-link completion before scoring. A timed-out
+    // job remains inspectable; no fabricated receipt or success is supplied.
+    const jobMeta = await waitForCompletion(p.praxisDir, res.id);
     const receipt = jobMeta && jobMeta.receiptId ? loadReceipt(path.join(p.praxisDir, 'receipts'), jobMeta.receiptId) : null;
 
     const scored = scoreEvalCase({
       testCase,
-      exitCode: jobMeta ? jobMeta.exitCode : 0,
-      touchedFiles: (receipt && receipt.evidence && receipt.evidence.filesTouched) || [],
+      exitCode: jobMeta?.receiptLinkedAt ? jobMeta.exitCode : null,
+      touchedFiles: (receipt?.evidence?.files_edited || receipt?.evidence?.filesTouched || [])
+        .map(file => (path.isAbsolute(file) ? path.relative(p.root, file) : file).replace(/\\/g, '/')),
       receipt,
-      durationMs,
+      durationMs: Date.now() - started,
     });
     scored.jobId = res.id;
+    scored.executionStatus = jobMeta?.receiptLinkedAt ? 'finished' : 'incomplete';
     results.push(scored);
 
     const badge = scored.pass ? sage('✓ PASS') : rose('✗ FAIL');
-    console.log(`  ${badge}  ${bold(testCase.id)}  ${grey('fidelity: ' + Math.round(scored.claimFidelity * 100) + '%')}  ${grey('job: ' + res.id)}`);
+    if (!json) console.log(`  ${badge}  ${bold(testCase.id)}  ${grey('fidelity: ' + Math.round(scored.claimFidelity * 100) + '%')}  ${grey('job: ' + res.id)}`);
   }
 
   const metrics = aggregateEvalMetrics(results);
+  const passed = metrics.passed === metrics.total;
+  if (!passed) process.exitCode = 1;
 
   if (json) {
-    emitJson({ ok: true, suite: suite.name, metrics, results });
+    emitJson({ ok: passed, suite: suite.name, metrics, results });
     return;
   }
 

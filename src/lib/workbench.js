@@ -33,21 +33,22 @@ export function npmInvocation(script, env = process.env) {
   return { command: 'npm', args: ['run', script], shell: process.platform === 'win32' };
 }
 
-export function launchWorkbench(status, { production = false, spawnImpl = spawn } = {}) {
+export function launchWorkbench(status, { production = false, spawnImpl = spawn, env = process.env, ready } = {}) {
   const invocation = npmInvocation(production ? 'start' : 'dev');
   return new Promise((resolve) => {
     let child;
     try {
       child = spawnImpl(invocation.command, invocation.args, {
         cwd: status.root, stdio: 'inherit', windowsHide: true,
-        shell: invocation.shell, env: { ...process.env },
+        shell: invocation.shell, env: { ...env },
       });
     } catch {
       console.error('Could not start the workbench. Check npm and the workbench dependencies.');
       resolve(1);
       return;
     }
-    let stopping = false;
+    let stopping = false, startupFailed = false;
+    const lifecycle = new AbortController();
     const stop = () => {
       if (stopping || child.exitCode != null) return;
       stopping = true;
@@ -63,14 +64,21 @@ export function launchWorkbench(status, { production = false, spawnImpl = spawn 
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);
     const finish = (code) => {
+      lifecycle.abort();
       process.removeListener('SIGINT', stop);
       process.removeListener('SIGTERM', stop);
-      resolve(code ?? 1);
+      resolve(startupFailed ? 1 : code ?? 1);
     };
     child.once('error', () => {
       console.error('Could not start the workbench. Check npm and the workbench dependencies.');
       finish(1);
     });
     child.once('close', finish);
+    if (ready) Promise.resolve().then(() => ready(lifecycle.signal)).catch(error => {
+      if (lifecycle.signal.aborted || stopping) return;
+      console.error(error.message);
+      startupFailed = true;
+      stop();
+    });
   });
 }

@@ -21,6 +21,16 @@ api = importlib.import_module('regen.app')
 
 
 class ApiIntegrationTests(unittest.TestCase):
+    def test_public_history_gets_human_actions_without_mutating_saved_evidence(self):
+        original = {'id': 'old-job', 'status': 'complete', 'snapshot': 'private-snapshot',
+                    'checks_for': 'private-snapshot', 'assessment': {'version': 1},
+                    'checks': [{'name': 'pip install .', 'kind': 'setup', 'status': 'failed',
+                                'output': 'Traceback: package read timed out'}]}
+        public = api.public_job(original)
+        self.assertTrue(public['assessment']['attention_items'])
+        self.assertNotIn('snapshot', public)
+        self.assertEqual(original['assessment'], {'version': 1})
+        self.assertIn('Traceback', public['checks'][0]['output'])
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -38,6 +48,7 @@ class ApiIntegrationTests(unittest.TestCase):
             patch.object(api, 'workers', {}),
             patch.object(api, 'cancellations', {}),
             patch.object(provider, 'analyze', side_effect=self.analyze),
+            patch.object(provider, 'plan_repair', side_effect=self.plan_repair),
             patch.object(provider, 'fix_project', side_effect=self.make_fix),
             patch.object(scanner.shutil, 'which', return_value=None),
             patch.object(scanner, '_osv', return_value=([], {'name': 'Dependencies', 'status': 'skipped', 'detail': 'Offline test'})),
@@ -65,7 +76,7 @@ class ApiIntegrationTests(unittest.TestCase):
         emit({'message': 'Contextual review completed.'})
         return scan
 
-    def make_fix(self, path, findings, emit, cancelled, budget):
+    def make_fix(self, path, findings, emit, cancelled, budget, plan=None):
         self.fix_number += 1
         target = path.parent / f'fixed-{self.fix_number}'
         shutil.copytree(path, target)
@@ -74,6 +85,19 @@ class ApiIntegrationTests(unittest.TestCase):
         (target / 'app.py').write_text(after)
         diff = ''.join(difflib.unified_diff(before.splitlines(True), after.splitlines(True), fromfile='a/app.py', tofile='b/app.py'))
         return {'path': str(target), 'diff': diff, 'changes': ['app.py'], 'review': {'approved': True, 'summary': 'Reviewed; runtime checks still required.'}, 'cost': budget.spent, 'agents': [{'name': 'Fixture repair', 'status': 'complete'}]}
+
+    def plan_repair(self, path, findings, source, emit, cancelled, budget):
+        budget.reserve(.1)
+        budget.settle(.1, .05)
+        kind = 'github' if source.startswith('https://') else 'local'
+        return {'id': 'a' * 24, 'finding_ids': [item['id'] for item in findings], 'source_kind': kind,
+                'objective': 'Disable debug mode without changing normal behavior.', 'assumptions': [],
+                'steps': [{'title': 'Change configuration', 'intent': 'Disable debug mode', 'files': ['app.py'],
+                           'validation': 'Run the regression suite', 'risk': 'Startup behavior could change'}],
+                'user_journeys': ['Start the application and inspect normal output'], 'unresolved': [],
+                'delivery': {'method': 'guarded_local_apply' if kind == 'local' else 'patch_or_review_branch',
+                             'summary': 'Fixture delivery'},
+                'planner': {'provider': 'fixture', 'model': 'fixture'}, 'created_at': 1}
 
     def finish(self, job_id):
         api.workers[job_id].join(10)
@@ -109,6 +133,78 @@ class ApiIntegrationTests(unittest.TestCase):
         self.assertNotIn(self.secret, json.dumps(stored))
         self.assertEqual(Store(self.data / 'jobs.sqlite3').get(job['id'])['status'], 'complete')
         self.assertEqual(self.client.get('/api/jobs').json()[0]['id'], job['id'])
+
+    def test_scan_can_skip_ai_and_run_authorized_container_checks(self):
+        with patch.object(provider, 'analyze') as model, patch.object(api.sandbox, 'run_checks', return_value=[{'name': 'tests', 'kind': 'command', 'runtime': 'docker', 'status': 'failed', 'output': 'Real failure'}]) as checks:
+            body = {'source': str(self.source), 'ai_review': False, 'run_checks': True}
+            self.assertEqual(self.client.post('/api/scans', json=body).status_code, 403)
+            model.assert_not_called()
+            checks.assert_not_called()
+            body.update(trust_confirmed=True, allow_network=True)
+            response = self.client.post('/api/scans', json=body)
+            self.assertEqual(response.status_code, 200)
+            job = self.finish(response.json()['id'])
+            model.assert_not_called()
+            self.assertTrue(checks.call_args.kwargs['allow_network'])
+            self.assertNotEqual(checks.call_args.args[0], self.source)
+            self.assertEqual(job['assessment']['checks_failed'], 1)
+            self.assertEqual(job['assessment']['status'], 'attention')
+            self.assertEqual(job['cost'], 0)
+            self.assertTrue(job['plan']['graph']['nodes'])
+
+    def test_docker_verify_never_dispatches_to_host(self):
+        job = self.scan()
+        with patch.object(scanner, 'run_checks') as host, patch.object(api.sandbox, 'run_checks', return_value=[{'name': 'Docker', 'status': 'skipped', 'output': 'Unavailable'}]) as container:
+            response = self.client.post(f"/api/jobs/{job['id']}/verify", json={'trust_confirmed': True, 'runtime_mode': 'docker'})
+            self.assertEqual(response.status_code, 200)
+            job = self.finish(job['id'])
+            host.assert_not_called()
+            container.assert_called_once()
+            self.assertEqual(job['checks'][0]['status'], 'skipped')
+
+    def test_network_cannot_be_enabled_without_authorized_execution(self):
+        response = self.client.post('/api/scans', json={'source': str(self.source), 'allow_network': True})
+        self.assertEqual(response.status_code, 422)
+
+    def test_provider_probe_validates_selection_and_keeps_default_settings(self):
+        with patch.object(provider, 'probe', return_value={'compatible': True, 'cost': .001}) as probe:
+            payload = {'provider': 'groq', 'model': 'fixture-model', 'input_price': .000001, 'output_price': .000001}
+            response = self.client.post('/api/providers/probe', json=payload)
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.json()['compatible'])
+            self.assertEqual(probe.call_args.args[0], payload)
+            self.assertEqual(self.client.post('/api/providers/probe', json={**payload, 'provider': 'unknown'}).status_code, 422)
+
+    def test_provider_failure_keeps_static_findings_and_runs_requested_checks(self):
+        with patch.object(provider, 'analyze', side_effect=provider.ProviderError('Provider unavailable')), patch.object(api.sandbox, 'run_checks', return_value=[{'name': 'test', 'status': 'passed', 'kind': 'command'}]) as checks:
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'run_checks': True, 'trust_confirmed': True})
+            job = self.finish(response.json()['id'])
+            self.assertEqual(job['status'], 'complete')
+            self.assertTrue(job['findings'])
+            self.assertIn('Provider unavailable', job['error'])
+            checks.assert_called_once()
+
+    def test_deep_review_mode_uses_pressure_agents_without_changing_execution_consent(self):
+        def deep(path, scan, emit, cancelled, budget):
+            return {**scan, 'pressure_tests': [{'agent': 'User journey agent', 'journeys': [], 'gaps': [], 'findings_added': 0}]}
+        with patch.object(provider, 'analyze_deep', side_effect=deep) as review:
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'deep'})
+            self.assertEqual(response.status_code, 200, response.text)
+            job = self.finish(response.json()['id'])
+        review.assert_called_once()
+        self.assertEqual(job['pressure_tests'][0]['agent'], 'User journey agent')
+
+    def test_ultra_review_mode_uses_the_ensemble_path(self):
+        def deep(path, scan, emit, cancelled, budget):
+            return {**scan, 'pressure_tests': [{'agent': 'Production architecture agent', 'provider': 'fixture',
+                                                'model': 'fixture', 'journeys': [], 'gaps': [], 'findings_added': 0}]}
+        with patch.object(provider, 'analyze_deep', side_effect=deep) as review:
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'ultra'})
+            self.assertEqual(response.status_code, 200)
+            job = self.finish(response.json()['id'])
+        review.assert_called_once()
+        self.assertEqual(job['pressure_tests'][0]['provider'], 'fixture')
+        self.assertEqual(job['checks'], [])
 
     def upload(self, files):
         return self.client.post('/api/uploads', json={'files': [
@@ -155,6 +251,39 @@ class ApiIntegrationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 422)
             model.assert_not_called()
 
+    def test_large_folder_uploads_in_bounded_resumable_batches(self):
+        size = 1024 * 1024
+        begin = self.client.post('/api/uploads/sessions', json={
+            'name': 'LargeProject', 'total_files': 21, 'total_bytes': 21 * size, 'skipped_files': 3})
+        self.assertEqual(begin.status_code, 200, begin.text)
+        token = begin.json()['upload_id']
+        for offset in range(0, 21, 7):
+            files = [{'path': f'LargeProject/src/file-{index}.js',
+                      'content': base64.b64encode(b'x' * size).decode('ascii')}
+                     for index in range(offset, min(offset + 7, 21))]
+            response = self.client.post(f'/api/uploads/sessions/{token}/files', json={'files': files})
+            self.assertEqual(response.status_code, 200, response.text)
+        response = self.client.post(f'/api/uploads/sessions/{token}/complete', json={})
+        self.assertEqual(response.status_code, 200, response.text)
+        uploaded = response.json()
+        self.assertEqual(uploaded['accepted_files'], 21)
+        self.assertEqual(uploaded['accepted_bytes'], 21 * size)
+        self.assertEqual(uploaded['skipped_files'], 3)
+        project, name = api.uploaded_project(uploaded['source'], api.DATA)
+        self.assertEqual(name, 'LargeProject')
+        self.assertEqual((project / 'src/file-20.js').stat().st_size, size)
+
+    def test_upload_session_rejects_cross_batch_duplicates_and_can_cancel(self):
+        begin = self.client.post('/api/uploads/sessions', json={
+            'name': 'Project', 'total_files': 2, 'total_bytes': 2, 'skipped_files': 0})
+        token = begin.json()['upload_id']
+        first = {'path': 'Project/app.py', 'content': base64.b64encode(b'a').decode('ascii')}
+        self.assertEqual(self.client.post(f'/api/uploads/sessions/{token}/files', json={'files': [first]}).status_code, 200)
+        duplicate = {'path': 'Project/APP.py', 'content': base64.b64encode(b'b').decode('ascii')}
+        self.assertEqual(self.client.post(f'/api/uploads/sessions/{token}/files', json={'files': [duplicate]}).status_code, 422)
+        self.assertEqual(self.client.post(f'/api/uploads/sessions/{token}/cancel', json={}).status_code, 200)
+        self.assertFalse((api.DATA / 'upload-staging' / token).exists())
+
     def test_fix_exports_and_stale_safe_apply_preserve_dotenv(self):
         job = self.fix(self.scan())
         self.assertEqual(job['status'], 'complete')
@@ -180,6 +309,23 @@ class ApiIntegrationTests(unittest.TestCase):
         self.assertEqual((self.source / '.env').read_text(), self.env_content)
         backup = self.data / job['id'] / 'apply-backup' / 'app.py'
         self.assertEqual(backup.read_text(), self.original)
+
+    def test_repair_plan_is_ai_generated_before_edits_and_bound_to_selection(self):
+        job = self.scan()
+        finding = next(item for item in job['findings'] if item['title'] == 'Debug mode is explicitly enabled')
+        response = self.client.post(f"/api/jobs/{job['id']}/fix-plan", json={'finding_ids': [finding['id']]})
+        self.assertEqual(response.status_code, 200, response.text)
+        planned = self.finish(job['id'])
+        self.assertEqual(planned['status'], 'complete')
+        self.assertEqual(planned['fix_plan']['source_kind'], 'local')
+        self.assertEqual(planned['fix_plan']['finding_ids'], [finding['id']])
+        self.assertIsNone(planned['fix'])
+        mismatch = self.client.post(f"/api/jobs/{job['id']}/fix", json={'finding_ids': [finding['id']], 'plan_id': 'b' * 24})
+        self.assertEqual(mismatch.status_code, 409)
+        response = self.client.post(f"/api/jobs/{job['id']}/fix", json={'finding_ids': [finding['id']], 'plan_id': planned['fix_plan']['id']})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.finish(job['id'])['status'], 'complete')
+        self.assertEqual(provider.fix_project.call_args.kwargs['plan']['id'], planned['fix_plan']['id'])
 
     def test_verification_needs_trust_and_runs_only_in_copy(self):
         job = self.fix(self.scan())

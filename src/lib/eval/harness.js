@@ -18,22 +18,31 @@ export function evalsDir(praxisDir) {
  * Validate an evaluation suite specification.
  */
 export function validateEvalSuite(suite) {
-  if (!suite || typeof suite !== 'object') {
+  if (!suite || typeof suite !== 'object' || Array.isArray(suite)) {
     return { ok: false, error: 'Eval suite must be an object' };
   }
-  if (!suite.name || typeof suite.name !== 'string') {
+  if (typeof suite.name !== 'string' || !suite.name.trim()) {
     return { ok: false, error: 'Eval suite requires a non-empty "name"' };
   }
   if (!Array.isArray(suite.cases) || suite.cases.length === 0) {
     return { ok: false, error: 'Eval suite requires a non-empty "cases" array' };
   }
 
+  const ids = new Set();
   for (const c of suite.cases) {
-    if (!c.id || typeof c.id !== 'string') {
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return { ok: false, error: 'Each case must be an object' };
+    if (typeof c.id !== 'string' || !c.id.trim()) {
       return { ok: false, error: 'Each case requires an "id"' };
     }
-    if (!c.task || typeof c.task !== 'string') {
+    if (ids.has(c.id)) return { ok: false, error: `Duplicate case id "${c.id}"` };
+    ids.add(c.id);
+    if (typeof c.task !== 'string' || !c.task.trim()) {
       return { ok: false, error: `Case "${c.id}" requires a "task"` };
+    }
+    for (const key of ['expectedFiles', 'forbiddenFiles']) {
+      if (c[key] !== undefined && (!Array.isArray(c[key]) || c[key].some(f => typeof f !== 'string' || !f.trim()))) {
+        return { ok: false, error: `Case "${c.id}" ${key} must be an array of non-empty paths` };
+      }
     }
   }
 
@@ -54,7 +63,8 @@ export function scoreEvalCase({
   const expectedFiles = new Set(testCase.expectedFiles || []);
   const forbiddenFiles = new Set(testCase.forbiddenFiles || []);
 
-  let filePrecision = 1.0;
+  touchedFiles = [...new Set(touchedFiles)];
+  let filePrecision = expectedFiles.size > 0 ? 0 : 1.0;
   if (expectedFiles.size > 0 && touchedFiles.length > 0) {
     const hits = touchedFiles.filter((f) => expectedFiles.has(f)).length;
     filePrecision = Math.round((hits / touchedFiles.length) * 100) / 100;
@@ -71,17 +81,23 @@ export function scoreEvalCase({
 
   if (receipt && Array.isArray(receipt.claims)) {
     for (const cl of receipt.claims) {
-      if (cl.ruling === 'verified') verifiedClaims++;
-      else if (cl.ruling === 'fabricated') fabricatedClaims++;
+      // Historical receipts store verdicts, not lowercase `ruling` fields.
+      // Keep compatibility with older benchmark inputs without changing a
+      // single receipt or treating non-claims as failed claims.
+      const ruling = cl?.verdict ?? cl?.ruling;
+      if (ruling === 'NOT_A_CLAIM') continue;
+      if (['TRUE', 'VERIFIED', 'verified'].includes(ruling)) verifiedClaims++;
+      else if (['FALSE', 'CONTRADICTED', 'fabricated'].includes(ruling)) fabricatedClaims++;
       else unverifiedClaims++;
     }
   }
 
   const totalClaims = verifiedClaims + unverifiedClaims + fabricatedClaims;
-  const claimFidelity = totalClaims > 0 ? Math.round((verifiedClaims / totalClaims) * 100) / 100 : 1.0;
+  const claimFidelity = totalClaims > 0 ? Math.round((verifiedClaims / totalClaims) * 100) / 100 : 0;
 
   const assertionPass = exitCode === 0 && forbiddenViolations === 0;
-  const isPass = assertionPass && claimFidelity >= 0.7 && filePrecision >= 0.5;
+  const receiptUsable = Boolean(receipt) && receipt.sealed !== false && (!receipt.chain || receipt.chain.ok === true);
+  const isPass = assertionPass && receiptUsable && fabricatedClaims === 0 && claimFidelity >= 0.7 && filePrecision >= 0.5;
 
   return {
     id: testCase.id,

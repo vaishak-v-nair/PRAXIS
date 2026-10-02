@@ -14,6 +14,63 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
 
 ## [Unreleased]
 
+## [0.14.2] — 2026-10-02
+
+### Added
+
+- `praxis review` prepares and opens local Project Review in one command. The
+  optional app uses a persistent user-data folder, locked frontend dependencies,
+  checksum-pinned official Astral uv, private Python, and a production build.
+  First-run setup is explicit; the dependency-free CLI's default remains unchanged.
+- Cloudflare Workers static-asset configuration serves the complete public
+  browser trial and local setup guide. Deployment remains a separate manual action.
+
+### Fixed
+
+- Card layouts wrap long model names, source paths, status labels and repair
+  files without clipping evidence. Responsive checks inspect individual cards.
+- Browser setup instructions distinguish a published launcher from a pending
+  release instead of offering commands missing from the current npm package.
+- Managed Review releases keep jobs and provider settings outside npm's cache.
+  Existing checkout state, secrets, memory and hooks are never migrated automatically.
+- The npm package excludes development-only Python tools while keeping the
+  runtime launcher and the existing package-size budget.
+
+## [0.14.1] — 2026-10-01
+
+### Fixed
+
+- CLI installation no longer installs optional Workbench Node/Python runtimes.
+  Workbench source and setup instructions still ship; setup is explicit.
+- Legacy evaluation waits for real job completion and receipt linking, reads
+  historical receipt verdicts and file evidence correctly, and fails on missing,
+  open, tampered, or contradicted evidence. JSON results and exit status agree.
+- Workflow validation rejects malformed/duplicate dependencies and cycles before
+  sorting. Prototype-named steps persist safely without inherited outputs.
+- Workbench upgrades Next.js to the vendor's patched 16.3.6 release.
+- Promptfoo development tooling upgrades to 0.123.1, resolving its vulnerable
+  js-yaml dependency. Golden outcomes and recall/precision baselines stay fixed.
+- API claim extraction enforces the same bounded wall-clock deadline as the
+  command extractor, including responses that keep sending bytes indefinitely.
+- A missing default extractor on Windows reaches the documented conservative,
+  labelled local fallback. Explicit extractor configuration still fails closed.
+- Website install copy uses `npx praxis-memory`; **Test Your Project** opens
+  local setup guidance. Clipboard failures no longer claim a successful copy.
+
+### Added
+
+- Manual npm release checks for matching metadata, release notes, private package
+  paths, package budget, unpublished version, installed behavior, golden evals,
+  backend, TypeScript, production build and dependency audit. `npm publish` runs
+  the same checks before uploading. GitHub publishing is manual-dispatch only.
+- Current local project review interface, isolated Docker runtime checks, shared
+  model budgets, bounded folder uploads, source-aware repair planning, and
+  readable evidence assessments. Existing source-apply and network gates remain.
+
+The previously undated entries below describe the imported Verify/Workbench
+foundation retained by this checkout; they do not imply all of it is new in this
+patch. The 2026-10-01 audit documents current validation and remaining limits.
+
 ### Added
 
 - **`praxis verify`**: static-first verification of an agent completion report
@@ -35,7 +92,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
   environment. `praxis workbench` and `npm run dev` launch its local services;
   `workbench --check --json` inspects readiness without starting them.
   Existing memory, receipts, hooks, tray, demo, deck, flow, and eval remain in
-  place. The optional app is outside the core npm tarball and retains explicit
+  place. Optional app source ships in the npm tarball; its dependencies, builds,
+  private state, tests and sample repository do not. It retains explicit
   runtime trust, shared model budgets, diff exports, and source-apply confirmation.
 - Folder upload intake, with isolated copies, file/size limits, credential
   exclusions, portable path checks, and download-only application of repairs.

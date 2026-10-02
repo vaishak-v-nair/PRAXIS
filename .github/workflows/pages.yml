@@ -3,12 +3,12 @@ name: Pages
 # The website deploys from the repo, by this workflow, to GitHub Pages — the
 # host we control end to end. Two Vercel projects died under this site without
 # anyone noticing; a user finding the 404 was the bug report. The site is a
-# single self-contained file (web/index.html, built by scripts/build-web.mjs
-# and committed), so deployment is upload-and-serve: no build step to break.
+# self-contained landing page plus a private browser inspection page. Build
+# the public scanner copies from the canonical backend before uploading.
 on:
   push:
     branches: [main]
-    paths: ['web/**', '.github/workflows/pages.yml']
+    paths: ['web/**', 'scripts/build-web.mjs', 'scripts/build-browser-engine.mjs', 'apps/workbench/backend/regen/scanner.py', 'apps/workbench/backend/regen/reality.py', 'apps/workbench/backend/regen/browser.py', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -29,6 +29,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Build website and canonical browser engine
+        run: node scripts/build-web.mjs
+      - name: Verify browser prompt and engine build contracts
+        run: node scripts/ci/run-tests.mjs test/browser-review.test.js test/public-site.test.js
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web

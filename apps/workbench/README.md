@@ -12,6 +12,7 @@ the original source hashes are recorded in `import-manifest.json`.
 From the PRAXIS repository root:
 
 ```powershell
+.\start.ps1          # Windows: prepare Node/Python dependencies and launch
 npm run dev
 node src/cli.js workbench --check --json
 ```
@@ -24,13 +25,16 @@ Use Ctrl+C to stop. The complete setup and directory plan is in
 
 1. Choose a provider in Model settings. Keys stay server-side in this app's
    ignored `.env` or environment variables; configuration lives in `.regen/provider.json`.
-2. Submit a local absolute folder or GitHub repository. Scans inspect a bounded
-   snapshot without executing project code. AI review sends redacted excerpts to
-   the selected provider. Missing tools and incomplete coverage remain visible.
-3. Select findings. Up to three specialists repair separate copies under a
-   shared per-job budget. The coordinator integrates edits and reviews the result.
-4. Review diffs and export a patch or project copy. Trusted runtime checks need
-   explicit confirmation and execute as your user; a copy is not a sandbox.
+2. Submit a local absolute folder, GitHub repository, or folder upload. The
+   complete review inspects a bounded snapshot, sends redacted context to
+   configured providers under a shared budget, and runs authorized Docker
+   commands. Missing tools, failed calls, and incomplete coverage remain visible.
+3. Select findings and draft a source-aware fix plan. Confirm model handoff or
+   copy the plan to your coding agent. Specialists prepare edits in separate
+   copies; the coordinator integrates changes and independently reviews them.
+4. Inspect diffs and export a patch or project copy. Browser runtime checks use
+   the bounded Node/Python Docker runner, with networking independently opt-in.
+   Legacy trusted-host API execution remains explicit and is not an OS sandbox.
 5. Apply to local source only after explicit confirmation, freshness checks,
    backups, and rollback protection. GitHub intake uses exports instead. Nothing
    is pushed automatically.
@@ -59,4 +63,6 @@ toolchain are separate. See its own README before running it.
 
 Workbench evidence remains separate from PRAXIS's signed receipts. The original
 `praxis demo`, `praxis deck`, memory, hooks, tray, and verification behavior remain
-available. The optional app is excluded from the core CLI's npm tarball.
+available. Optional Workbench source ships in the npm tarball; its dependencies,
+Python environment, generated builds, backend tests, sample repository, and
+private runtime state do not. The core CLI never imports Workbench dependencies.

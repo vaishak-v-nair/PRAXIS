@@ -11,7 +11,7 @@ from .scanner import safe_files
 EXTENSIONS = {'.py', '.ts', '.tsx', '.js', '.jsx', '.mjs', '.vue', '.svelte'}
 
 
-def related_source_paths(root, selected, max_nodes=250):
+def related_source_paths(root, selected, max_nodes=250, *, include_graph=False):
     """Bounded graph retrieval; never imports code or resolves outside the snapshot."""
     root = Path(root).resolve()
     files = {file.relative_to(root).as_posix(): file for file in safe_files(root)
@@ -58,6 +58,10 @@ def related_source_paths(root, selected, max_nodes=250):
     dependencies = sorted(set().union(*(links.get(path, set()) for path in selected)) - set(selected))
     callers = sorted(path for path, targets in links.items() if targets & set(selected)
                      and path not in selected and path not in dependencies)
-    return {'paths': [*selected, *dependencies, *callers], 'dependencies': dependencies,
+    result = {'paths': [*selected, *dependencies, *callers], 'dependencies': dependencies,
             'callers': callers, 'indexed_files': len(indexed), 'eligible_files': len(files),
             'limited': len(indexed) < len(files), 'method': 'static-local-imports'}
+    if include_graph:
+        result.update(nodes=indexed, edges=[{'source': source, 'target': target} for source, targets in links.items()
+                                           for target in sorted(targets) if target in links and source != target])
+    return result

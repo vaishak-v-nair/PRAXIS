@@ -1,7 +1,7 @@
 {
   "name": "praxis-memory",
-  "version": "0.14.0",
-  "description": "Your AI says \"done.\" PRAXIS proves it. Signed, tamper-evident receipts of what your coding agent actually did — plus durable project memory. Local-first: no server, no account, your code never leaves your machine.",
+  "version": "0.14.2",
+  "description": "Local-first project review, evidence-backed coding-agent claim verification, signed receipts, and durable project memory. The CLI has zero runtime dependencies; Workbench uses separately installed dependencies and configured model providers.",
   "type": "module",
   "bin": {
     "praxis": "src/cli.js",
@@ -20,16 +20,27 @@
     "README.md",
     "docs/VERIFY-QUICKSTART.md",
     "docs/GITHUB-APP.md",
+    "docs/WORKBENCH-INTEGRATION.md",
+    "docs/AGENT-WORKFLOW.md",
+    "docs/PROJECT-REVIEW-QUICKSTART.md",
+    "docs/MANUAL-NPM-RELEASE.md",
     "LICENSE"
   ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
+    "prepublishOnly": "node scripts/ci/release-check.mjs",
+    "release:check": "node scripts/ci/release-check.mjs",
+    "release:metadata": "node scripts/ci/release-check.mjs --metadata-only",
     "postinstall": "node scripts/postinstall.js",
     "test": "node --test \"test/*.test.js\"",
     "dev": "node src/cli.js workbench",
     "workbench": "node src/cli.js workbench",
+    "review": "node src/cli.js review",
+    "build:site": "node scripts/build-web.mjs && node scripts/build-public-site.mjs",
+    "cloudflare:check": "npx --yes wrangler@4.146.0 deploy --dry-run",
+    "cloudflare:deploy": "npx --yes wrangler@4.146.0 deploy",
     "dev:api": "npm --prefix apps/workbench run dev:api",
     "dev:web": "npm --prefix apps/workbench run dev:web",
     "typecheck:workbench": "npm --prefix apps/workbench run typecheck",
@@ -61,7 +72,7 @@
     "@langchain/langgraph": "1.4.17",
     "@libsql/client": "0.17.4",
     "ffmpeg-static": "^5.3.0",
-    "promptfoo": "0.122.1",
+    "promptfoo": "0.123.1",
     "sharp": "^0.35.3",
     "three": "0.181.2",
     "zod": "4.6.5"
@@ -70,7 +81,12 @@
     "type": "git",
     "url": "git+https://github.com/vaishak-v-nair/PRAXIS.git"
   },
-  "homepage": "https://vaishak-v-nair.github.io/PRAXIS",
+  "homepage": "https://praxis-six-xi.vercel.app",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "tag": "latest"
+  },
   "bugs": {
     "url": "https://github.com/vaishak-v-nair/PRAXIS/issues"
   }

@@ -76,3 +76,38 @@ test('aggregateEvalMetrics aggregates multiple cases accurately', () => {
   assert.equal(agg.avgFilePrecision, 0.75);
   assert.equal(agg.avgDurationMs, 150);
 });
+
+test('eval rejects missing evidence, contradictions, and empty required file scope', () => {
+  const testCase = { id: 'fix', task: 'Fix src/a.js', expectedFiles: ['src/a.js'] };
+  for (const receipt of [null, { verdict: 'UNVERIFIED', claims: [] }]) {
+    const score = scoreEvalCase({ testCase, exitCode: 0, touchedFiles: ['src/a.js'], receipt });
+    assert.equal(score.pass, false, 'an agent exit code is not claim evidence');
+    assert.equal(score.claimFidelity, 0);
+  }
+  const receipt = { verdict: 'VERIFIED', claims: [{ verdict: 'TRUE' }] };
+  const empty = scoreEvalCase({ testCase, exitCode: 0, receipt });
+  assert.equal(empty.pass, false);
+  assert.equal(empty.filePrecision, 0);
+  const contradicted = { claims: [...Array(9).fill({ verdict: 'TRUE' }), { verdict: 'FALSE' }] };
+  assert.equal(scoreEvalCase({ testCase, exitCode: 0, touchedFiles: ['src/a.js'], receipt: contradicted }).pass, false);
+});
+
+test('eval understands the unchanged receipt format and refuses tampered or open records', () => {
+  const testCase = { id: 'c', task: 'Update documentation' };
+  const receipt = { sealed: true, chain: { ok: true }, verdict: 'VERIFIED', claims: [{ verdict: 'TRUE' }, { verdict: 'NOT_A_CLAIM' }] };
+  const score = scoreEvalCase({ testCase, exitCode: 0, receipt });
+  assert.equal(score.pass, true);
+  assert.equal(score.verifiedClaims, 1);
+  assert.equal(score.unverifiedClaims, 0);
+  for (const invalid of [{ ...receipt, chain: { ok: false } }, { ...receipt, sealed: false }]) {
+    assert.equal(scoreEvalCase({ testCase, exitCode: 0, receipt: invalid }).pass, false);
+  }
+});
+
+test('eval validates case shapes, duplicates and file lists without throwing', () => {
+  for (const cases of [[null], [4], [{ id: ' ', task: 'x' }], [{ id: 'a', task: ' ' }],
+    [{ id: 'a', task: 'x', expectedFiles: 'src/a.js' }], [{ id: 'a', task: 'x', forbiddenFiles: [4] }],
+    [{ id: 'a', task: 'x' }, { id: 'a', task: 'y' }]]) {
+    assert.equal(validateEvalSuite({ name: 'pressure', cases }).ok, false);
+  }
+});

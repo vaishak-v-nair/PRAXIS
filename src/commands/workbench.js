@@ -50,6 +50,7 @@ export async function workbench(argv = []) {
     console.error(`Workbench is not ready: ${status.missing.join(', ')}.`);
     console.error('Use a PRAXIS source checkout, install apps/workbench dependencies, or supply --path.');
     console.error('See docs/WORKBENCH-INTEGRATION.md. No dependencies were installed automatically.');
+    console.error('For managed setup and browser opening, run npx praxis-memory review.');
     return 1;
   }
   console.log(`PRAXIS Workbench · ${status.frontendUrl} · API ${status.backendUrl}`);

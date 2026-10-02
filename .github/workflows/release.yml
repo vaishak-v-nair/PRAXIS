@@ -1,55 +1,43 @@
-name: Release
+name: Manual npm release
 
-# A trust product whose own releases are hand-rolled from a laptop is
-# self-refuting. Provenance can only be minted from CI, so this workflow IS the
-# release ritual: write the changelog entry, push a v-tag, approve the
-# environment, npm publishes with a provenance attestation. No long-lived npm
-# token exists anywhere.
-#
-#   1. CHANGELOG.md: rename [Unreleased] to [0.10.0] — YYYY-MM-DD, commit
-#   2. git tag v0.10.0 && git push origin v0.10.0
-#
-# Step 1 is not optional: the changelog job refuses a tag the file does not
-# name, before the approval gate — the fleet auto-upgrades, and this file is
-# the only notice it gets.
-#
-# One-time setup on npmjs.com (trusted publisher). All four values must match
-# this file EXACTLY or publish fails with a bare 404:
-#   organization/user : vaishak-v-nair
-#   repository        : PRAXIS
-#   workflow filename : release.yml
-#   environment name  : release
-#
-# Every job is guarded on the repository name, and this workflow is the reason
-# the guard is not optional: the confidential mirror receives this file through
-# a branch merge, so a v-tag pushed there would otherwise try to publish
-# praxis-memory from a repository the npm trusted publisher does not recognise.
+# Only a maintainer dispatch can publish. A pushed tag alone does nothing.
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing reviewed tag matching package.json (for example v0.14.1)'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
 jobs:
-  # Fails in seconds if CHANGELOG.md does not name the tagged version, so a
-  # human is never asked to approve a release that cannot finish. The file is
-  # the source of truth: the GitHub Release body is extracted from it below,
-  # which is what keeps the repo file and the release page from drifting apart.
-  changelog:
+  metadata:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
-    name: the changelog names this release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - run: node scripts/ci/changelog.mjs notes "$GITHUB_REF_NAME"
+      - name: reviewed tag matches package version
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; const tag = process.env.RELEASE_TAG; const pkg = JSON.parse(fs.readFileSync('package.json')); if (!/^v[0-9]+\.[0-9]+\.[0-9]+$/.test(tag) || tag !== 'v' + pkg.version) process.exit(1);"
+          test "$(git describe --tags --exact-match)" = "$RELEASE_TAG"
+      - run: npm run release:metadata
+      - run: node scripts/ci/leak-guard.mjs
 
   test:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
-    name: test · ${{ matrix.os }} · node ${{ matrix.node }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -58,21 +46,15 @@ jobs:
         node: [22, 24, 26]
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
-      # The SAME runner ci.yml uses, not a bare `npm test`. It caps how many
-      # test files run at once on CI, and 17 of the 39 spawn node children of
-      # their own — uncapped on a two-core runner they compete to fork and one
-      # fails outright. This job blocks a publish, so a flake here fails a
-      # release AFTER the tag is pushed, and npm versions are immutable.
-      # Two runners of one suite must not disagree about how to run it.
-      - name: npm test
-        run: node scripts/ci/run-tests.mjs
+      - run: node scripts/ci/run-tests.mjs
 
   pack-smoke:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
-    name: pack + install + launch · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -80,68 +62,83 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
       - uses: actions/setup-node@v5
         with:
           node-version: 24
       - run: node scripts/ci/pack-smoke.mjs
 
-  # Live judge certification used to gate this step. It needs an ANTHROPIC_API_KEY
-  # repository secret to run the shipped judge for real, and this project does not
-  # keep one — so the gate was removed rather than left to fail, or worse, faked
-  # against a model nobody ships. The suite itself is intact: the same seven
-  # iron-rule scenarios run in CI on every push against a recorded judge
-  # (test/judge-evals.test.js), and `node scripts/ci/run-live-evals.mjs` grades a
-  # live model on demand. To restore the gate, add the secret and re-add a job
-  # calling .github/workflows/live-evals.yml with publish depending on it.
+  verify-golden:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts
+      - run: npm run eval:verify
+        env:
+          PROMPTFOO_DISABLE_TELEMETRY: '1'
+
+  workbench:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --prefix apps/workbench --ignore-scripts
+      - run: python -m venv apps/workbench/.venv
+      - run: apps/workbench/.venv/bin/python -m pip install -r apps/workbench/backend/requirements.txt
+      - run: apps/workbench/.venv/bin/python -m pip check
+      - run: npm run test:workbench
+      - run: npm run typecheck:workbench
+      - run: npm run build:workbench
+      - run: npm --prefix apps/workbench audit --omit=dev --audit-level=high
 
   publish:
     if: github.repository == 'vaishak-v-nair/PRAXIS'
-    name: publish to npm (provenance)
-    needs: [test, pack-smoke, changelog]
+    needs: [metadata, test, pack-smoke, verify-golden, workbench]
     runs-on: ubuntu-latest
-    # The human control point. Everything above is machine-verified; this is
-    # the one place a person says "ship it."
     environment: release
     permissions:
-      contents: write # to create the GitHub Release
-      id-token: write # to mint the provenance attestation via OIDC
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-
-      # Runner npm can lag; trusted publishing needs >= 11.5.1.
-      - name: ensure npm supports trusted publishing
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: prepare gate tooling without application lifecycle scripts
         run: |
-          npm install -g npm@latest
-          npm --version
-
-      - name: the tag must match the version being published
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          PKG="$(node -p "require('./package.json').version")"
-          if [ "$TAG" != "$PKG" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $PKG"
-            exit 1
-          fi
-          echo "publishing $PKG"
-
-      # No --provenance flag: OIDC trusted publishing mints the attestation
-      # automatically, and passing the flag with a token-less setup fails.
-      - name: npm publish
-        run: npm publish
-
-      # The release body is CHANGELOG.md's entry for this version — written by
-      # a person, gated above, never typed into a web form after the fact. The
-      # auto-generated commit list is appended underneath as the paper trail.
-      # This page is where support changes and deprecation reasons reach a
-      # fleet that auto-upgrades.
-      - name: create the GitHub Release from CHANGELOG.md
+          npm install -g npm@11
+          npm ci --ignore-scripts
+          npm ci --prefix apps/workbench --ignore-scripts
+          python -m venv apps/workbench/.venv
+          apps/workbench/.venv/bin/python -m pip install -r apps/workbench/backend/requirements.txt
+      # Trusted publisher must match vaishak-v-nair / PRAXIS / release.yml / release.
+      # No stored npm token. prepublishOnly repeats the local gate before upload.
+      - run: npm publish
+      - name: create GitHub release from the reviewed changelog
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          node scripts/ci/changelog.mjs notes "$GITHUB_REF_NAME" > .release-notes.md
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" \
-            --notes-file .release-notes.md --generate-notes
+          node scripts/ci/changelog.mjs notes "$RELEASE_TAG" > .release-notes.md
+          gh release create "$RELEASE_TAG" --title "$RELEASE_TAG" --notes-file .release-notes.md --generate-notes

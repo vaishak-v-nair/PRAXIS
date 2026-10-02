@@ -20,8 +20,9 @@ Run `npm run dev` from PRAXIS and open `http://127.0.0.1:3000`.
    project copy for GitHub and uploaded sources. Local path submissions retain
    explicit source-apply confirmation, freshness checks, backups, and rollback.
 
-Uploads accept one folder, up to 10,000 files, 2 MiB per file, 20 MiB total,
-and 32 MiB encoded request size. Two uploads may run concurrently. Credentials,
+Uploads accept one folder, up to 25,000 reviewable files, 2 MiB per file,
+100 MiB total, and 32 MiB per encoded request batch. Large selections are sent
+through resumable bounded batches. Two uploads may run concurrently. Credentials,
 dependency directories, generated output, and private memory directories are
 excluded. Traversal, Windows reserved names, duplicate names ignoring case,
 and file/directory conflicts are rejected before writing files. Empty folders
@@ -56,6 +57,14 @@ installed, and configuration means linked on disk; neither proves a running
 client has connected. Custom adapters are discovered by executable; unknown
 clients need their documented MCP configuration rather than guessed hooks.
 Automatic capture remains specific to clients with supported transcripts or hooks.
+
+`praxis init` also converts the shipped `/praxis-*` templates into portable
+Agent Skills under the ignored project `.agents/skills` directory. If Codex is
+installed, the same generated skills are refreshed under `~/.codex/skills`.
+PRAXIS-generated skills carry an ownership marker; a user-authored skill with a
+colliding name is preserved. Init repairs legacy personal Claude/Codex hook
+commands from bare `praxis capture` to `npx -y praxis-memory capture` without
+changing hooks owned by other tools. Restart the coding client to reload skills.
 
 For an explicit live speed check of configured `.env` API credentials:
 

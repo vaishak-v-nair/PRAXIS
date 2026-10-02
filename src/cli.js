@@ -33,6 +33,7 @@ import { uninstall } from './commands/uninstall.js';
 import { update } from './commands/update.js';
 import { demo } from './commands/demo.js';
 import { workbench } from './commands/workbench.js';
+import { review } from './commands/review.js';
 import { verifyCommand } from './commands/verify.js';
 import { githubAppCommand } from './commands/github-app.js';
 import { live } from './commands/live.js';
@@ -67,6 +68,7 @@ function help() {
   const sections = [
     [bold('Start'), [
       ['npx praxis-memory', `set up PRAXIS here ${grey('(or show status if already set up)')}`],
+      ['npx praxis-memory review', `install and open Project Review ${grey('· local, no account')}`],
       [`${c} demo`, `see the whole thing in one minute ${grey('— no setup, no network')}`],
       [`${c} demo --live`, grey('the same loop on real work: a sandbox agent, judged live (spends tokens)'), 'quiet'],
     ]],
@@ -159,7 +161,7 @@ const COMMANDS = [
   'init', 'connect', 'status', 'capture', 'feedback', 'tray', 'switch', 'health',
   'telemetry', 'trace', 'vault', 'checkpoint', 'remember', 'recap',
   'forget', 'save', 'explain', 'gate', 'receipt', 'run', 'jobs',
-  'approve', 'gov', 'deck', 'flow', 'eval', 'verify', 'live', 'github-app', 'mcp', 'doctor', 'update', 'uninstall', 'demo', 'workbench', 'help',
+  'approve', 'gov', 'deck', 'flow', 'eval', 'verify', 'live', 'github-app', 'mcp', 'doctor', 'update', 'uninstall', 'demo', 'workbench', 'review', 'help',
 ];
 switch (cmd) {
   case 'connect':
@@ -252,6 +254,9 @@ switch (cmd) {
     break;
   case 'workbench':
     process.exitCode = await workbench(process.argv.slice(3));
+    break;
+  case 'review':
+    process.exitCode = await review(process.argv.slice(3));
     break;
   case 'mcp':
     await mcp();

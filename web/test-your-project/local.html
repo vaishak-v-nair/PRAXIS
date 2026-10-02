@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; connect-src 'self' https://registry.npmjs.org; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Install Project Review · PRAXIS</title>
+  <meta name="description" content="Start local PRAXIS Project Review with one command. No Git checkout or manual Python setup needed for the managed launcher.">
+  <link rel="canonical" href="https://praxis-six-xi.vercel.app/test-your-project/local.html">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./install.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to installation</a>
+  <header class="app-header"><a class="brand" href="../">PRAXIS <span>/ Install</span></a><nav aria-label="Main"><a href="./">Try in your browser</a><a href="https://github.com/vaishak-v-nair/PRAXIS">Source</a></nav></header>
+  <main id="main" class="install-page">
+    <section class="page-heading"><span class="eyebrow">PROJECT REVIEW · RUNS ON YOUR COMPUTER</span><h1>Your project.<br><span>Your local workspace.</span></h1><p>Open Project Review with one command. Setup prepares the interface and API, keeps your saved reviews in a stable folder, and opens your browser when both services are ready.</p></section>
+    <div class="intake-grid">
+      <section class="panel" aria-labelledby="install-title">
+        <div class="section-heading"><h2 id="install-title">Start Project Review</h2><span class="badge neutral" id="release-badge">Checking release</span></div>
+        <p class="fine-print">Install <a href="https://nodejs.org/en/download" target="_blank" rel="noreferrer">Node.js 22 or later</a>, then close and reopen your terminal. No separate Git or Python installation is needed.</p>
+        <label class="field" for="install-command">Run in Terminal or PowerShell<input class="install-command" id="install-command" readonly value="Checking the public release…" spellcheck="false"></label>
+        <div class="run-actions"><button class="button primary" id="copy-install" disabled>Copy install command</button><span id="install-status" role="status" aria-live="polite">Checking the official npm registry. No project files are sent.</span></div>
+        <p class="fine-print">The first run downloads application dependencies and a private Python runtime, then builds the interface. Allow several minutes. Keep the terminal open while using PRAXIS; Ctrl+C stops its services.</p>
+        <details class="coverage"><summary>Already working from the source checkout?</summary><p class="fine-print">From the PRAXIS directory, run the new launcher directly. This works before the npm release is published.</p><pre><code>node src/cli.js review</code></pre><p class="fine-print">Use <code>review --check</code> to inspect readiness without changing files, or <code>review --setup-only</code> to install without starting services. The existing <code>.\start.ps1</code> developer launcher remains available.</p></details>
+      </section>
+      <aside class="panel scope" aria-labelledby="included-title"><span class="eyebrow">WHAT SETUP DOES</span><h2 id="included-title">Prepare once.<br>Keep your reviews.</h2><dl>
+        <div><dt>Private app runtime</dt><dd>Installs locked frontend dependencies and prepares Python with a checksum-pinned official Astral uv download. No administrator access or global Python changes.</dd></div>
+        <div><dt>Persistent local data</dt><dd>Saved reviews and provider settings stay outside npm's cache and app release folders. Existing project evidence, keys and memory are never imported automatically.</dd></div>
+        <div><dt>Healthy startup</dt><dd>Opens the local interface only after the actual API and page respond. Ports already used by another service are reported; that service is left running.</dd></div>
+      </dl></aside>
+    </div>
+    <section class="panel install-next" aria-labelledby="next-title"><span class="eyebrow">AFTER STARTUP</span><h2 id="next-title">Review, understand, decide.</h2><ol>
+      <li><strong>Bring your project.</strong> Select a local path, GitHub repository URL or folder upload in the local app.</li>
+      <li><strong>Connect a provider when you need AI review.</strong> Source inspection works without a key. Configure your provider and shared spending limit in the app; setup itself makes no paid model calls.</li>
+      <li><strong>Add runtime evidence when needed.</strong> Docker in Linux mode is required for isolated project execution. Execution and package-download access require separate, explicit authorization.</li>
+      <li><strong>Read the evidence and gaps.</strong> Draft a fix plan, inspect it, and copy it to your coding agent or confirm a model handoff. Source changes require their own approval.</li>
+    </ol><p class="fine-print">This is a local web application, not a signed desktop installer. Node.js is still a prerequisite. The hosted browser trial inspects source only and does not run your project.</p><a href="https://github.com/vaishak-v-nair/PRAXIS/blob/main/docs/PROJECT-REVIEW-QUICKSTART.md">Full local review guide →</a></section>
+  </main>
+  <footer><span>PRAXIS / Final engineering check</span><span>Local setup makes no model requests.</span></footer>
+</body>
+</html>

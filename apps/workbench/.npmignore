@@ -1,0 +1,16 @@
+# Development tests remain in the checkout, not in the CLI download.
+backend/tests/
+tools/*.py
+README.upstream.md
+repos/
+.env
+.env.*
+!.env.example
+.regen/
+.next/
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+*.tsbuildinfo
+next-env.d.ts

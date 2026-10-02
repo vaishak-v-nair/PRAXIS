@@ -3,6 +3,11 @@ node_modules/
 npm-debug.log*
 .DS_Store
 
+# Local credentials. Templates remain reviewable; real values never enter Git.
+.env
+.env.*
+!.env.example
+
 # Local dogfood artifacts
 .praxis/
 .gstack/
@@ -61,3 +66,11 @@ apps/workbench/repos/*/data/
 apps/workbench/repos/*/chroma_db/
 apps/workbench/repos/*/index_db/
 evals/verify/redteam-cases.yaml
+
+# Public scanner copies are generated from the canonical backend.
+web/test-your-project/engine/
+web/test-your-project/release.json
+.wrangler/
+
+# Local npm package archives are generated release artifacts.
+*.tgz

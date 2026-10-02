@@ -11,6 +11,7 @@ import { patchAgentsMd } from '../lib/agentsmd.js';
 import { patchSettings, resolveHookScope, contributorCount, ignoreLocalSettings } from '../lib/settings.js';
 import { patchMcpConfig } from '../lib/mcp/config.js';
 import { autoConnect } from '../lib/agent-connect.js';
+import { installPraxisSkills, repairPersonalAgentHooks } from '../lib/skills.js';
 import { masthead, mascotBlock, miniHeader, sage, rose, bold, grey, dim, dailyQuote } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
 import { readFileSync } from 'node:fs';
@@ -159,6 +160,25 @@ export async function init() {
     fs.copyFileSync(path.join(TEMPLATES, name), path.join(p.commandsDir, name));
   }
   done.push(`.claude/commands — ${slashCmds.length} /praxis-* commands, one per praxis command`);
+
+  // Agent Skills are the portable surface used by Codex and compatible coding
+  // agents. Generated files stay machine-local; existing user-authored skills
+  // with the same name are preserved rather than overwritten.
+  const projectSkills = installPraxisSkills(TEMPLATES, path.join(p.root, '.agents', 'skills'));
+  done.push(`.agents/skills — ${projectSkills.filter(item => item.state !== 'preserved').length} portable PRAXIS skills`);
+  try {
+    const codexHome = path.join(os.homedir(), '.codex');
+    if (fs.existsSync(codexHome)) {
+      const codexSkills = installPraxisSkills(TEMPLATES, path.join(codexHome, 'skills'));
+      done.push(`~/.codex/skills — ${codexSkills.filter(item => item.state !== 'preserved').length} PRAXIS skills available across projects`);
+    }
+  } catch {
+    /* user-scope skills are best-effort; project skills remain available */
+  }
+
+  for (const result of repairPersonalAgentHooks(os.homedir())) {
+    if (result.repaired) done.push(`${result.file} — repaired ${result.repaired} legacy PRAXIS hook`);
+  }
 
   // user-scope commands: make /praxis-* visible in EVERY project, not just this one
   try {

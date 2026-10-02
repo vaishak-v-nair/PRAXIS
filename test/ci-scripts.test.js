@@ -8,11 +8,17 @@ import { checkTrackedPaths, RULES } from '../scripts/ci/leak-guard.mjs';
 import { parseCoverage, checkFloor, readFloor } from '../scripts/ci/coverage-floor.mjs';
 import { runWithConcurrency, summarize, DEFAULT_CONCURRENCY } from '../scripts/ci/run-live-evals.mjs';
 import { sections, notesFor } from '../scripts/ci/changelog.mjs';
-import { testConcurrency } from '../scripts/ci/run-tests.mjs';
+import { testConcurrency, testFiles } from '../scripts/ci/run-tests.mjs';
 import { isEnvironmental } from './helpers/flaky-env.mjs';
 
 const MB = 1024 * 1024;
 const CHANGELOG = fs.readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8');
+
+test('CI runner retains the full default suite and validates focused test selections', () => {
+  assert.deepEqual(testFiles(), ['test/*.test.js']);
+  assert.deepEqual(testFiles(['test/browser-review.test.js']), ['test/browser-review.test.js']);
+  for (const file of ['../outside.js', '--test-name-pattern=x', 'test/missing/subdir.js']) assert.throws(() => testFiles([file]), /Select test/);
+});
 
 test('tarball budget: passes under, fails over, and always names the size', () => {
   const under = checkBudget(2.8 * MB);

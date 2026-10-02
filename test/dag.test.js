@@ -150,3 +150,23 @@ test('createWorkflowRun, readWorkflowRun, and updateWorkflowRun round-trip', () 
   assert.equal(updated.status, 'done');
   assert.equal(readWorkflowRun(praxisDir, created.id).status, 'done');
 });
+
+test('DAG validation and sorting reject malformed dependencies and cycles consistently', () => {
+  for (const dependsOn of ['root', 4, {}, null, ['root', 'root'], [null]]) {
+    const steps = [{ id: 'root', task: 'Root' }, { id: 'child', task: 'Child', dependsOn }];
+    assert.equal(validateDag({ name: 'pressure', steps }).ok, false);
+    assert.equal(topologicalSort(steps).ok, false);
+  }
+  assert.equal(topologicalSort([{ id: 'a', task: 'A', dependsOn: ['b'] }]).ok, false);
+  assert.equal(topologicalSort([{ id: 'a', task: 'A', dependsOn: ['b'] }, { id: 'b', task: 'B', dependsOn: ['a'] }]).ok, false);
+});
+
+test('workflow state preserves prototype-named steps without inheriting task output', t => {
+  const root = sandbox();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const praxisDir = path.join(root, '.praxis');
+  const run = createWorkflowRun(praxisDir, { name: 'safe-keys', steps: [{ id: '__proto__', task: 'Literal step' }] });
+  assert.ok(Object.hasOwn(run.meta.steps, '__proto__'));
+  assert.equal(readWorkflowRun(praxisDir, run.id).steps.__proto__.task, 'Literal step');
+  assert.equal(interpolateStepTask('{{steps.toString.output}}', {}), '');
+});

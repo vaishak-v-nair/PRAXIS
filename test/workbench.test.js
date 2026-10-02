@@ -54,7 +54,7 @@ test('workbench readiness never certifies provider access or replaces the core p
   assert.equal(status.frontendUrl, 'http://127.0.0.1:3000');
   const core = JSON.parse(fs.readFileSync('package.json', 'utf8'));
   assert.equal(Object.keys(core.dependencies || {}).length, 0);
-  assert.ok(!core.files.includes('apps'), 'the optional app is outside the core tarball');
+  assert.ok(core.files.includes('apps/workbench'), 'optional app source ships while its dependencies remain separate');
   assert.ok(fs.existsSync('src/commands/demo.js'));
   assert.ok(fs.existsSync('src/commands/deck.js'));
 });

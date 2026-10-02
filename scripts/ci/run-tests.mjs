@@ -77,11 +77,16 @@ export function testConcurrency(env = process.env) {
   return Number.isInteger(n) && n > 0 ? n : 1;
 }
 
+export function testFiles(argv = []) {
+  if (argv.some(file => !/^test\/[a-z0-9-]+\.test\.js$/i.test(file))) throw new Error('Select test/<name>.test.js files; other paths and flags are not accepted.');
+  return argv.length ? argv : ['test/*.test.js'];
+}
+
 function main() {
   const args = ['--test', '--test-reporter=tap', '--test-reporter-destination=stdout'];
   const concurrency = testConcurrency();
   if (concurrency) args.push(`--test-concurrency=${concurrency}`);
-  args.push('test/*.test.js');
+  args.push(...testFiles(process.argv.slice(2)));
   // No test may spawn a tray host, whether or not it remembered the env var
   // itself. Learned the observable way: every full-suite run left one hidden
   // NotifyIcon host per throwaway init repo, and a day of runs left ten

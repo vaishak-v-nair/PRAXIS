@@ -6,23 +6,43 @@
 
 ### Your AI says "done." PRAXIS proves it.
 
-**Praxis is the open-source Full-Stack Agentic AI Orchestration & Verification Layer.** 
-It provides deterministic state machine execution (LangGraph/LangChain), multi-agent swarms (CrewAI), and Advanced RAG observability (LangSmith). Every agent session produces a sealed, tamper-evident **receipt** of its execution graph. 
-It also gives your AI a durable **durable vector memory**: distilled and automatically injected, so agents never lose context.
+**PRAXIS is a local project review tool for software built with AI.**
+Bring a folder or GitHub repository, inspect source-backed findings, run authorized
+checks in Docker, and review a fix plan before handing it to a model or coding agent.
+The existing CLI separately provides claim verification, signed receipts, portable
+project memory, agent adapters, and a tray companion.
 
 [![npm](https://img.shields.io/npm/v/praxis-memory?color=d6547a&label=npm)](https://www.npmjs.com/package/praxis-memory)
 [![CI](https://github.com/vaishak-v-nair/PRAXIS/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vaishak-v-nair/PRAXIS/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-4fa376)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A522-4e8fd0)](https://nodejs.org)
-[![local-first](https://img.shields.io/badge/data-never%20leaves%20your%20machine-dfa03a)](#safety)
+[![local-first](https://img.shields.io/badge/workspace-local%20first-dfa03a)](#safety)
 
-**[Website](https://vaishak-v-nair.github.io/PRAXIS/)** · **[Changelog](CHANGELOG.md)** · **[Receipt spec](RECEIPT-SPEC.md)** · **[Start here (no terminal experience)](docs/START-HERE.md)**
+**[Website](https://praxis-six-xi.vercel.app/)** · **[Test your project in the browser](https://praxis-six-xi.vercel.app/test-your-project/)** · **[Changelog](CHANGELOG.md)** · **[Receipt spec](RECEIPT-SPEC.md)** · **[Start here (no terminal experience)](docs/START-HERE.md)**
 
-```bash
-./start.ps1
+```powershell
+# From this checkout with Node.js 22+:
+node src/cli.js review
 ```
 
-*One command — spins up the complete AI Full-Stack on your machine. It installs all multi-repo dependencies (Next.js/Python), sets up the vector stores, and boots the orchestration workbench. Prefer the CLI? `npx praxis-memory` arms the terminal hooks.*
+The new Review launcher prepares dependencies, installs private Python and builds
+the production interface. It opens **http://127.0.0.1:3000** when both services
+respond. Saved reviews and provider settings live in a persistent user-data folder,
+outside npm's cache. Use `review --check` for an inert readiness check, or
+`review --setup-only` to prepare without starting services. The public command
+`npx praxis-memory@0.14.2 review` becomes available after the manual npm release;
+this checkout command works now. Node.js remains a prerequisite.
+
+The existing Windows developer launcher `.\start.ps1` remains available with
+its `-Check`, `-SkipInstall` and explicit `-InitMemory` options. Model keys stay server-side; reviews send bounded,
+redacted excerpts to the providers you configure and use a shared spending limit.
+Docker runtime execution and source application remain explicit actions.
+
+**[Project review quickstart](docs/PROJECT-REVIEW-QUICKSTART.md)** ·
+**[Setup on any platform](docs/WORKBENCH-INTEGRATION.md)** ·
+**[Product and codebase map](docs/PRODUCT-MAP.md)**
+
+Prefer the existing memory CLI? `npx praxis-memory` sets up its supported hooks.
 
 **Want to see it before you install anything?**
 
@@ -43,9 +63,12 @@ npx praxis-memory demo
 
 *[Full recording as MP4](docs/demo.mp4) — the whole run, including the story the GIF stops before.*
 
-*Proof first: within a few seconds you have a genuine signed receipt of the agent's DAG execution on your own disk, verified in front of you. No network round-trips.*
+*The offline demo seals an explicitly marked recorded excerpt and checks its chain
+and signature. It carries no judge verdict and is separate from a Workbench review.*
 
-*Building swarms? `npx praxis-memory demo --live` runs the same loop on real work: a Sandbox agent executes a multi-step LangGraph plan, judged live. It tracks every state transition and tool invocation (spends tokens).*
+*`npx praxis-memory demo --live` runs an installed coding agent in a throwaway
+project and requests a separate judge (spends tokens). `praxis live` is the
+two-scenario Verify presentation, with optional LangGraph.js orchestration.*
 
 *Never used a terminal? **[Start here](docs/START-HERE.md)** — five minutes, no prior knowledge, works the same in VS Code, Cursor, or a plain terminal window.*
 
@@ -68,6 +91,11 @@ their sessions run `npx` too. `praxis doctor` always tells you which one you're 
 | **0 bytes** | **$0** | **1 file** | **MIT** |
 |:--:|:--:|:--:|:--:|
 | leave your machine | added inference cost | portable markdown | open source |
+
+These figures describe the local memory/capture and offline signature loop.
+Workbench model reviews, explicit live agent/judge runs, Verify extraction,
+repository downloads, and configured MCP sources have their own network and cost
+boundaries. PRAXIS does not guarantee free model access or remaining API credit.
 
 Every new Claude Code session starts from zero. You re-explain the stack, it re-explores
 yesterday's dead ends, and it "simplifies" the one file that must never be touched.
@@ -93,17 +121,22 @@ Praxis closes the loop: the context survives the session.
 - **Auto-load** — `init` adds a managed block to `CLAUDE.md` that `@`-includes your
   memory. Claude reads `CLAUDE.md` automatically, so memory loads every session with
   zero manual steps.
-- **Agent Orchestration** — Native support for executing isolated DAG paths via `praxis flow`. Integrates closely with LangGraph and CrewAI state machines.
+- **Agent orchestration** — `praxis flow` uses the native DAG runner. Optional
+  LangGraph.js orchestration is confined to PRAXIS Live; Workbench uses its own
+  bounded Python review and repair pipeline. CrewAI is not integrated.
 - **Auto-capture** — `init` installs a `Stop` hook. When a session ends,
   `praxis capture` appends a structured state transition summary on its own.
-- **Receipts** — the same `Stop` hook also seals a signed, hash-chained receipt
-  of the entire multi-agent tool execution graph (commands, files, tests) — evidence
-  only, zero model calls. `praxis receipt` reads it back.
+- **Receipts** — supported session evidence can be sealed into a signed,
+  hash-chained record (commands, files, tests). A transcript's unsupported fields
+  are not invented. Sealing is separate from judging completion claims.
+  `praxis receipt` reads the recorded evidence back.
 - **Snapshots** — a `PreCompact` hook fires right before Claude squeezes a full
   session. Praxis saves the context size, your recent asks and the files touched.
 - **Always on** — a `SessionStart` hook brings the tray companion up the moment
   a Claude session opens. Health is ambient, not a command you remember to run.
-- **Observability** — Direct instrumentation for LangSmith and Langfuse.
+- **Inspectable evidence** — Workbench retains command outcomes, coverage gaps,
+  model findings, and repair history locally. LangSmith is a transitive optional
+  development dependency, not a dedicated tracing integration; Langfuse is not integrated.
 - **Nothing is ever lost** — the working memory stays small so Claude loads fast,
   but entries rotated out of it move to `.praxis/archive/sessions/` (one file per
   month, oldest first). With an Obsidian vault connected, the archive is mirrored there too.
@@ -143,6 +176,8 @@ shared model budgets, runtime trust, and source-apply confirmation. It has separ
 Next.js/Python dependencies; scans can send redacted excerpts to your selected
 model provider. The existing CLI, offline receipt demo, and deck remain available.
 See [setup and directory plan](docs/WORKBENCH-INTEGRATION.md).
+For the current project-review workflow, see
+[Project review quickstart](docs/PROJECT-REVIEW-QUICKSTART.md).
 
 ```bash
 npx praxis-memory     # set up here (or show status, if already set up)
@@ -162,7 +197,7 @@ praxis gate [ref]     # slop-risk score for a commit — triage before you revie
 praxis receipt        # proof of what the AI did this session (--html · --list)
 praxis receipt verify <file>   # offline proof: chain + signature, free
 praxis receipt --verify        # judge this session's claims (one model call)
-npx praxis verify              # check the latest AI-agent commit and sign the result
+npx praxis-memory verify       # check the latest AI-agent commit and sign the result
 praxis github-app              # run the PR check + comment webhook service
 praxis flow [file]    # native DAG orchestration — parallel isolated agent execution
 praxis eval [suite]    # offline deterministic fidelity benchmark against signed receipts
@@ -367,32 +402,35 @@ redacted like everything else, and `praxis vault off` disconnects any time
 
 ## AI Orchestration & Evaluation
 
-PRAXIS brings agentic orchestration and offline evaluation directly into your project without the bloat, token latency, or external cloud dependencies of frameworks like LangChain, LangGraph, or CrewAI. The core engine is **100% native, zero-dependency, and strictly `<10ms` in overhead**.
+The CLI uses native JavaScript orchestration, memory retrieval, and evaluation
+with zero runtime dependencies. Agent execution and optional model calls have
+their own latency and cost. Optional LangGraph.js is a PRAXIS Live presentation
+adapter; it does not replace the native verifier or Workbench's Python pipeline.
 
 ### 1. Native DAG Engine (`praxis flow`)
 Orchestrates complex, multi-step agentic workflows where dependent tasks are topologically sorted via Kahn's algorithm and independent tasks execute concurrently.
-- **Strict Node Sandboxing:** Each node executes in isolation with its own inputs and outputs. Upstream errors fail fast without silently corrupting downstream agent state.
-- **Receipts Per Step:** Every step in the DAG generates its own tamper-evident cryptographic receipt, providing complete auditability across the entire execution graph.
+- **Dependency ordering:** Steps have explicit inputs and dependencies. Coding-agent execution follows the selected adapter's permission mode; a DAG node is not itself an OS sandbox.
+- **Recorded outcomes:** Supported jobs retain execution evidence. Agent completion, available receipt evidence, and a verified claim remain distinct.
 - **Zero Framework Bloat:** No external dependencies, custom Python runtimes, or complex graph DSLs. Defined in clean, declarative configuration.
 
 ### 2. Advanced Context Retrieval (BM25)
 Standard LLM workflows pass static files or rely on slow, expensive cloud vector databases. PRAXIS builds an embedded, zero-dependency **BM25 index** (TF-IDF with exponential recency decay) directly over `.praxis/memory.md`.
-- **Sub-Millisecond Retrieval:** Queries run in under `0.3ms` locally on disk with zero network hops.
+- **Local retrieval:** Queries use local records without an embedding API. Historical microbenchmarks are shown below; runtime depends on the corpus and machine.
 - **Recency-Weighted Ranking:** Recent architectural decisions and constraints are prioritized over older historical records, keeping the agent grounded in current project realities.
 
 ### 3. Evaluation Harness (`praxis eval`)
-Deterministic, offline benchmark scoring that measures autonomous agent fidelity without non-deterministic LLM judges.
-- **Evidence-Based Ground Truth:** Scores agent claims against hash-chained, Ed25519-signed session receipts. If an agent claims it wrote code or passed tests, `praxis eval` verifies the cryptographic filesystem proof.
+Deterministic scoring of execution outcomes, expected file scope, and available claim rulings. Running an evaluation can invoke a coding agent; deterministic scoring does not make that execution offline or free.
+- **Evidence limits:** An exit code, a claim ruling, and a valid receipt signature answer separate questions. Use Verify's independent claim checks for committed changes; evaluation scoring alone is not cryptographic proof of implementation correctness.
 - **Regression Testing:** Integrates directly into CI/CD pipelines to catch agent performance regressions before deployment.
 
-### 4. Verified Benchmarks
-The orchestration and retrieval engines are continuously stress-tested under extreme synthetic loads:
+### 4. Historical microbenchmarks
+Earlier synthetic measurements are shown for context, not universal latency or coverage guarantees. Current regression counts must come from a fresh test run.
 
 | Benchmark / Operation | Verified Performance | Latency Ceiling |
 |---|---|---|
 | **1,000-Node DAG Topological Sort** | **1.80 ms** | `< 10.0 ms` |
 | **Local BM25 Context Retrieval** | **0.26 ms** | `< 1.0 ms` |
-| **Core Test Suite Coverage** | **430 passing assertions (0 failures)** | `100%` |
+| **Earlier core regression run** | **430 passing assertions (0 failures)** | Not a coverage percentage |
 | **External Runtime Dependencies** | **0 added** | `0` |
 
 ## Safety
@@ -402,10 +440,12 @@ The orchestration and retrieval engines are continuously stress-tested under ext
   never to write secrets.
 - **Never auto-commits** — `init` adds `.praxis/` to `.gitignore` by default. Commit
   the memory deliberately if you want shared team context.
-- **Local only** — memory, receipts, health, trace: all local files, zero
-  network calls. The two exceptions are explicit and opt-in: `praxis receipt
-  --verify` runs *your own* `claude` CLI once to judge the claims, and
-  anonymous usage counts are sent only if you said yes at setup
+- **Explicit network boundaries** — memory capture and offline signature checks
+  use local files. Workbench model review sends bounded, redacted source context
+  to configured providers; GitHub intake and advisory lookup use the network.
+  Live agents, judge/extraction calls, and MCP evidence sources have separate
+  access requirements. Submitted-project network permission is independently
+  controlled. Anonymous usage counts are sent only after setup opt-in
   (`praxis telemetry show` prints exactly what).
 
 ## Roadmap
@@ -447,9 +487,21 @@ for permissions, model access, and evidence boundaries.
 
 ```bash
 git clone https://github.com/vaishak-v-nair/PRAXIS.git && cd PRAXIS
-npm link          # puts `praxis` on your PATH (needed for the auto-hook)
+npm link          # optional: puts `praxis` on your PATH; hooks use npx
 npm test          # node --test "test/*.test.js"
 ```
+
+Manual npm release from the full source checkout:
+
+```bash
+npm run release:check
+npm login --registry=https://registry.npmjs.org/
+npm publish --access public --registry=https://registry.npmjs.org/
+```
+
+The prepublish gate runs before upload; a tag push alone does not publish.
+See [manual release setup](docs/MANUAL-NPM-RELEASE.md) for development tooling,
+package inspection, authentication and the optional manual CI provenance route.
 
 ## License
 

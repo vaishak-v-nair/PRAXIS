@@ -19,6 +19,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { checkBudget, parsePackJson } from './tarball-budget.mjs';
+import { checkPackage } from './release-check.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const IS_WIN = process.platform === 'win32';
@@ -64,6 +65,8 @@ function main() {
     const json = r.out.slice(r.out.indexOf('['));
     const info = parsePackJson(json);
     const entry = JSON.parse(json)[0];
+    const contents = checkPackage(entry);
+    if (!contents.ok) throw new Error(contents.errors.join('\n'));
     tarball = path.join(REPO, entry.filename);
     if (!fs.existsSync(tarball)) throw new Error(`tarball not found at ${tarball}`);
     const budget = checkBudget(info.unpackedSize);
@@ -79,7 +82,11 @@ function main() {
     if (r.status !== 0) throw new Error('npm install failed:\n' + r.out);
     const bin = path.join(workdir, 'node_modules', '.bin', IS_WIN ? 'praxis-memory.cmd' : 'praxis-memory');
     if (!fs.existsSync(bin)) throw new Error('the praxis-memory bin was not installed');
-    return 'installed';
+    const installed = path.join(workdir, 'node_modules', 'praxis-memory');
+    for (const relative of ['node_modules', 'apps/workbench/node_modules', 'apps/workbench/.venv', '.praxis', 'apps/workbench/.regen']) {
+      if (fs.existsSync(path.join(installed, relative))) throw new Error('fresh CLI install unexpectedly created ' + relative);
+    }
+    return 'installed without optional runtimes or private state';
   });
 
   const cli = (...args) => {
@@ -102,6 +109,69 @@ function main() {
     if (r.status !== 0) throw new Error(`exit ${r.status}:\n${r.out}`);
     if (!/PRAXIS/.test(r.out)) throw new Error('help output did not render');
     return `${r.out.split('\n').length} lines`;
+  });
+
+  step('installed Verify distinguishes true and false claims in a real Git repo', () => {
+    if (!workdir) throw new Error('skipped — nothing installed');
+    const root = path.join(workdir, 'verify-repo');
+    fs.mkdirSync(root);
+    const git = (...args) => {
+      const result = sh('git', args, { cwd: root });
+      if (result.status !== 0) throw new Error(result.out);
+    };
+    git('init', '-q');
+    git('config', 'user.name', 'Codex Package Fixture');
+    git('config', 'user.email', 'fixture@example.test');
+    git('config', 'commit.gpgsign', 'false');
+    fs.writeFileSync(path.join(root, 'README.md'), 'before\n');
+    git('add', 'README.md'); git('commit', '-qm', 'Initial README');
+    fs.writeFileSync(path.join(root, 'README.md'), 'after\n');
+    git('add', 'README.md'); git('commit', '-qm', 'Updated README.md');
+    const installedCli = path.join(workdir, 'node_modules/praxis-memory/src/cli.js');
+    for (const [claim, expected, exit] of [['Updated README.md', 'VERIFIED', 0], ['Updated missing.txt', 'CONTRADICTED', 1]]) {
+      const start = Date.now();
+      const result = sh(process.execPath, [installedCli, 'verify', '--claim', claim, '--json'], { cwd: root, timeout: 60000 });
+      if (result.status !== exit) throw new Error(`expected exit ${exit}, got ${result.status}: ${result.out}`);
+      const output = JSON.parse(result.out);
+      if (output.decision?.decisions?.[0]?.verdict !== expected) throw new Error('wrong installed verdict for ' + claim);
+      if (Date.now() - start >= 60000) throw new Error('Verify exceeded one minute');
+      const check = sh(process.execPath, ['--input-type=module', '-e', `
+        import fs from 'node:fs';
+        import { verifyVerifyReceipt } from './node_modules/praxis-memory/src/lib/verify/verify-receipt.js';
+        if (!verifyVerifyReceipt(JSON.parse(fs.readFileSync(process.argv[1], 'utf8')))) process.exit(1);
+      `, output.artifact.file], { cwd: workdir });
+      if (check.status !== 0) throw new Error('installed Ed25519 receipt failed signature validation');
+    }
+    return 'VERIFIED + CONTRADICTED, both Ed25519 signatures checked';
+  });
+
+  step('npx praxis-memory verify needs no account or repository config', () => {
+    if (!workdir) throw new Error('skipped — nothing installed');
+    const root = path.join(workdir, 'verify-repo');
+    const stub = path.join(workdir, 'unconfigured-agent');
+    fs.mkdirSync(stub);
+    // Represent a machine with no authenticated extractor. Never invoke a real
+    // paid coding agent from a package/release check on a maintainer's machine.
+    fs.writeFileSync(path.join(stub, 'unconfigured.cjs'), 'process.exit(1);\n');
+    fs.writeFileSync(path.join(stub, IS_WIN ? 'claude.cmd' : 'claude'), IS_WIN ? '"%dp0%\\unconfigured.cjs" %*\r\n' : '#!/bin/sh\nexit 1\n', { mode: 0o700 });
+    const env = { ...process.env, ANTHROPIC_API_KEY: '', PRAXIS_VERIFY_EXTRACTOR_CMD: '',
+      PATH: stub + path.delimiter + (process.env.PATH || process.env.Path || '') };
+    if (IS_WIN) env.Path = env.PATH;
+    for (const [report, expected, exit] of [['Updated README.md', 'VERIFIED', 0], ['Updated missing.txt', 'CONTRADICTED', 1]]) {
+      fs.appendFileSync(path.join(root, 'README.md'), report + '\n');
+      for (const args of [['add', 'README.md'], ['commit', '-qm', report]]) {
+        const commit = sh('git', args, { cwd: root });
+        if (commit.status !== 0) throw new Error(commit.out);
+      }
+      const start = Date.now();
+      const result = sh('npx', ['--no-install', 'praxis-memory', 'verify', '--json'], { cwd: root, env, timeout: 60000 });
+      if (result.status !== exit) throw new Error(`npx returned ${result.status}: ${result.out}`);
+      const output = JSON.parse(result.out);
+      if (output.decision?.decisions?.[0]?.verdict !== expected) throw new Error('zero-config npx produced the wrong verdict');
+      if (output.claims?.[0]?.source?.extractor !== 'local-conservative-fallback') throw new Error('unconfigured extraction was not labelled honestly');
+      if (Date.now() - start >= 60000) throw new Error('zero-config npx exceeded one minute');
+    }
+    return 'zero-argument engine: true + false claims, labelled local fallback';
   });
 
   step('PRAXIS Live serves and verifies from the installed build', () => {

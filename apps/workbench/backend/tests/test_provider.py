@@ -9,8 +9,10 @@ from unittest.mock import patch
 import httpx
 
 from regen.provider import (Budget, BudgetExceeded, Model, ProviderError, WORKER_HISTORY_BYTES,
-                            _history_bytes, analyze, apply_edit, clean, compact_worker_history,
-                            create_file, fix_project, read_file, repair_worker, retry_delay, source_context)
+                            _history_bytes, analyze, analyze_deep, apply_edit, clean, compact_worker_history,
+                            configured_provider_selections,
+                            create_file, fix_project, plan_repair, read_file, repair_worker, retry_delay,
+                            source_context, _review_json, _validated_findings)
 from regen.scanner import _process
 
 
@@ -26,7 +28,149 @@ class RepairModel:
         return {'role': 'assistant', 'content': None, 'tool_calls': [{'id': 'edit-1', 'type': 'function', 'function': {'name': 'edit_file', 'arguments': json.dumps({'path': 'client.py', 'search': 'verify=False', 'replace': 'verify=True'})}}]}
 
 
+class PlanningModel:
+    provider = 'fixture'
+    model = 'planner-fixture'
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def call(self, messages, tools=None, max_tokens=2200):
+        return {'role': 'assistant', 'content': json.dumps({
+            'objective': 'Repair the selected issue', 'assumptions': ['API remains stable'],
+            'steps': [{'title': 'Repair client', 'intent': 'Enable certificate verification',
+                       'files': ['client.py', 'unrelated.py', '../escape'], 'validation': 'Run TLS regression test',
+                       'risk': 'Legacy endpoints may use invalid certificates'}],
+            'user_journeys': ['Connect to a valid TLS endpoint'], 'unresolved': ['Legacy endpoint inventory']})}
+
+
+class RetryPlanningModel(PlanningModel):
+    calls = 0
+
+    def call(self, messages, tools=None, max_tokens=2200):
+        type(self).calls += 1
+        if type(self).calls == 1:
+            return {'role': 'assistant', 'content': '{"objective":"missing steps"}'}
+        return super().call(messages, tools, max_tokens)
+
+
+class DeepReviewModel:
+    provider = 'fixture'
+    model = 'deep-fixture'
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def call(self, messages, tools=None, max_tokens=2200):
+        finding = {'category': 'quality', 'severity': 'medium', 'confidence': 'likely',
+                   'title': 'TLS verification disabled', 'description': 'The client disables certificate verification.',
+                   'why': 'A user connection can be intercepted.', 'location': {'file': 'client.py', 'line': 1},
+                   'evidence': 'verify=False', 'fix': 'Enable certificate verification.', 'fixable': True}
+        return {'role': 'assistant', 'content': json.dumps({'findings': [finding],
+                'journeys': [{'name': 'Connect', 'result': 'fails', 'evidence': 'verify=False'}], 'gaps': []})}
+
+
+class PayloadRetryModel:
+    def __init__(self, failure='payload_too_large'):
+        self.calls = 0
+        self.failure = failure
+
+    def call(self, messages, tools=None, max_tokens=2200):
+        self.calls += 1
+        if self.calls == 1:
+            error = ProviderError('payload rejected')
+            setattr(error, self.failure, True)
+            raise error
+        return {'role': 'assistant', 'content': '{"findings":[]}'}
+
+
 class ProviderSafetyTests(unittest.TestCase):
+    def test_ai_finding_requires_real_line_and_token_bounded_nearby_evidence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'api.py').write_text('from fastapi.responses import JSONResponse\nvalue = 1\n')
+            base = {'category': 'quality', 'severity': 'high', 'confidence': 'likely',
+                    'title': 'Bad import', 'description': 'Import is wrong', 'why': 'Startup fails',
+                    'fix': 'Fix the import', 'fixable': True,
+                    'location': {'file': 'api.py', 'line': 1}}
+            prefix = {**base, 'evidence': 'from fastapi.responses import JSON'}
+            wrong_line = {**base, 'evidence': 'value = 1', 'location': {'file': 'api.py', 'line': 99}}
+            exact = {**base, 'evidence': 'from fastapi.responses import JSONResponse'}
+            accepted, _ = _validated_findings(root, [prefix, wrong_line, exact])
+        self.assertEqual(len(accepted), 1)
+        self.assertEqual(accepted[0]['evidence'], exact['evidence'])
+
+    def test_large_review_payload_retries_once_with_reported_smaller_context(self):
+        for failure in ('payload_too_large', 'json_generation_failed'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                (root / 'large.py').write_text('value = 1\n' * 5000)
+                report, events, model = {}, [], PayloadRetryModel(failure)
+                result = _review_json(model, root, 'Review:\n', report, limit=40000,
+                                      retry_limit=2000, emit=events.append)
+                self.assertEqual(result, {'findings': []})
+                self.assertEqual(model.calls, 2)
+                self.assertEqual(report['limit_characters'], 2000)
+                self.assertIn('smaller evidence window', events[0]['message'])
+
+    def test_deep_review_runs_three_bounded_personas_and_deduplicates_findings(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'client.py').write_text('verify=False\n')
+            ensemble = [{'provider': name, 'model': name + '-model', 'input_price': 0, 'output_price': 0}
+                        for name in ('groq', 'openrouter', 'gemini', 'nvidia')]
+            with patch('regen.provider.Model', DeepReviewModel), patch('regen.provider.configured_provider_selections', return_value=ensemble):
+                result = analyze_deep(root, {'findings': [], 'coverage': []}, lambda _: None,
+                                      threading.Event(), Budget(2))
+        self.assertEqual(len(result['pressure_tests']), 4)
+        self.assertEqual(len(result['coverage']), 5)
+        self.assertEqual(len(result['findings']), 1)
+        self.assertEqual([item['agent'] for item in result['pressure_tests']],
+                         ['User journey agent', 'Reliability agent', 'Security agent', 'Production architecture agent'])
+        self.assertEqual({item['provider'] for item in result['pressure_tests']},
+                         {'groq', 'openrouter', 'gemini', 'nvidia'})
+
+    def test_ensemble_uses_configured_providers_primary_first_with_conservative_shared_budget(self):
+        env = {'GROQ_API_KEY': 'configured', 'NVIDIA_NIM_KEY': 'configured',
+               'OPENROUTER_API_KEY': '', 'GEMINI_API_KEY': '', 'REGEN_PROVIDER': 'groq',
+               'REGEN_MODEL': 'primary-model', 'REGEN_INPUT_PRICE': '.000001',
+               'REGEN_OUTPUT_PRICE': '.000002'}
+        with patch.dict('os.environ', env, clear=True):
+            selections = configured_provider_selections()
+        self.assertEqual([item['provider'] for item in selections], ['groq', 'nvidia'])
+        self.assertEqual(selections[0]['model'], 'primary-model')
+        self.assertEqual(selections[1]['input_price'], .000004)
+        self.assertEqual(selections[1]['output_price'], .000008)
+
+    def test_repair_plan_is_source_aware_and_rejects_unbacked_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'client.py').write_text('verify = False\n')
+            (root / 'unrelated.py').write_text('value = 1\n')
+            finding = {'id': 'f1', 'title': 'TLS disabled', 'description': 'Client disables TLS checks',
+                       'fix': 'Enable checks', 'location': {'file': 'client.py', 'line': 1}}
+            with patch('regen.provider.Model', PlanningModel):
+                plan = plan_repair(root, [finding], 'https://github.com/acme/repo.git', lambda _: None,
+                                   threading.Event(), Budget(1))
+        self.assertEqual(plan['source_kind'], 'github')
+        self.assertEqual(plan['delivery']['method'], 'patch_or_review_branch')
+        self.assertEqual(plan['steps'][0]['files'], ['client.py'])
+        self.assertEqual(plan['finding_ids'], ['f1'])
+
+    def test_repair_plan_retries_one_missing_steps_schema_before_failing(self):
+        RetryPlanningModel.calls = 0
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'client.py').write_text('verify = False\n')
+            finding = {'id': 'f1', 'title': 'TLS disabled', 'description': 'Client disables TLS checks',
+                       'fix': 'Enable checks', 'location': {'file': 'client.py', 'line': 1}}
+            with patch('regen.provider.Model', RetryPlanningModel):
+                plan = plan_repair(root, [finding], str(root), lambda _: None,
+                                   threading.Event(), Budget(1))
+        self.assertEqual(RetryPlanningModel.calls, 2)
+        self.assertEqual(plan['source_kind'], 'local')
+        self.assertEqual(plan['steps'][0]['files'], ['client.py'])
+
     def request_model(self):
         model = object.__new__(Model)
         model.budget = Budget(1)
@@ -287,6 +431,41 @@ class ProviderSafetyTests(unittest.TestCase):
             root = Path(directory)
             (root / 'app.py').write_text('RELATIVE_PATH_WORKS = True\n')
             self.assertIn('RELATIVE_PATH_WORKS = True', source_context(root))
+
+    def test_large_first_file_does_not_consume_entire_application_context(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'app.py').write_text('APPLICATION_ENTRY = True\n' + '# large source\n' * 10000)
+            (root / 'service.py').write_text('APPLICATION_SERVICE = True\n')
+            (root / 'tests').mkdir()
+            (root / 'tests/test_a.py').write_text('TEST_ONLY = True\n')
+            report = {}
+            context = source_context(root, limit=10000, report=report)
+            self.assertIn('APPLICATION_ENTRY', context)
+            self.assertIn('APPLICATION_SERVICE', context)
+            self.assertGreaterEqual(report['included_files'], 2)
+            self.assertGreater(report['truncated_files'], 0)
+            self.assertLessEqual(len(context), 10000)
+
+    def test_context_preserves_executable_credential_references(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'app.py').write_text('payload = dict(api_key=groq_key)\n')
+            self.assertIn('api_key=groq_key', source_context(root))
+
+    def test_repair_tools_preserve_credential_references_without_accepting_literals(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = 'runtime_key = "example-key"\npayload = dict(api_key=runtime_key)\n'
+            touched = set()
+            create_file(root, {'path': 'app.py', 'content': source}, touched)
+            self.assertEqual(read_file(root, {'path': 'app.py'}), source)
+            replacement = 'payload = dict(api_key=runtime_key, timeout=5)'
+            apply_edit(root, {'path': 'app.py', 'search': 'payload = dict(api_key=runtime_key)', 'replace': replacement}, touched)
+            self.assertIn(replacement, (root / 'app.py').read_text())
+            with self.assertRaises(ValueError):
+                apply_edit(root, {'path': 'app.py', 'search': replacement,
+                                  'replace': 'payload = dict(api_key="opaquecredential123456")'}, touched)
 
     def test_bounded_context_reports_omissions_and_never_exposes_partial_secrets(self):
         with tempfile.TemporaryDirectory() as directory:

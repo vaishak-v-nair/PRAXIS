@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/pyodide/v314.0.7/full/ 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net/pyodide/v314.0.7/full/; worker-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Test your project · PRAXIS</title>
+  <meta name="description" content="Try PRAXIS on your source files privately in your browser. Inspect real findings and copy a grounded prompt for your coding agent. No project upload or automatic edits.">
+  <link rel="canonical" href="https://praxis-six-xi.vercel.app/test-your-project/">
+  <link rel="stylesheet" href="style.css"><script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to project test</a>
+  <header class="app-header"><nav aria-label="Main navigation"><a class="brand" href="../">PRAXIS <span>/ Project test</span></a><a href="local.html">Use locally ↗</a></nav><span class="privacy-pill">● Private browser inspection</span></header>
+  <main id="main">
+    <header class="page-heading"><span class="eyebrow">TRY BEFORE YOU INSTALL</span><h1>A real check.<br><span>A clearer next step.</span></h1><p>Select your project. PRAXIS runs its existing source scanner on your computer, then writes an evidence-backed brief for your AI coding agent.</p></header>
+    <div class="intake-grid">
+      <section class="panel intake" aria-labelledby="intake-title"><div class="section-heading"><h2 id="intake-title">Test your project</h2><span class="badge neutral">Source review</span></div>
+        <p class="muted">Your files stay in browser memory. No account, provider key, or project upload.</p>
+        <div class="folder-zone"><span class="folder-symbol" aria-hidden="true">⌁</span><strong id="selection-name">Choose your project folder</strong><p id="selection-detail">Dependencies, credentials, private memory, generated files, and files above 2 MiB are excluded before reading.</p><div class="button-row"><button id="choose-folder" class="button">Choose folder</button><button id="choose-files" class="button quiet">Select files instead</button></div></div>
+        <input type="file" id="folder" webkitdirectory multiple hidden aria-label="Select project folder"><input type="file" id="files" multiple hidden aria-label="Select source files">
+        <label class="field" for="goal">What should this project do? <span>Optional · included as context in your brief</span><textarea id="goal" rows="2" maxlength="2000" placeholder="Describe the user journey you want your agent to protect."></textarea></label>
+        <div class="run-actions"><button id="run" class="button primary" disabled>Inspect source →</button><button id="cancel" class="button" hidden>Stop inspection</button><span id="progress" role="status" aria-live="polite">Select a folder or files to start.</span></div><p id="error" class="error" role="alert" hidden></p>
+        <p class="fine-print">Up to 25,000 files and 100 MiB after exclusions. First run downloads the pinned <a href="https://pyodide.org/en/stable/usage/webworker.html" target="_blank" rel="noreferrer">Pyodide runtime</a>. No project code is imported or executed. Clear or close this page to discard the review.</p>
+      </section>
+      <aside class="panel scope" aria-labelledby="scope-title"><span class="eyebrow">HONEST ABOUT SCOPE</span><h2 id="scope-title">Source evidence first.<br>Runtime proof comes next.</h2><dl><div><dt>Available here</dt><dd>Credential-pattern checks, Python syntax and behavioral AST inspection, bounded source patterns, and discovered test/build commands.</dd></div><div><dt>Requires local PRAXIS</dt><dd>Docker execution, dependency advisory tools, provider analysis, end-to-end journeys, and commit-bound verification.</dd></div><div><dt>Your next step</dt><dd>Review the findings, copy the agent brief, and run the missing checks in your project. This page never edits your source or declares it production-ready.</dd></div></dl><a class="button" href="local.html">Set up local PRAXIS ↗</a></aside>
+    </div>
+    <section id="results" hidden aria-labelledby="results-title" tabindex="-1">
+      <header class="results-heading"><div><span class="eyebrow">RECORDED SOURCE OBSERVATIONS</span><h2 id="results-title"></h2><p id="result-summary" class="muted"></p></div><button id="clear" class="button">Clear review</button></header>
+      <div id="metrics" class="metric-grid"></div><div class="report-grid">
+        <div><section class="panel" aria-labelledby="findings-title"><div class="section-heading"><h3 id="findings-title">Findings to investigate</h3><span id="finding-count" class="badge neutral"></span></div><p class="muted">Matches identify source conditions. Context and reproduction decide whether a change is needed. Select the observations to include in your agent brief.</p><div id="findings"></div><button id="more" class="button quiet" hidden>Show more findings</button></section><details class="panel coverage"><summary>What was checked — and what was not</summary><div id="coverage"></div><div id="commands"></div></details></div>
+        <aside class="panel handoff" aria-labelledby="handoff-title"><span class="eyebrow">YOUR AGENT, YOUR DECISION</span><h3 id="handoff-title">A grounded implementation brief</h3><p class="muted">Copy this into the agent already working on your project. It asks the agent to verify each observation, plan the change, and run the relevant checks.</p><label for="prompt" class="sr-only">AI agent prompt</label><textarea id="prompt" rows="18" readonly spellcheck="false"></textarea><div class="button-row"><button id="copy" class="button primary">Copy agent prompt</button><button id="download" class="button">Download brief</button></div><p id="copy-status" role="status" aria-live="polite"></p><p class="fine-print">The brief is assembled from this inspection, not generated by an LLM. No implementation has been authorized here.</p></aside>
+      </div>
+    </section>
+    <noscript><p class="panel">JavaScript and WebAssembly are required for private browser inspection. <a href="local.html">Use local PRAXIS</a> instead.</p></noscript>
+  </main><footer><span>PRAXIS / Evidence before confidence</span><a href="local.html">Install for everyday use ↗</a></footer>
+</body>
+</html>

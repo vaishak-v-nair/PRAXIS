@@ -77,7 +77,7 @@ export async function advanceWorkflowRun(praxisDir, id) {
   let allTierDone = true;
   let anyFailed = false;
 
-  const stepOutputs = {};
+  const stepOutputs = Object.create(null);
 
   for (const stepId of Object.keys(run.steps)) {
     const step = run.steps[stepId];

@@ -27,7 +27,7 @@ export function workflowRunsDir(praxisDir) {
  * Returns { ok: true } or { ok: false, error: string }.
  */
 export function validateDag(spec) {
-  if (!spec || typeof spec !== 'object') {
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
     return { ok: false, error: 'Spec must be a valid JSON object' };
   }
   if (!spec.name || typeof spec.name !== 'string' || !spec.name.trim()) {
@@ -41,7 +41,7 @@ export function validateDag(spec) {
   const stepMap = new Map();
 
   for (const step of spec.steps) {
-    if (!step || typeof step !== 'object') {
+    if (!step || typeof step !== 'object' || Array.isArray(step)) {
       return { ok: false, error: 'Each step must be a valid object' };
     }
     if (!step.id || typeof step.id !== 'string' || !step.id.trim()) {
@@ -52,6 +52,12 @@ export function validateDag(spec) {
     }
     if (!step.task || typeof step.task !== 'string' || !step.task.trim()) {
       return { ok: false, error: `Step "${step.id}" requires a non-empty "task"` };
+    }
+    if (step.dependsOn !== undefined && (!Array.isArray(step.dependsOn) || step.dependsOn.some(dep => typeof dep !== 'string' || !dep.trim()))) {
+      return { ok: false, error: `Step "${step.id}" dependsOn must be an array of step IDs` };
+    }
+    if (new Set(step.dependsOn || []).size !== (step.dependsOn || []).length) {
+      return { ok: false, error: `Step "${step.id}" has duplicate dependencies` };
     }
     stepIds.add(step.id);
     stepMap.set(step.id, step);
@@ -111,6 +117,8 @@ export function validateDag(spec) {
  * Returns { ok: true, tiers: Array<Array<Step>> }
  */
 export function topologicalSort(steps) {
+  const validation = validateDag({ name: 'sort', steps });
+  if (!validation.ok) return validation;
   const stepMap = new Map(steps.map((s) => [s.id, s]));
   const inDegree = new Map();
   const adj = new Map();
@@ -164,7 +172,7 @@ export function topologicalSort(steps) {
  */
 export function interpolateStepTask(task, stepOutputs = {}) {
   return task.replace(/\{\{\s*steps\.([a-zA-Z0-9_-]+)\.output\s*\}\}/g, (_, stepId) => {
-    return stepOutputs[stepId] != null ? String(stepOutputs[stepId]) : '';
+    return Object.hasOwn(stepOutputs, stepId) && stepOutputs[stepId] != null ? String(stepOutputs[stepId]) : '';
   });
 }
 
@@ -181,7 +189,7 @@ export function createWorkflowRun(praxisDir, spec) {
 
   const { tiers } = topologicalSort(spec.steps);
 
-  const stepsState = {};
+  const stepsState = Object.create(null);
   for (const step of spec.steps) {
     stepsState[step.id] = {
       id: step.id,

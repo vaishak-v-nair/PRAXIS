@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='praxis-upload-ui-') as temp, sync_playw
     errors, uploads, scans = [], [], []
     page.on('pageerror', lambda _: errors.append('JavaScript runtime error'))
     def capture(request):
-        if request.url.endswith('/api/uploads'):
+        if '/api/uploads/sessions/' in request.url and request.url.endswith('/files'):
             uploads.append(request.post_data_json)
     page.on('request', capture)
     def block_model_scan(route):
@@ -50,20 +50,22 @@ with tempfile.TemporaryDirectory(prefix='praxis-upload-ui-') as temp, sync_playw
         route.fulfill(status=422, content_type='application/json', body=json.dumps({'detail': 'Intake smoke: model scan deliberately not started.'}))
     page.route('**/api/scans', block_model_scan)
     page.goto('http://127.0.0.1:3000', wait_until='networkidle')
-    page.get_by_text('Backend connected', exact=True).wait_for()
-    page.get_by_role('tab', name='Upload folder', exact=True).click()
+    page.get_by_text('Local service connected', exact=True).wait_for()
+    page.get_by_role('button', name='Upload folder', exact=True).click()
     page.locator('input[type=file]').set_input_files(str(folder))
-    page.get_by_role('status').filter(has_text='1 file ready').wait_for()
+    page.get_by_text('1 files ready', exact=False).wait_for()
     assert uploads and len(uploads[0]['files']) == 1
     assert uploads[0]['files'][0]['path'] == 'BrowserProject/app.py'
     assert 'private-upload-sentinel' not in json.dumps(uploads)
-    assert page.locator('#project-source').input_value() == 'BrowserProject'
+    assert page.locator('.upload-zone').get_by_text('BrowserProject', exact=True).is_visible()
     for width in (320, 390, 768, 1440):
         page.set_viewport_size({'width': width, 'height': 900})
         assert not page.evaluate('document.documentElement.scrollWidth > innerWidth + 2'), f'Upload overflow at {width}px'
     page.screenshot(path=str(artifacts / 'praxis-folder-upload.png'), full_page=True)
-    page.get_by_role('button', name='Scan project', exact=True).click()
-    page.get_by_role('alert').filter(has_text='model scan deliberately not started').wait_for()
+    assert page.get_by_role('button', name='Run complete review', exact=True).is_disabled()
+    page.get_by_label('I trust this project and authorize').check()
+    page.get_by_role('button', name='Run complete review', exact=True).click()
+    page.get_by_role('alert').filter(has_text='model scan deliberately not started').first.wait_for()
     assert scans and scans[0]['source'].startswith('upload://')
     with httpx.Client() as client:
         assert client.post('http://127.0.0.1:9123/api/uploads', json={}, headers={'origin':'https://evil.example'}).status_code == 403

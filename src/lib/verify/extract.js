@@ -57,16 +57,33 @@ export function parseExtractionOutput(text, meta = {}) {
   return Object.freeze({ ...manifest, claims: Object.freeze(manifest.claims.map((claim) => Object.freeze({ ...claim, source: Object.freeze({ ...claim.source, extractor: meta.extractor || meta.command || 'claude', promptHash: meta.promptHash || null, responseDigest: meta.responseDigest || null }) }))) });
 }
 
-function requestClaude(body, { env = process.env, request = https.request, timeoutMs = 120000 } = {}) {
+function requestClaude(body, { env = process.env, request = https.request, timeoutMs = DEFAULT_COMMAND_TIMEOUT_MS } = {}) {
   const key = env.ANTHROPIC_API_KEY; if (!key) throw new VerifyInputError('claude-unconfigured', 'Claude extraction needs an existing Claude login or ANTHROPIC_API_KEY.');
   return new Promise((resolve, reject) => {
     const data = Buffer.from(JSON.stringify(body));
+    let deadline, settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true; clearTimeout(deadline);
+      if (error) reject(error instanceof VerifyInputError ? error : new VerifyInputError('extractor-failed', redact(error.message)));
+      else resolve(value);
+    };
     const req = request({ protocol: 'https:', hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': data.length, 'x-api-key': key, 'anthropic-version': '2023-06-01' } }, (res) => {
       const chunks = []; let bytes = 0;
       res.on('data', (chunk) => { bytes += chunk.length; if (bytes <= 2 * 1024 * 1024) chunks.push(chunk); else req.destroy(new Error('Claude response exceeded 2 MiB.')); });
-      res.on('end', () => { const text = Buffer.concat(chunks).toString('utf8'); if (res.statusCode < 200 || res.statusCode >= 300) reject(new VerifyInputError('extractor-failed', `Claude extraction failed with HTTP ${res.statusCode}.`)); else resolve(text); });
+      res.on('error', error => finish(error));
+      res.on('aborted', () => finish(new Error('Claude extraction response was interrupted.')));
+      res.on('end', () => { const text = Buffer.concat(chunks).toString('utf8'); if (res.statusCode < 200 || res.statusCode >= 300) finish(new VerifyInputError('extractor-failed', `Claude extraction failed with HTTP ${res.statusCode}.`)); else finish(null, text); });
     });
-    req.setTimeout(timeoutMs, () => req.destroy(new Error('Claude extraction timed out.'))); req.on('error', (error) => reject(error instanceof VerifyInputError ? error : new VerifyInputError('extractor-failed', redact(error.message)))); req.end(data);
+    const timeout = () => {
+      const error = new VerifyInputError('extractor-timeout', 'Claude extraction timed out.');
+      finish(error); req.destroy(error);
+    };
+    // Socket timeouts alone reset when bytes arrive. Enforce wall time as well,
+    // so API extraction cannot consume the CLI's entire first-minute budget.
+    deadline = setTimeout(timeout, timeoutMs);
+    req.setTimeout(timeoutMs, timeout);
+    req.on('error', error => finish(error)); req.end(data);
   });
 }
 
@@ -76,7 +93,10 @@ export function resolveExtractorCommand(env = process.env) {
 }
 
 export function extractClaimsWithCommand(report, { task = '', env = process.env, timeoutMs = DEFAULT_COMMAND_TIMEOUT_MS } = {}) {
-  const argv = resolveExtractorCommand(env), prompt = buildExtractionPrompt(report, task), launch = agentSpawn(argv, { env });
+  const argv = resolveExtractorCommand(env), prompt = buildExtractionPrompt(report, task);
+  let launch;
+  try { launch = agentSpawn(argv, { env }); }
+  catch (error) { throw new VerifyInputError('extractor-failed', redact(error.message)); }
   return new Promise((resolve, reject) => {
     const child = spawn(launch.file, launch.args, { env, windowsHide: true, shell: false, stdio: ['pipe', 'pipe', 'pipe'] }); let stdout = '', stderr = '', settled = false;
     const timer = setTimeout(() => { terminateProcessTree(child); finish(new VerifyInputError('extractor-timeout', 'Claude extraction timed out.')); }, timeoutMs);
@@ -116,7 +136,7 @@ export async function extractClaims(report, { task = '', env = process.env, requ
       return fallbackManifest(report, task, fallbackPaths, error);
     }
   }
-  const response = await requestClaude({ model: env.PRAXIS_VERIFY_CLAUDE_MODEL || 'claude-sonnet-4-5-20250929', max_tokens: 4096, messages: [{ role: 'user', content: prompt }], tools: [{ name: 'submit_claims', description: 'Return the atomic completion claims.', input_schema: CLAIM_EXTRACTION_SCHEMA }], tool_choice: { type: 'tool', name: 'submit_claims' } }, { env, request });
+  const response = await requestClaude({ model: env.PRAXIS_VERIFY_CLAUDE_MODEL || 'claude-sonnet-4-5-20250929', max_tokens: 4096, messages: [{ role: 'user', content: prompt }], tools: [{ name: 'submit_claims', description: 'Return the atomic completion claims.', input_schema: CLAIM_EXTRACTION_SCHEMA }], tool_choice: { type: 'tool', name: 'submit_claims' } }, { env, request, timeoutMs: commandTimeout(env) });
   return parseExtractionOutput(response, { report, extractor: 'anthropic-messages-api', promptHash: crypto.createHash('sha256').update(prompt).digest('hex'), responseDigest: crypto.createHash('sha256').update(response).digest('hex') });
 }
 

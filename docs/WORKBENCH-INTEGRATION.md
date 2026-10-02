@@ -6,6 +6,8 @@ repository; the existing PRAXIS implementation remains in place.
 
 For folder uploads, GitHub connection troubleshooting, and coding-agent
 compatibility, see [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
+For the user workflow and evidence limits, see
+[Project review quickstart](PROJECT-REVIEW-QUICKSTART.md).
 
 ## Directory responsibilities
 
@@ -23,8 +25,31 @@ compatibility, see [AGENT-WORKFLOW.md](AGENT-WORKFLOW.md).
 
 The root npm package retains zero runtime dependencies. The workbench is an
 optional application with its own npm lockfile and Python virtual environment.
-It is available from a source checkout and is excluded from the small CLI npm
-tarball. An installed CLI can use `praxis workbench --path <checkout>/apps/workbench`.
+The npm tarball includes optional Workbench source, but not its dependency
+folders, Python environment, generated builds, local jobs, backend tests, or
+sample repository. Install and run its separate dependencies explicitly; the
+core CLI never loads them. A source checkout is recommended for development and
+the full regression tools. An installed CLI can also use
+`praxis workbench --path <checkout>/apps/workbench`.
+
+### Managed consumer setup (0.14.2)
+
+`node src/cli.js review` works from this checkout. After the manual npm release,
+`npx praxis-memory@0.14.2 review` works without Git or manual Python setup.
+This explicit command alone prepares the optional app; postinstall and the existing
+default CLI remain inert with respect to these dependencies. See the
+[consumer quickstart](PROJECT-REVIEW-QUICKSTART.md) for paths and options.
+
+The launcher copies only allowlisted runtime source to a version/fingerprint
+release directory in the user's application-data folder. Jobs and provider settings
+remain in a separate persistent `data` folder, not npm's cache. It does not migrate
+checkout evidence or credentials. `PRAXIS_WORKBENCH_DATA_DIR` and
+`PRAXIS_WORKBENCH_ENV_FILE` are trusted-process, absolute-path overrides; without
+them the backend retains its original `.regen` and `.env` locations. Submitted
+project commands do not receive these variables. The key-entry endpoint shares
+the existing loopback Host/Origin and active-job protections, returns no secrets,
+and leaves environment keys authoritative. Saved keys are local files, not an OS
+keychain. Provider probes and all runtime/apply budget gates remain explicit.
 
 ## Integration sequence
 

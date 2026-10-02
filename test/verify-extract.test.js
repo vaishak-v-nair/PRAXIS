@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { CLAIM_SCHEMA } from '../src/lib/verify/schema.js';
 import { buildExtractionPrompt, extractClaims, parseExtractionOutput } from '../src/lib/verify/extract.js';
 
@@ -73,4 +74,35 @@ test('an explicitly configured extractor fails closed', async () => {
     }),
     (error) => error === failure,
   );
+});
+
+test('API extraction has an absolute deadline even when a response keeps sending bytes', async () => {
+  let destroyed = false;
+  const request = (_options, receive) => {
+    const req = new EventEmitter();
+    req.setTimeout = () => {}; // A trickling response prevents socket inactivity.
+    let stream;
+    req.end = () => {
+      const response = new EventEmitter();
+      response.statusCode = 200;
+      receive(response);
+      stream = setInterval(() => response.emit('data', Buffer.from(' ')), 5);
+      setTimeout(() => { clearInterval(stream); if (!destroyed) response.emit('end'); }, 350);
+    };
+    req.destroy = error => { destroyed = true; clearInterval(stream); req.emit('error', error); };
+    return req;
+  };
+  await assert.rejects(extractClaims('Updated README.md', {
+    env: { ANTHROPIC_API_KEY: 'fixture-only', PRAXIS_VERIFY_EXTRACT_TIMEOUT_MS: '100' }, request,
+  }), error => error.code === 'extractor-timeout');
+  assert.equal(destroyed, true);
+});
+
+test('a real missing default extractor falls back without an account on Windows and Unix', async () => {
+  const manifest = await extractClaims('Updated README.md', {
+    env: { PATH: '', Path: '', SystemRoot: process.env.SystemRoot || '', TEMP: os.tmpdir() },
+    fallbackPaths: ['README.md'],
+  });
+  assert.equal(manifest.claims[0].source.extractor, 'local-conservative-fallback');
+  assert.equal(manifest.claims[0].scope.kind, 'file-change');
 });

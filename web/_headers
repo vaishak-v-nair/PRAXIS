@@ -1,0 +1,14 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+/test-your-project/engine/*
+  Cache-Control: no-cache
+
+/test-your-project/*.mjs
+  Content-Type: text/javascript; charset=utf-8
+
+/test-your-project/*.js
+  Content-Type: text/javascript; charset=utf-8

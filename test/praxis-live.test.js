@@ -72,7 +72,10 @@ test('PRAXIS Live Tier 3 preserves contradicted verdicts through LangGraph', asy
 
 test('PRAXIS Live serves one page and streams a token-protected run', async (t) => {
   const { server, token } = createLiveServer({ stageDelayMs: 0 });
-  t.after(() => server.close());
+  t.after(() => new Promise((resolve, reject) => {
+    server.close((error) => error ? reject(error) : resolve());
+    server.closeAllConnections?.();
+  }));
   const port = await listenLiveLocal(server, 0);
   const origin = `http://127.0.0.1:${port}`;
   const page = await fetch(`${origin}/?t=${token}`);

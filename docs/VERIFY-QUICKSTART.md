@@ -5,15 +5,16 @@
 Run this from the repository containing the agent's commit:
 
 ```powershell
-npx praxis verify
+npx praxis-memory verify
 ```
 
 With no flags, PRAXIS selects the latest commit whose author or commit message identifies a supported AI coding agent. If no such metadata exists, it uses `HEAD`. The selected commit message is the completion report and task context. PRAXIS calls Claude with a fixed structured-output schema, binds every accepted claim to the exact base/head commits and trees, runs static verification, and writes a separate Ed25519-signed Verify receipt. There is no PRAXIS account or project configuration.
 
-The package published by this repository is `praxis-memory`. From environments where the `praxis` bin is not already resolvable, use:
+The package published by this repository is `praxis-memory`. A global or local
+installation also provides the `praxis` alias:
 
 ```powershell
-npx praxis-memory verify
+praxis verify
 ```
 
 ## Explicit input
@@ -25,7 +26,11 @@ praxis verify --task "Update the docs" --claim "Updated README.md"
 praxis verify --task-file ticket.txt --manifest claims.json
 ```
 
-Reports use Claude extraction by default. PRAXIS uses `ANTHROPIC_API_KEY` with the Anthropic Messages API when available, otherwise it uses an existing authenticated `claude` CLI. `PRAXIS_VERIFY_EXTRACTOR_CMD` remains available as a JSON argv array for controlled testing and compatible local adapters. The prompt and JSON schema live together in `src/lib/verify/extract.js`. Every successful extraction is logged locally under `.praxis/verify/extractions`; report text is represented by a digest and validated claims.
+Reports use Claude extraction by default. PRAXIS uses `ANTHROPIC_API_KEY` with the Anthropic Messages API when available, otherwise it uses an existing authenticated `claude` CLI. If the default CLI extractor is unavailable, a labelled conservative local parser keeps specific file claims checkable and leaves unsupported behavior unproven. Explicitly configured extractor failures fail closed. API and command extraction have a 20-second default wall-clock limit, configurable up to 45 seconds with `PRAXIS_VERIFY_EXTRACT_TIMEOUT_MS`. `PRAXIS_VERIFY_EXTRACTOR_CMD` remains available as a JSON argv array for controlled testing and compatible local adapters. The prompt and JSON schema live together in `src/lib/verify/extract.js`. Every successful extraction is logged locally under `.praxis/verify/extractions`; report text is represented by a digest and validated claims.
+
+The unrelated registry package named `praxis` belongs to another project.
+Do not use `npx praxis verify` as a fresh-install command; use the published
+package name above. Cold download time depends on network/cache availability.
 
 Use `--preview-claims` when you want extraction without verification:
 
