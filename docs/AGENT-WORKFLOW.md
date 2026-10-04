@@ -10,12 +10,14 @@ formats are preserved; a successful process is not automatically verified work.
 
 Run `npm run dev` from PRAXIS and open `http://127.0.0.1:3000`.
 
-1. Choose **Local folder**, **GitHub repository**, or **Upload folder**.
+1. Choose **Local path**, **GitHub URL**, or **Upload folder**.
 2. A folder upload uses the browser's directory picker. Selection stages an
    isolated copy locally without running a scan or model call. The ready-file
-   count shows exclusions. Click **Scan project** to begin the budgeted review.
-3. Inspect findings and coverage gaps, select fixable issues, and review the
-   specialists' patches and independent review.
+   count shows exclusions. Describe the intended workflow, choose your budget,
+   and confirm runtime trust before clicking **Run complete review**.
+3. Inspect findings and coverage gaps. **Draft a fix plan** maps the files,
+   validation and risks without editing source. Review the plan before an AI
+   handoff, or copy it into your existing coding agent.
 4. Authorize runtime checks only for a project you trust. Download a patch or
    project copy for GitHub and uploaded sources. Local path submissions retain
    explicit source-apply confirmation, freshness checks, backups, and rollback.

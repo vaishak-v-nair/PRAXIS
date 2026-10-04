@@ -1,0 +1,140 @@
+<template>
+  <style>
+    @font-face {
+      font-family: "Inter";
+      src: url("assets/fonts/Inter-variable.ttf") format("truetype");
+      font-style: normal;
+      font-weight: 100 900;
+      font-display: swap;
+    }
+
+    #root {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      color: #F4F7FB;
+      font-family: "Inter";
+    }
+
+    #f13-close-ground {
+      position: absolute;
+      inset: 0;
+      background: #0B0F17;
+    }
+
+    #f13-close-project {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 81.481481%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    #f13-close-project path {
+      fill: none;
+      stroke: #24415E;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    #f13-close-project #f13-close-fold {
+      stroke: #8DBEFF;
+      stroke-opacity: 0.65;
+    }
+
+    #f13-close-copy {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    #f13-close-wordmark,
+    #f13-close-domain,
+    #f13-close-action {
+      position: absolute;
+      left: 53.125%;
+      width: 41.145833%;
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    #f13-close-wordmark {
+      top: 29.62963%;
+      font-size: 86px;
+      line-height: 1.1;
+      font-weight: 600;
+      letter-spacing: -3.5px;
+    }
+
+    #f13-close-domain {
+      top: 42.592593%;
+      font-size: 64px;
+      line-height: 1.25;
+      font-weight: 400;
+      letter-spacing: -0.5px;
+    }
+
+    #f13-close-action {
+      top: 51.851852%;
+      color: #8DBEFF;
+      font-size: 60px;
+      line-height: 1.25;
+      font-weight: 400;
+      letter-spacing: -0.6px;
+    }
+
+    #f13-close-mascot { position:absolute; left:110px; top:285px; width:800px; height:450px; object-fit:contain; }
+</style>
+
+  <div id="root" data-composition-id="13-close" data-width="1920" data-height="1080">
+    <div id="f13-close-ground" class="clip" data-start="0" data-duration="7.34" data-track-index="0"></div>
+
+    <svg id="f13-close-project" class="clip" data-start="0" data-duration="7.34" data-track-index="1" viewBox="0 0 1920 880" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path id="f13-close-sheet" data-close-path d="M 966 750 L 966 242 L 1690 242 L 1816 368 L 1816 750 Z" />
+      <path id="f13-close-fold" data-close-path d="M 1690 242 L 1690 368 L 1816 368" />
+    </svg>
+
+    <div id="f13-close-copy" class="clip" data-start="0" data-duration="7.34" data-track-index="2">
+      <div id="f13-close-wordmark">PRAXIS</div>
+      <div id="f13-close-domain">praxis-six-xi.vercel.app</div>
+      <div id="f13-close-action">Start with the browser check</div>
+    </div>
+
+    <video id="f13-close-mascot" class="clip" src="assets/brand/happy.webm" data-frame-video="approved" data-start="0" data-duration="7.34" data-track-index="3" data-frame-video-x="110" data-frame-video-y="285" data-frame-video-width="800" data-frame-video-height="450" data-frame-video-fit="contain" muted playsinline></video>
+  </div>
+
+  <script>
+    (() => {
+      const frame = document.querySelector('[data-composition-id="13-close"]');
+      const sheet = frame.querySelector('#f13-close-sheet');
+      const fold = frame.querySelector('#f13-close-fold');
+      const tl = gsap.timeline({ paused: true });
+      const duration = { progress: 0 };
+
+      [sheet, fold].forEach((path) => {
+        const length = path.getTotalLength();
+        path.style.strokeDasharray = String(length);
+        path.style.strokeDashoffset = String(length);
+      });
+
+      tl.fromTo(sheet,
+        { strokeDashoffset: sheet.getTotalLength() },
+        { strokeDashoffset: 0, duration: 0.75, ease: "power2.out" },
+        0.18
+      );
+      tl.fromTo(fold,
+        { strokeDashoffset: fold.getTotalLength() },
+        { strokeDashoffset: 0, duration: 0.5, ease: "power2.out" },
+        0.7425
+      );
+      tl.to(duration, { progress: 1, duration: 7.34, ease: "none" }, 0);
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["13-close"] = tl;
+    })();
+  </script>
+</template>

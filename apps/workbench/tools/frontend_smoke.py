@@ -24,7 +24,8 @@ def audit(page, name):
         # separately; these DOM states do not represent backend evidence.
         page.evaluate('(theme) => document.documentElement.dataset.theme = theme', theme)
         result = page.evaluate("async () => (await axe.run(document, {runOnly: {type: 'tag', values: ['wcag2a','wcag2aa','wcag21aa','wcag22aa']}})).violations")
-        failures = [{'id': item['id'], 'targets': [node['target'] for node in item['nodes']]} for item in result]
+        failures = [{'id': item['id'], 'targets': [node['target'] for node in item['nodes']],
+                     'details': [node.get('failureSummary') for node in item['nodes']]} for item in result]
         assert not failures, (name, theme, failures)
         for width in (320, 390, 768, 1024, 1440):
             page.set_viewport_size({'width': width, 'height': 1000})

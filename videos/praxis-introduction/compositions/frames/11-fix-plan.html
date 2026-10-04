@@ -1,0 +1,22 @@
+<template>
+  <style>
+    #root { position:relative; width:100%; height:100%; overflow:hidden; container-type:size; }
+    .f11-background { position:absolute; inset:0; background:#0B0F17; }
+    #f11-recording { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+  </style>
+  <div id="root" data-composition-id="11-fix-plan" data-width="1920" data-height="1080">
+    <div id="f11-background" class="clip f11-background" data-start="0" data-duration="12.065011" data-track-index="0"></div>
+    <video id="f11-recording" class="clip" src="assets/recordings-v4/11-fix-plan.mp4" data-frame-video="approved"
+      data-start="0" data-duration="12.065011" data-track-index="1"
+      data-frame-video-x="0" data-frame-video-y="0" data-frame-video-width="1920"
+      data-frame-video-height="1080" data-frame-video-fit="contain" muted playsinline></video>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({paused:true});
+      tl.to({progress:0},{progress:1,duration:12.065011,ease:'none'},0);
+      window.__timelines=window.__timelines||{};
+      window.__timelines['11-fix-plan']=tl;
+    })();
+  </script>
+</template>

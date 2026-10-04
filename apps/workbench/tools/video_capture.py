@@ -105,7 +105,11 @@ def main():
         shot(page, 'source-finding.png', 'Human-readable impact, recorded source and response for the constant-success path.', '.triage')
         current = call('/jobs/' + bad_id)
         if not current.get('fix_plan'):
-            page.get_by_role('button', name='Draft a fix plan', exact=True).click()
+            repairable = [finding for finding in current['findings'] if finding.get('fixable')][:2]
+            assert repairable, 'No source-backed repair candidate exists; do not substitute a plan'
+            for finding in repairable:
+                page.get_by_label(f"Select {finding['title']} for repair", exact=True).check()
+            page.get_by_role('button', name=f'Draft plan for {len(repairable)}', exact=False).click()
             page.locator('.repair-plan').wait_for(timeout=150000)
         else:
             nav.get_by_role('button', name='changes', exact=True).click()

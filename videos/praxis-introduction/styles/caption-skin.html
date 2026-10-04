@@ -1,0 +1,53 @@
+<style data-brand-tokens></style>
+<style>
+  @font-face{font-family:'Inter';src:url('assets/fonts/Inter-variable.ttf') format('truetype');font-weight:100 900;font-style:normal;font-display:block}
+  #captions-root{position:absolute;inset:0;pointer-events:none}
+  #caption-stage{position:absolute;left:192px;right:192px;top:920px;height:104px;pointer-events:none}
+  .caption-group{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0}
+  .caption-line{margin:0;width:fit-content;max-width:100%;padding:var(--caption-pad,14px) 16px;box-sizing:border-box;border-radius:8px;background:rgba(11,15,23,.94);text-align:center;font:400 var(--caption-size,34px)/1.1 'Inter',sans-serif;color:#F4F7FB;white-space:normal;overflow-wrap:normal}
+</style>
+<div id="captions-root" data-composition-id="captions" data-timeline-locked data-start="0" data-duration="0" data-width="0" data-height="0">
+  <div id="caption-stage" data-layout-allow-caption-zone></div>
+</div>
+<script>
+var GROUPS = [];
+var DURATION = 0;
+(() => {
+  // Join the measured word groups into readable phrases. The caption text does
+  // not bounce or change color; only one phrase is present at any moment.
+  const phrases=[];
+  GROUPS.forEach(group=>{
+    const last=phrases[phrases.length-1];
+    if(last && last.frame===group.frame && last.words.length+group.words.length<=9 && group.start-last.end<0.6 && !/[.!?]$/.test(last.text)){
+      last.words=last.words.concat(group.words);last.text=last.words.map(word=>word.text).join(' ');last.end=Math.max(last.end,group.end);
+    } else phrases.push({...group,words:group.words.slice()});
+  });
+  const stage=document.getElementById('caption-stage');
+  const tl=gsap.timeline({paused:true});
+  // Use genuinely vacant parts of the recorded UI. Local shots share an
+  // empty middle section of their fixed footer. The browser handoff has a
+  // vacant left column after its observed cut; before it, its upper-right
+  // margin is empty. No product text is erased or repainted for subtitles.
+  const positions=[
+    {time:0,left:192,right:192,top:920,height:104,size:34,pad:14},
+    {time:10.9,left:1130,right:48,top:0,height:90,size:30,pad:8},
+    {time:16.8,left:72,right:884,top:920,height:104,size:32,pad:10},
+    {time:22.185011,left:560,right:440,top:986,height:88,size:30,pad:8},
+    {time:117.35,left:192,right:192,top:920,height:104,size:34,pad:14}
+  ];
+  positions.forEach(p=>tl.set(stage,{left:p.left,right:p.right,top:p.top,height:p.height,
+    '--caption-size':p.size+'px','--caption-pad':p.pad+'px'},p.time));
+  phrases.forEach((phrase,index)=>{
+    const group=document.createElement('div');group.id='caption-group-'+index;group.className='caption-group';
+    const line=document.createElement('p');line.className='caption-line';line.textContent=phrase.text;group.appendChild(line);stage.appendChild(group);
+    const next=phrases[index+1];
+    const start=Math.max(0,phrase.start);
+    const end=Math.min(DURATION,phrase.end+0.16,next?next.start:DURATION);
+    if(end<=start)throw new Error('Invalid measured caption window');
+    group.dataset.captionStart=String(start);group.dataset.captionEnd=String(end);
+    tl.set(group,{opacity:1},start);tl.set(group,{opacity:0},end);
+  });
+  const span={progress:0};tl.to(span,{progress:1,duration:DURATION,ease:'none'},0);
+  window.__timelines['captions']=tl;
+})();
+</script>

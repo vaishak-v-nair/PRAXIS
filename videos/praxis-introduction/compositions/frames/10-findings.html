@@ -1,0 +1,22 @@
+<template>
+  <style>
+    #root { position:relative; width:100%; height:100%; overflow:hidden; container-type:size; }
+    .f10-background { position:absolute; inset:0; background:#0B0F17; }
+    #f10-recording { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+  </style>
+  <div id="root" data-composition-id="10-findings" data-width="1920" data-height="1080">
+    <div id="f10-background" class="clip f10-background" data-start="0" data-duration="10.26" data-track-index="0"></div>
+    <video id="f10-recording" class="clip" src="assets/recordings-v4/10-findings.mp4" data-frame-video="approved"
+      data-start="0" data-duration="10.26" data-track-index="1"
+      data-frame-video-x="0" data-frame-video-y="0" data-frame-video-width="1920"
+      data-frame-video-height="1080" data-frame-video-fit="contain" muted playsinline></video>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({paused:true});
+      tl.to({progress:0},{progress:1,duration:10.26,ease:'none'},0);
+      window.__timelines=window.__timelines||{};
+      window.__timelines['10-findings']=tl;
+    })();
+  </script>
+</template>

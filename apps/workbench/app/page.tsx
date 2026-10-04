@@ -11,6 +11,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { ReviewHistory } from "@/components/ReviewHistory";
 import { ProjectGuide } from "@/components/ProjectGuide";
 import { StatusBar } from "@/components/StatusBar";
+import { InspectionIllustration } from "@/components/InspectionIllustration";
 
 export default function Home() {
   const workspace = useWorkspace();
@@ -30,10 +31,10 @@ export default function Home() {
       {!workspace.online && !workspace.loading && <Notice error><strong>Start your local service to continue.</strong><p>Restart the terminal session that launched Project Review, then retry this connection. Your saved results remain in the local data folder.</p><button className="button" onClick={() => void workspace.refresh()}><RefreshCw size={14} />Retry connection</button></Notice>}
       {workspace.error && <div className="error-row"><Notice error>{workspace.error}</Notice><button className="icon" aria-label="Dismiss error" onClick={() => workspace.setError("")}><X size={16} /></button></div>}
       {workspace.loadingJob ? <section className="loading-surface" aria-busy="true"><div className="skeleton" /><div className="skeleton short" /><p>Loading review…</p></section> : workspace.job ? <ReviewWorkspace key={workspace.job.id} job={workspace.job} connectedModel={connectedModel} openModels={() => setDialog("models")} busy={workspace.busy} streaming={workspace.streaming} back={() => workspace.open(null)} action={(name, body) => jobAction(name, body).catch(() => undefined)} verify={() => setDialog("verify")} apply={() => setDialog("apply")} /> : workspace.id ? <Empty title="Review could not be loaded"><p>Check the local connection or return to your reviews.</p><button className="button" onClick={() => workspace.open(null)}>All reviews</button></Empty> : <>
-        <div className="home-heading"><div><div className="section-label"><span className="accent-dot" />Project review, grounded in evidence</div>
-          <h1>Built with AI.<br /><span>Ready for a real review.</span></h1>
-          <p>Understand what works, what is missing, and what needs fixing—with evidence you can inspect.</p>
-        </div><div className="workspace-edition"><span className="edition-mark">Your code. Your call.</span><p>Review locally.<br />Repair on your terms.</p></div></div>
+        <div className="home-heading"><div><div className="section-label"><span className="accent-dot" />Your local inspection workspace</div>
+          <h1>Before you ship,<br /><span>see what holds up.</span></h1>
+          <p>Bring the project you built with AI. Find what works, what could fail, and what to fix next—with evidence you can inspect.</p>
+        </div><InspectionIllustration /></div>
         <Intake disabled={workspace.busy || !workspace.online} health={workspace.health}
           models={() => setDialog("models")} start={body => workspace.mutate("/scans", body)} />
         <ReviewHistory jobs={workspace.jobs} loading={workspace.loading} open={id => workspace.open(id)} />

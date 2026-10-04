@@ -213,6 +213,13 @@ source, paid-provider credit or truth through model consensus. Browser review
 is limited. Remote invitations require an authenticated deployment; the local
 API is not public.
 
+## Product walkthrough
+
+The [introduction video source](videos/praxis-introduction/README.md) covers the
+website trial, local review, collaborating specialists, people in the workspace,
+real test outcomes and fix-plan handoff. Captures and the rendered MP4 stay local;
+the source guide explains how to reproduce the demonstration and its limits.
+
 ## Roadmap
 
 Improve real-repository coverage and consumer setup first. Remote collaboration

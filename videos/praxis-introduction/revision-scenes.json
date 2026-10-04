@@ -1,0 +1,80 @@
+[
+  {
+    "frame": 1,
+    "slug": "question",
+    "title": "Looks finished. Let us check.",
+    "text": "You built an app with AI. It looks good. But does it actually work?"
+  },
+  {
+    "frame": 2,
+    "slug": "website",
+    "title": "Start here",
+    "text": "That's where Praxis comes in. Open the website and choose Test Your Project."
+  },
+  {
+    "frame": 3,
+    "slug": "browser",
+    "title": "Try a private check",
+    "text": "Pick your project folder. The browser reads the code on your device, points out possible problems, and gives you a prompt to copy. It hasn't run the app yet."
+  },
+  {
+    "frame": 4,
+    "slug": "local-setup",
+    "title": "Run the local tool",
+    "text": "For real tests and AI review, run Praxis locally. Here, we're using the working release candidate. The new public package hasn't been released yet."
+  },
+  {
+    "frame": 5,
+    "slug": "local-intake",
+    "title": "Choose your project",
+    "text": "Choose a folder, upload your source, or paste a GitHub link. Add your goal and a spending limit. Tests run in a separate Docker copy, after you allow them."
+  },
+  {
+    "frame": 6,
+    "slug": "ai-team",
+    "title": "Meet the review team",
+    "text": "Four AI specialists look at the same project: how it feels to use, how reliable it is, how secure it is, and what's needed to ship it."
+  },
+  {
+    "frame": 7,
+    "slug": "provider-limits",
+    "title": "Honest about limits",
+    "text": "They compare findings and check each other's evidence. If a provider runs out of credit or hits a limit, Praxis tells you. It never pretends the review finished."
+  },
+  {
+    "frame": 8,
+    "slug": "people",
+    "title": "People join the review",
+    "text": "People can join the conversation too. Leave a goal, ask a specialist, or add a private note. You decide what the AI team can see."
+  },
+  {
+    "frame": 9,
+    "slug": "runtime-proof",
+    "title": "Catch the false success",
+    "text": "Now watch this. One version saves an order, and its tests pass. The broken version says success, but saves nothing. The real test catches it."
+  },
+  {
+    "frame": 10,
+    "slug": "findings",
+    "title": "Understand the problem",
+    "text": "Each finding explains the problem, why it matters, and where to look. Checks that didn't run stay visible, so a green result doesn't hide missing work."
+  },
+  {
+    "frame": 11,
+    "slug": "fix-plan",
+    "title": "Make a plan first",
+    "text": "Next, draft a fix plan. Review the changes, the risks, and the tests. Then copy the plan into your coding agent. Planning leaves your original files untouched."
+  },
+  {
+    "frame": 12,
+    "slug": "context",
+    "title": "See what happened",
+    "text": "The source map shows how files connect. The activity view shows what actually ran. You can inspect both instead of trusting a summary."
+  },
+  {
+    "frame": 13,
+    "slug": "close",
+    "title": "PRAXIS",
+    "text": "Build with AI. Check with Praxis. Try the browser check first, then go local for the deeper review."
+  }
+]
