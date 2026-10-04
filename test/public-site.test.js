@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { buildPublicSite } from '../scripts/build-public-site.mjs';
 import { buildVercelSite } from '../scripts/build-vercel-site.mjs';
 import { releaseAvailability } from '../web/test-your-project/install.mjs';
@@ -42,6 +44,26 @@ test('Cloudflare config names the existing static Worker and builds canonical br
   assert.match(config.build.command, /build-web.mjs/);
   assert.equal(config.main, undefined);
   for (const binding of ['kv_namespaces', 'd1_databases', 'r2_buckets', 'vars']) assert.equal(config[binding], undefined);
+});
+
+test('production Vercel output excludes upload metadata and preserves public page and scanner hashes', () => {
+  const config = JSON.parse(fs.readFileSync('vercel.json', 'utf8'));
+  assert.equal(config.buildCommand, 'node scripts/build-vercel-site.mjs');
+  assert.equal(config.outputDirectory, 'web/dist');
+  const result = spawnSync(process.execPath, ['scripts/build-vercel-site.mjs'], { encoding: 'utf8', timeout: 15000 });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const destination = path.resolve(config.outputDirectory);
+  const staged = path.resolve(JSON.parse(fs.readFileSync('wrangler.jsonc', 'utf8')).assets.directory);
+  assert.equal(fs.existsSync(path.join(destination, 'manifest-for-upload.json')), false);
+  const hash = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+  for (const name of ['index.html', 'appearance.js', 'test-your-project/index.html', 'test-your-project/local.html', 'test-your-project/engine/manifest.json']) {
+    assert.equal(hash(path.join(destination, name)), hash(path.join(staged, name)), name);
+  }
+  const manifest = JSON.parse(fs.readFileSync(path.join(destination, 'test-your-project/engine/manifest.json'), 'utf8'));
+  for (const [name, expected] of Object.entries(manifest.files)) {
+    assert.equal(hash(path.join(destination, 'test-your-project/engine', name)), expected, name);
+    assert.equal(hash(path.join('apps/workbench/backend/regen', name)), expected, name);
+  }
 });
 
 test('Vercel staging retains the generated engine and removes stale output without nesting it', t => {

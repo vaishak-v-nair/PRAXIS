@@ -2,8 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "node -e \"process.exit(0)\"",
-  "buildCommand": "npm run build:site",
-  "outputDirectory": "apps/workbench/.regen/artifacts/public-site",
+  "buildCommand": "node scripts/build-vercel-site.mjs",
+  "outputDirectory": "web/dist",
   "headers": [
     {
       "source": "/(.*)",
