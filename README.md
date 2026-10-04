@@ -17,9 +17,10 @@
 
 </div>
 
-Bring a project folder or GitHub repository. PRAXIS inspects an isolated copy,
-shows source-backed findings and gaps, runs authorized checks in Docker, and
-helps you draft a fix plan before handing it to your model or coding agent.
+Bring a project folder or GitHub repository. PRAXIS inspects a separate source
+copy, shows source-backed findings and gaps, and prepares a grounded brief for
+your coding agent. The first source review needs no Docker or provider key.
+Add model review or explicitly authorized project checks when you need them.
 People and AI specialists work around one review. Model opinions and recorded
 execution remain visibly separate.
 
@@ -34,7 +35,7 @@ node src/cli.js review
 The managed launcher prepares the optional app, installs private Python, builds
 the production interface, then opens `http://127.0.0.1:3000` after both services
 respond. Saved reviews use persistent user data outside npm's cache. Git and
-system Python are not required for this managed path. `review --check` checks
+system Python and Docker are not required to start this managed path. `review --check` checks
 readiness without installation; `review --setup-only` prepares without launch.
 
 After the **manual npm release**, the consumer command is:
@@ -54,11 +55,12 @@ available. See [managed setup](docs/WORKBENCH-INTEGRATION.md) and
 1. **Understand:** inventory actual files, stack, plans, entrypoints and tests.
 2. **Inspect:** use existing scanners for source-backed risks, leakage,
    dependencies, incomplete paths and false-success patterns.
-3. **Collaborate:** four specialists inspect the same bounded, redacted snapshot,
+3. **Collaborate, optionally:** four specialists inspect the same bounded, redacted snapshot,
    then challenge peer findings using real source snippets and finding IDs.
-4. **Execute:** run discovered project commands in Docker when explicitly trusted.
+4. **Execute, optionally:** authorize discovered commands on this computer or
+   in Docker. Local execution has host permissions; Docker never falls back to it.
 5. **Decide:** show demonstrated behavior, failed checks, limits and release blockers.
-6. **Plan:** inspect a source-aware fix plan, copy it to a paid coding agent, or
+6. **Plan:** copy the findings to your coding agent, inspect a source-aware fix plan, or
    authorize your configured model to prepare proposed changes.
 
 Local paths, GitHub HTTPS URLs and folder uploads share the workflow. Uploads
@@ -192,10 +194,12 @@ replace the authoritative native verifier.
 
 ## Safety
 
-Submitted projects are untrusted data; inspection never imports them. Execution
-requires trust and uses the disposable Docker copy. Network access is separately
-authorized. Docker reduces exposure, not every possible hostile-project risk.
-Missing tools remain unavailable.
+Submitted projects are untrusted data; inspection never imports them. Source
+review executes no project commands. Optional execution requires explicit trust
+and a selected environment. Trusted local checks run in a review copy but can
+access this computer's files and network; the copy and stripped environment are
+not an OS sandbox. Docker provides the existing disposable container path with
+separate network authorization and no host fallback. Missing tools remain unavailable.
 
 Models receive bounded, redacted source excerpts through configured providers.
 Dependency lookup may send package names and versions to OSV. Local storage

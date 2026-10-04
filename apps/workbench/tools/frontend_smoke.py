@@ -1,6 +1,6 @@
 """Frontend contracts and accessibility against the running production app.
 
-Real intake/Docker execution lives in assessment_smoke.py and intake_smoke.py.
+Real intake/runtime execution lives in assessment_smoke.py and intake_smoke.py.
 This suite uses explicitly synthetic API states for errors/paused/patch controls.
 """
 import copy
@@ -32,7 +32,7 @@ def audit(page, name):
             page.wait_for_timeout(80)
             assert not page.evaluate('document.documentElement.scrollWidth > innerWidth + 2'), (name, theme, width)
             escaped = page.evaluate("""() => {
-                const cards = '.metric-strip > article,.pressure-grid > article,.dimension-grid > article,.attention-item,.evidence-inspector,.method-panel,.handoff-option';
+                const cards = '.metric-strip > article,.pressure-grid > article,.dimension-grid > article,.attention-item,.evidence-inspector,.method-panel,.handoff-option,.priority-finding,.agent-brief,.runtime-controls';
                 const failures = [];
                 const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
                 while (walker.nextNode()) {
@@ -60,8 +60,7 @@ with sync_playwright() as runtime:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(BASE, wait_until='networkidle')
     page.get_by_text('Local service connected', exact=True).wait_for()
-    page.get_by_role('button', name='Use light theme').click()
-    assert page.locator('html').get_attribute('data-theme') == 'light'
+    assert page.locator('html').get_attribute('data-theme') == 'light', 'First-run appearance should use warm paper'
     page.get_by_role('button', name='Use dark theme').click()
     assert page.locator('html').get_attribute('data-theme') == 'dark'
     page.reload(wait_until='networkidle')
@@ -88,6 +87,7 @@ with sync_playwright() as runtime:
 
     # Deterministic UI-only states; never presented as live backend evidence.
     fixture = {'id': 'ui-fixture', 'name': 'UI contract fixture', 'source': 'E:/synthetic/project', 'status': 'complete', 'revision': 1,
+               'review_goal': 'Save orders and preserve their recorded details.',
                'budget': 5, 'cost': .02, 'files_scanned': 4, 'languages': ['Python'], 'events': [],
                'commands': [['python', '-m', 'unittest']],
                'findings': [{'id': 'f1', 'title': 'Debug mode enabled', 'category': 'security', 'severity': 'high', 'confidence': 'confirmed',
@@ -130,6 +130,9 @@ with sync_playwright() as runtime:
                                               'limits': ['A passing command proves only its recorded snapshot.']}]}}
     # Four distinct model reports exercise the balanced grid and preserve the
     # difference between a model hypothesis and executed evidence.
+    fixture['findings'].insert(0, {'id': 'f2', 'title': 'Documentation needs context', 'category': 'maintainability',
+        'severity': 'info', 'confidence': 'unconfirmed', 'description': 'Synthetic manual-review finding.',
+        'why': 'Confirm the intended workflow before changing documentation.', 'fixable': False})
     fixture['pressure_tests'] = [
         {'agent': name, 'provider': 'test-provider', 'model': 'explicit-ui-fixture',
          'journeys': [{'name': 'Recorded fixture journey', 'result': result, 'evidence': 'Synthetic UI evidence, not an executed journey.'}],
@@ -161,10 +164,9 @@ with sync_playwright() as runtime:
             'action': 'Inspect the corresponding evidence.', 'source': 'synthetic fixture'})
     fixture['assessment']['gaps'] = ['Traceback: raw-machine-output-must-not-appear-in-actions']
     fixture_health = {'status': 'ok', 'settings': {'provider': 'groq', 'model': 'fixture-coder'},
-                      'providers': [{'name': 'groq', 'configured': True}],
-                      'docker': {'ready': True, 'engine': True, 'local_context': True,
-                                 'detail': 'Synthetic Docker readiness.',
-                                 'images': {'node': {'image': 'node:22-bookworm-slim', 'ready': True}}}}
+                      'providers': [{'name': 'groq', 'configured': False}], 'tools': {},
+                      'docker': {'ready': False, 'engine': False, 'local_context': False,
+                                 'detail': 'Synthetic missing Docker state.'}}
     def fixture_api(route):
         path = route.request.url.split('/api')[-1]
         if path.endswith('/events'):
@@ -182,30 +184,115 @@ with sync_playwright() as runtime:
                                                             body=json.dumps(fixture_health)))
     page.route('**/api/scans', fixture_api)
     page.goto(BASE, wait_until='networkidle')
+    assert page.get_by_role('button', name='Upload folder', exact=True).get_attribute('aria-pressed') == 'true'
+    assert not page.locator('.review-details').evaluate('(element) => element.open')
+    assert page.get_by_label('I trust this project and authorize').count() == 0
+    page.get_by_role('button', name='Local path', exact=True).click()
     page.get_by_label('Project folder path', exact=False).fill('C:/synthetic/project')
-    assert page.get_by_role('button', name='Run complete review').is_disabled()
-    page.get_by_label('I trust this project and authorize').check()
-    page.get_by_role('button', name='Run complete review').click()
+    page.get_by_label('What should this project do?', exact=False).fill(fixture['review_goal'])
+    assert page.get_by_role('button', name='Review project', exact=True).is_enabled()
+    page.get_by_role('button', name='Review project', exact=True).click()
     page.get_by_role('heading', name='UI contract fixture', exact=True).wait_for()
     assert actions[-1]['path'] == '/scans'
-    assert actions[-1]['body'] == {'source': 'C:/synthetic/project', 'budget': 5, 'ai_review': True,
-                                  'review_mode': 'team', 'review_goal': '', 'run_checks': True,
-                                  'trust_confirmed': True, 'allow_network': False}
+    assert actions[-1]['body'] == {'source': 'C:/synthetic/project', 'budget': 5, 'ai_review': False,
+                                  'review_mode': 'team', 'review_goal': fixture['review_goal'], 'run_checks': False,
+                                  'trust_confirmed': False, 'allow_network': False, 'runtime_mode': 'docker'}
     page.goto(BASE, wait_until='networkidle')
     page.get_by_role('button', name='GitHub URL', exact=True).click()
     page.get_by_label('Repository URL', exact=False).fill('https://github.com/example/synthetic')
-    assert page.get_by_role('button', name='Run complete review').is_disabled()
-    page.get_by_label('I trust this project and authorize').check()
-    page.get_by_role('button', name='Run complete review').click()
+    assert page.get_by_role('button', name='Review project', exact=True).is_enabled()
+    page.get_by_role('button', name='Review project', exact=True).click()
     page.get_by_role('heading', name='UI contract fixture', exact=True).wait_for()
     assert actions[-1]['body']['source'] == 'https://github.com/example/synthetic'
     assert actions[-1]['body']['allow_network'] is False
+    assert actions[-1]['body']['ai_review'] is False and actions[-1]['body']['run_checks'] is False
+    # Explicit local execution remains available without Docker or a provider.
+    page.goto(BASE, wait_until='networkidle')
+    page.get_by_role('button', name='Local path', exact=True).click()
+    source_input = page.get_by_label('Project folder path', exact=False)
+    source_input.fill('C:/synthetic/project')
+    page.locator('.review-details > summary').click()
+    assert page.get_by_label('Add connected model review', exact=False).is_disabled()
+    page.get_by_label('Also run project commands', exact=False).check()
+    assert page.get_by_role('button', name='Review project', exact=True).is_disabled()
+    assert page.get_by_label('I trust this project and authorize').count() == 0
+    environment = page.get_by_label('Execution environment', exact=True)
+    environment.select_option('docker')
+    page.get_by_text('Optional Docker runtime needs setup', exact=True).wait_for()
+    assert page.get_by_label('I trust this project and authorize').is_disabled()
+    assert environment.input_value() == 'docker', 'Missing Docker must not silently switch to local execution'
+    audit(page, 'missing-docker-intake')
+    environment.select_option('host')
+    page.get_by_text('Local commands can access this computer.', exact=True).wait_for()
+    assert page.get_by_label('Allow network access', exact=False).count() == 0
+    consent = page.get_by_label('I trust this project and authorize')
+    consent.check()
+    source_input.fill('C:/synthetic/changed')
+    assert not consent.is_checked(), 'Source changes must revoke execution consent'
+    consent.check()
+    environment.select_option('docker')
+    assert not consent.is_checked(), 'Environment changes must revoke execution consent'
+    environment.select_option('host')
+    consent.check()
+    page.get_by_role('button', name='Review project', exact=True).click()
+    page.get_by_role('heading', name='UI contract fixture', exact=True).wait_for()
+    assert actions[-1]['body']['runtime_mode'] == 'host'
+    assert actions[-1]['body']['run_checks'] and actions[-1]['body']['trust_confirmed']
+    assert not actions[-1]['body']['allow_network'] and not actions[-1]['body']['ai_review']
+    # These are synthetic request-contract assertions, not proof of host isolation.
+    fixture_health['providers'].append({'name': 'nvidia', 'configured': True})
+    page.reload(wait_until='networkidle')
+    before_plan = len(actions)
+    page.get_by_role('navigation', name='Review sections').get_by_role('button', name='findings', exact=False).click()
+    assert page.get_by_role('button', name='Draft a fix plan', exact=True).is_disabled()
+    page.get_by_text('Drafting a plan needs a configured AI provider.', exact=False).wait_for()
+    page.get_by_label('Select Debug mode enabled for repair', exact=True).check()
+    assert page.get_by_role('button', name='Draft plan for 1', exact=True).is_disabled()
+    assert page.get_by_role('button', name='Copy findings to my agent', exact=True).is_enabled()
+    assert len(actions) == before_plan, 'Another configured provider must not enable planning for an unconfigured selected provider'
+    page.get_by_role('navigation', name='Review sections').get_by_role('button', name='overview', exact=True).click()
+    before_brief = len(actions)
+    page.get_by_role('button', name='Copy findings to my agent', exact=True).click()
+    page.get_by_role('button', name='Findings copied', exact=True).wait_for()
+    # Windows clipboard can normalize LF to CRLF; retain every other character.
+    copied_brief = page.evaluate('navigator.clipboard.readText()').replace('\r\n', '\n')
+    assert 'Review ID: ui-fixture' in copied_brief and 'Source: E:/synthetic/project' in copied_brief
+    assert fixture['review_goal'] in copied_brief and 'app.py:1' in copied_brief
+    assert '"status":"failed"' in copied_brief and 'not a public source hash or a signed verification receipt' in copied_brief
+    assert len(actions) == before_brief, 'Copying must not call a model or approve a repair'
+    with page.expect_download() as downloaded:
+        page.get_by_role('button', name='Download brief', exact=True).click()
+    downloaded.value.save_as(ARTIFACTS / 'synthetic-agent-brief.txt')
+    assert (ARTIFACTS / 'synthetic-agent-brief.txt').read_text(encoding='utf-8') == copied_brief
+    page.evaluate("Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: () => Promise.reject(new Error('Synthetic clipboard denied'))}})")
+    page.get_by_role('button', name='Findings copied', exact=True).click()
+    handoff_text = page.get_by_label('Findings handoff text', exact=True)
+    handoff_text.wait_for(state='visible')
+    assert handoff_text.input_value() == copied_brief
+    assert handoff_text.evaluate('(element) => element === document.activeElement && element.selectionStart === 0 && element.selectionEnd === element.value.length')
+    page.get_by_role('alert').filter(has_text='Clipboard access is unavailable').wait_for()
+    assert len(actions) == before_brief
+    audit(page, 'source-bound-brief-fallback')
+    fixture_health['providers'][0]['configured'] = True
+    fixture_health['docker'].update(ready=True, engine=True, local_context=True,
+                                   detail='Synthetic Docker readiness.', images={'node': {'image': 'node:22-bookworm-slim', 'ready': True}})
     page.goto(BASE + '/?job=ui-fixture', wait_until='networkidle')
     page.get_by_role('heading', name='UI contract fixture', exact=True).wait_for()
     page.get_by_role('heading', name='Production readiness is blocked', exact=True).wait_for()
     page.get_by_role('heading', name='Observed behavior is failing', exact=True).wait_for()
     page.get_by_text('Evidence still required', exact=True).wait_for()
     page.get_by_role('heading', name='What still needs attention', exact=True).wait_for()
+    page.locator('.priority-finding').get_by_role('heading', name='Debug mode enabled', exact=True).wait_for()
+    assert 'Debug output may expose details.' in page.locator('.priority-finding').inner_text()
+    assert 'app.py:1' in page.locator('.priority-finding').inner_text()
+    page.locator('.project-actions').get_by_text('Review finished', exact=True).wait_for()
+    page.set_viewport_size({'width': 390, 'height': 844})
+    assert page.locator('.metric-strip article').nth(1).locator('small').is_visible()
+    assert all(item.is_visible() for item in page.locator('.metric-note').all()), 'Mobile metric details must remain available'
+    position = lambda selector: page.locator(selector).bounding_box()['y']
+    assert position('.final-verdict') < position('.priority-finding') < position('#review-agent-brief') < position('.decision-next')
+    assert page.locator('.decision-shortcuts').get_by_role('link', name='Open agent brief').is_visible()
+    page.set_viewport_size({'width': 1440, 'height': 1000})
     assert page.locator('.pressure-grid > article').count() == 4
     assert page.get_by_text('Model says works', exact=True).count() == 1
     assert page.get_by_text('Model flags failure', exact=True).count() == 1
@@ -257,6 +344,22 @@ with sync_playwright() as runtime:
             page.get_by_label('Search findings').fill('absent')
             page.get_by_role('heading', name='No matching findings').wait_for()
             page.get_by_label('Search findings').fill('')
+            assert page.locator('.evidence-inspector').get_by_role('heading', name='Debug mode enabled', exact=True).count() == 1
+            before_copy = len(actions)
+            page.get_by_role('button', name='Copy findings to my agent', exact=True).click()
+            page.get_by_role('button', name='Findings copied', exact=True).wait_for()
+            selected_brief = page.evaluate('navigator.clipboard.readText()')
+            assert 'Finding ID: f1' in selected_brief and 'Finding ID: f2' not in selected_brief
+            assert 'Selected findings: 1 of 2' in selected_brief
+            assert len(actions) == before_copy
+            page.locator('.finding-row').filter(has_text='Documentation needs context').get_by_role('button').click()
+            assert page.get_by_role('button', name='Draft a fix plan', exact=True).is_disabled()
+            page.get_by_role('button', name='Copy findings to my agent', exact=True).click()
+            page.get_by_role('button', name='Findings copied', exact=True).wait_for()
+            manual_brief = page.evaluate('navigator.clipboard.readText()')
+            assert 'Finding ID: f2' in manual_brief and 'Finding ID: f1' not in manual_brief
+            assert len(actions) == before_copy, 'Manual-review findings should remain copyable without a model'
+            page.locator('.finding-row').filter(has_text='Debug mode enabled').get_by_role('button').click()
             page.get_by_role('button', name='Draft a fix plan', exact=True).click()
             page.wait_for_timeout(250)
             assert actions[-1]['body']['finding_ids'] == ['f1']
@@ -289,6 +392,19 @@ with sync_playwright() as runtime:
     page.locator('.project-actions').get_by_role('button', name='Run checks').click()
     audit(page, 'runtime-dialog')
     assert page.get_by_role('button', name='Run authorized checks').is_disabled()
+    assert page.get_by_label('I trust this project and authorize').count() == 0
+    environment = page.get_by_label('Execution environment', exact=True)
+    environment.select_option('host')
+    page.get_by_label('I trust this project and authorize').check()
+    page.get_by_label('Browser start command (optional)', exact=False).fill('npm run dev')
+    assert not page.get_by_label('I trust this project and authorize').is_checked()
+    audit(page, 'trusted-local-runtime-dialog')
+    environment.select_option('docker')
+    assert not page.get_by_label('I trust this project and authorize').is_checked()
+    page.get_by_label('I trust this project and authorize').check()
+    page.get_by_label('Allow network access', exact=False).check()
+    assert not page.get_by_label('I trust this project and authorize').is_checked()
+    page.get_by_label('Allow network access', exact=False).uncheck()
     page.get_by_label('I trust this project and authorize').check()
     page.get_by_role('button', name='Run authorized checks').click()
     page.wait_for_timeout(250)
@@ -305,12 +421,42 @@ with sync_playwright() as runtime:
     page.wait_for_timeout(250)
     assert actions[-1]['path'].endswith('/cancel')
 
+    # Presentation only: preserve the saved source condition without promoting
+    # a low-confidence suggestion to an executed failure or release approval.
+    source_fixture = copy.deepcopy(fixture)
+    source_fixture.update(status='complete', revision=4, checks=[])
+    source_fixture['findings'] = [{'id': 'source-suggestion', 'title': 'Constant success needs context',
+        'category': 'incomplete', 'severity': 'low', 'confidence': 'suggestion',
+        'description': 'Synthetic source-only suggestion; intended behavior requires confirmation.',
+        'why': 'Confirm the contract before release.', 'fixable': False}]
+    source_fixture['assessment'].update(title='1 evidenced blocker', checks_failed=0,
+        implementation={'status': 'placeholder_risk', 'label': 'A production path may be simulated'},
+        readiness={'status': 'blocked', 'label': 'Production readiness is blocked',
+                   'detail': 'One source pattern was recorded as a blocker.',
+                   'blockers': ['REALITY: Constant success needs context']},
+        dimensions=[{'id': 'reality', 'label': 'Implementation reality', 'status': 'placeholder_risk',
+                     'detail': 'Source pattern only.', 'evidence_count': 1}])
+    fixture = source_fixture
+    page.goto(BASE + '/?job=ui-fixture', wait_until='networkidle')
+    page.locator('.final-verdict').get_by_role('heading', name='Source concern needs confirmation', exact=True).wait_for()
+    assert page.locator('.final-verdict').get_attribute('class') == 'final-verdict not_established'
+    assert 'no runtime check was executed' in page.locator('.final-verdict').inner_text()
+    page.get_by_text('Inspect saved assessment', exact=True).click()
+    assert 'Production readiness is blocked' in page.locator('.final-verdict').inner_text()
+    page.locator('.dimension-grid').get_by_text('needs human review', exact=True).wait_for()
+    fixture['checks'] = [{'name': 'Behavioral test', 'status': 'failed', 'runtime': 'host', 'exit_code': 1}]
+    fixture['assessment']['checks_failed'] = 1
+    fixture['assessment']['implementation'].update(status='contradicted', label='Observed behavior is failing')
+    page.reload(wait_until='networkidle')
+    page.locator('.final-verdict').get_by_role('heading', name='Production readiness is blocked', exact=True).wait_for()
+    assert page.locator('.final-verdict').get_attribute('class') == 'final-verdict blocked'
+    assert page.get_by_text('Inspect saved assessment', exact=True).count() == 0
+
     page.goto(BASE, wait_until='networkidle')
     page.route('**/api/scans', lambda route: route.fulfill(status=422, content_type='application/json', body=json.dumps({'detail': 'Synthetic invalid repository URL'})))
     page.get_by_role('button', name='GitHub URL').click()
     page.get_by_label('Repository URL', exact=False).fill('https://github.com/example/invalid')
-    page.get_by_label('I trust this project and authorize').check()
-    page.get_by_role('button', name='Run complete review').click()
+    page.get_by_role('button', name='Review project', exact=True).click()
     page.get_by_role('alert').filter(has_text='Synthetic invalid repository URL').first.wait_for()
     page.route('**/api/jobs', lambda route: route.fulfill(status=200, content_type='application/json', body='[]'))
     page.goto(BASE, wait_until='networkidle')
@@ -319,7 +465,7 @@ with sync_playwright() as runtime:
     page.reload(wait_until='networkidle')
     page.get_by_text('Local service offline', exact=True).wait_for()
     assert page.locator('.footer-state').get_attribute('data-state') == 'offline'
-    assert page.get_by_role('button', name='Run complete review').is_disabled()
+    assert page.get_by_role('button', name='Review project', exact=True).is_disabled()
     # Appearance must remain usable with browser storage blocked. This is a
     # presentation failure case, not an API or model execution.
     isolated = browser.new_context()
@@ -327,9 +473,9 @@ with sync_playwright() as runtime:
     storage_page = isolated.new_page()
     storage_page.on('pageerror', lambda error: errors.append(str(error)))
     storage_page.goto(BASE, wait_until='networkidle')
-    assert storage_page.locator('html').get_attribute('data-theme') == 'dark'
-    storage_page.get_by_role('button', name='Use light theme').click()
     assert storage_page.locator('html').get_attribute('data-theme') == 'light'
+    storage_page.get_by_role('button', name='Use dark theme').click()
+    assert storage_page.locator('html').get_attribute('data-theme') == 'dark'
     isolated.close()
     # New key entry: UI-only fixture, no real provider credential or model call.
     key_context = browser.new_context()

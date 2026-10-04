@@ -36,6 +36,10 @@ the full regression tools. An installed CLI can also use
 
 `node src/cli.js review` works from this checkout. After the manual npm release,
 `npx praxis-memory@0.14.2 review` works without Git or manual Python setup.
+Docker is optional: the default review inspects source without executing the
+project or calling a model. Explicit runtime checks can use a trusted local
+review copy or Docker. Native checks retain host permissions and are not an OS
+sandbox; unavailable Docker never falls back to host execution.
 This explicit command alone prepares the optional app; postinstall and the existing
 default CLI remain inert with respect to these dependencies. See the
 [consumer quickstart](PROJECT-REVIEW-QUICKSTART.md) for paths and options.

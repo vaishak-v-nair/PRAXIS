@@ -11,3 +11,34 @@ export function statusMeta(value) {
   return {tone:success.has(status) ? 'positive' : danger.has(status) ? 'negative' : warning.has(status) ? 'warning' : 'neutral',
     icon:success.has(status) ? 'check' : danger.has(status) ? 'error' : warning.has(status) ? 'warning' : 'neutral', label:status.replaceAll('_',' ')};
 }
+
+export function evidenceLabel(value) {
+  return String(value || '').replace(/^REALITY:\s*/i, '');
+}
+
+// Presentation only: a low-confidence source suggestion is not an executed failure.
+// Keep the recorded assessment intact for reports, exports and agent handoffs.
+/** @param {import("./contracts").Job} job */
+export function reviewPresentation(job) {
+  const assessment = job.assessment;
+  const readiness = assessment?.readiness;
+  const blockers = readiness?.blockers;
+  const sourceConcern = readiness?.status === 'blocked' &&
+    assessment?.implementation?.status === 'placeholder_risk' &&
+    Array.isArray(job.checks) && job.checks.length === 0 && assessment.checks_failed === 0 &&
+    Array.isArray(blockers) && blockers.length > 0 && blockers.every(blocker => {
+      if (typeof blocker !== 'string' || !/^REALITY:\s/.test(blocker)) return false;
+      const matches = job.findings?.filter(finding => finding.title === evidenceLabel(blocker));
+      return matches?.length === 1 && ['low', 'info'].includes(matches[0].severity.toLowerCase()) &&
+        matches[0].confidence === 'suggestion';
+    });
+  if (!sourceConcern) return { readiness, implementation: assessment?.implementation,
+    dimensions: assessment?.dimensions, title: assessment?.title, sourceConcern: false };
+  const detail = 'Source inspection suggests a concern, but no runtime check was executed. Confirm the intended behavior before release; readiness is not established.';
+  return { sourceConcern: true, title: 'Confirm the source concern',
+    readiness: { ...readiness, status: 'not_established', label: 'Source concern needs confirmation', detail },
+    implementation: { ...assessment.implementation, status: 'needs_human_review',
+      label: 'Source concern needs confirmation', detail },
+    dimensions: assessment.dimensions?.map(dimension => dimension.id === 'reality' ?
+      { ...dimension, status: 'needs_human_review', detail } : dimension) };
+}

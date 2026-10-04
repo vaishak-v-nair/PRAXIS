@@ -16,7 +16,8 @@ node src/cli.js review
 This prepares the optional application's locked Node dependencies and private
 Python runtime, builds the production interface, and opens the browser after
 the actual API and page respond. Initial setup needs internet and several minutes;
-Git and system Python are not required. Repeat the same command for later sessions.
+Git, system Python and Docker are not required to start the tool or inspect source.
+Repeat the same command for later sessions.
 `review --check [--json]` is inert; `review --setup-only` installs without launching;
 `review --no-open` keeps automatic browser opening off. Ctrl+C stops both services.
 
@@ -57,30 +58,38 @@ For a fresh checkout, follow the separate Node/Python installation steps in
 
 ## Review your project
 
-1. Choose a local folder, paste a GitHub repository URL, or upload a folder.
-2. Open **Models**, select a provider, and save its key locally if none is configured.
-   Choose its model and actual token rates, then test compatibility if desired.
-   Set a shared spending limit. A configured key does not guarantee remaining credit.
-3. For runtime evidence, start Docker Desktop in Linux mode and prepare the
-   images shown in the interface. Authorize execution only for a project you
-   trust. Package downloads also require the separate network option.
-4. Select **Run complete review**. Keep the page open or return to the saved
-   review later. Stopping a review preserves its completed evidence.
-5. Read **What the project has actually demonstrated** and **What still needs
-   attention**. Each priority action explains the limit and the next step;
-   Execution retains exact commands, statuses, and logs.
-6. Open Findings, select relevant issues, and select **Draft a fix plan**.
-   Review the plan before confirming the model handoff, or copy it into your
-   existing coding agent. Planning does not authorize source changes.
+1. Choose your project folder, paste a GitHub repository URL, or provide a local path.
+2. Describe what the project should do, then select **Review project**. The default
+   source review needs no provider key, Docker, or project-command authorization.
+   It inspects a separate copy and reports source-backed findings and limits.
+3. Read the prioritized issues, successful observations, and checks that have not
+   been performed. A finished review does not mean the project works end to end.
+   Copy the findings into your coding agent; the brief includes source locations,
+   review scope, and a requirement to validate the current source before edits.
+4. Optionally add model review in the review options. Open **Models**, select a
+   provider, and save its key locally. Set actual token rates and a shared spending
+   limit. A configured key does not guarantee access or remaining credit. Source
+   inspection still works when models are unavailable.
+5. For runtime evidence, inspect the discovered commands and explicitly choose
+   trusted local execution or Docker. Authorize only a project you trust. Local
+   execution uses a review copy but can access your computer and network; it is
+   not an OS sandbox. Docker needs its local Linux engine and prepared images,
+   and retains separate network consent. There is no automatic environment fallback.
+6. For a model-generated plan, select relevant Findings and **Draft a fix plan**.
+   Review it before confirming a model handoff, or copy it into your existing
+   coding agent. A copied brief, generated plan, implementation, and source apply
+   are distinct actions. Planning does not authorize source changes.
 
 Local projects use guarded apply with freshness checks, backup, and rollback.
 GitHub and uploaded projects provide downloadable patches or project copies;
-PRAXIS does not push to your repository. Runtime checks execute a disposable,
-bounded snapshot without host mounts or credentials.
+PRAXIS does not push to your repository. Docker checks use disposable containers
+without host mounts or provider credentials. Local checks use a separate source
+copy and a stripped process environment, with host permissions explicitly disclosed.
 
 ## What the result means
 
-- A completed source scan establishes inspection within the reported limits.
+- A completed source scan establishes inspection within the reported limits;
+  it does not establish test or user-journey success.
 - A model finding is a hypothesis with a source reference, not runtime proof.
 - Dependency setup success is separate from test or build success. A download
   failure leaves behavior unproven; it does not prove a broken implementation.

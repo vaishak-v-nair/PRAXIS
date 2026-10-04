@@ -231,6 +231,142 @@ class ApiIntegrationTests(unittest.TestCase):
             self.assertEqual(job['cost'], 0)
             self.assertTrue(job['plan']['graph']['nodes'])
 
+    def test_source_only_review_needs_no_provider_docker_or_execution_consent(self):
+        with patch.object(provider, 'analyze') as model, patch.object(provider, 'configured_provider_selections', return_value=[]), \
+                patch.object(scanner, 'run_checks') as host, patch.object(api.sandbox, 'run_checks') as container:
+            response = self.client.post('/api/scans', json={
+                'source': str(self.source), 'ai_review': False, 'run_checks': False})
+            self.assertEqual(response.status_code, 200, response.text)
+            job = self.finish(response.json()['id'])
+            model.assert_not_called()
+            host.assert_not_called()
+            container.assert_not_called()
+        self.assertEqual(job['status'], 'complete')
+        self.assertTrue(job['findings'])
+        self.assertEqual(job['checks'], [])
+        self.assertEqual(job['cost'], 0)
+        self.assertEqual(job['assessment']['implementation']['status'], 'not_established')
+        self.assertNotEqual(job['assessment']['readiness']['status'], 'release_candidate')
+
+    def test_source_only_and_ultra_review_retain_redacted_intent_without_exposing_fingerprint(self):
+        goal = 'Check the checkout workflow. ' + self.secret
+        for mode, ai in (('standard', False), ('ultra', True)):
+            with self.subTest(mode=mode), patch.object(provider, 'analyze_deep', side_effect=lambda path, scan, *args: scan):
+                response = self.client.post('/api/scans', json={
+                    'source': str(self.source), 'ai_review': ai, 'review_mode': mode,
+                    'review_goal': goal, 'run_checks': False})
+                job = self.finish(response.json()['id'])
+                self.assertEqual(job['review_goal'], 'Check the checkout workflow. [REDACTED]')
+                self.assertNotIn(self.secret, json.dumps(api.store.get(job['id'])))
+                self.assertNotIn('source_fingerprint', job)
+
+    def test_missing_requested_provider_preserves_source_review_without_execution(self):
+        with patch.object(provider, 'analyze', side_effect=provider.ProviderError('No provider key configured')):
+            response = self.client.post('/api/scans', json={
+                'source': str(self.source), 'ai_review': True, 'run_checks': False})
+            job = self.finish(response.json()['id'])
+        self.assertEqual(job['status'], 'complete')
+        self.assertTrue(job['findings'])
+        self.assertEqual(job['checks'], [])
+        self.assertIn('No provider key configured', job['error'])
+        model_coverage = next(item for item in job['coverage'] if item['name'] == 'AI contextual review')
+        self.assertEqual(model_coverage['status'], 'skipped')
+
+    def test_initial_scan_honors_explicit_trusted_host_and_streams_results_in_copy(self):
+        streamed = [{'name': 'python -m unittest', 'kind': 'command', 'runtime': 'host',
+                     'network': 'host', 'status': 'failed', 'output': 'Actual assertion failed'}]
+
+        def execute(path, commands, emit, cancelled, **options):
+            self.assertNotEqual(path, self.source)
+            self.assertFalse((path / '.env').exists())
+            options['on_result'](streamed)
+            self.assertEqual(api.store.all()[0]['checks'], streamed)
+            return streamed
+
+        with patch.object(provider, 'analyze') as model, patch.object(scanner, 'run_checks', side_effect=execute) as host, \
+                patch.object(api.sandbox, 'run_checks') as container:
+            body = {'source': str(self.source), 'ai_review': False, 'run_checks': True,
+                    'runtime_mode': 'host', 'trust_confirmed': False}
+            self.assertEqual(self.client.post('/api/scans', json=body).status_code, 403)
+            host.assert_not_called()
+            body['trust_confirmed'] = True
+            response = self.client.post('/api/scans', json=body)
+            self.assertEqual(response.status_code, 200, response.text)
+            job = self.finish(response.json()['id'])
+            host.assert_called_once()
+            container.assert_not_called()
+            model.assert_not_called()
+        self.assertEqual(job['checks'], streamed)
+        self.assertEqual(job['assessment']['implementation']['status'], 'contradicted')
+        self.assertEqual((self.source / 'app.py').read_text(), self.original)
+
+    def test_invalid_initial_runtime_is_rejected_before_work(self):
+        for runtime in ('auto', 'podman', '../host', None):
+            with self.subTest(runtime=runtime):
+                response = self.client.post('/api/scans', json={
+                    'source': str(self.source), 'ai_review': False, 'runtime_mode': runtime})
+                self.assertEqual(response.status_code, 422)
+        self.assertEqual(api.store.all(), [])
+
+    def test_fix_runtime_keeps_legacy_host_default_and_honors_explicit_docker(self):
+        for runtime in (None, 'docker'):
+            with self.subTest(runtime=runtime):
+                job = self.scan()
+                selected = next(f for f in job['findings'] if f['fixable'])['id']
+                body = {'finding_ids': [selected], 'run_checks': True, 'trust_confirmed': True}
+                if runtime:
+                    body['runtime_mode'] = runtime
+                results = [{'name': 'test', 'kind': 'command', 'runtime': runtime or 'host',
+                            'status': 'passed', 'output': 'Executed tests passed'}]
+                with patch.object(scanner, 'run_checks', return_value=results) as host, \
+                        patch.object(api.sandbox, 'run_checks', return_value=results) as container:
+                    self.assertEqual(self.client.post(f"/api/jobs/{job['id']}/fix", json={**body, 'trust_confirmed': False}).status_code, 403)
+                    host.assert_not_called()
+                    container.assert_not_called()
+                    response = self.client.post(f"/api/jobs/{job['id']}/fix", json=body)
+                    self.assertEqual(response.status_code, 200, response.text)
+                    done = self.finish(job['id'])
+                    chosen, other = (container, host) if runtime == 'docker' else (host, container)
+                    chosen.assert_called_once()
+                    other.assert_not_called()
+                    self.assertNotEqual(chosen.call_args.args[0], self.source)
+                    self.assertEqual(done['checks'], results)
+        self.assertEqual((self.source / 'app.py').read_text(), self.original)
+
+    def test_failed_host_execution_never_falls_back_to_docker(self):
+        unavailable = [{'name': 'npm run test', 'kind': 'command', 'runtime': 'host',
+                        'status': 'skipped', 'output': 'Executable unavailable: npm'}]
+        with patch.object(scanner, 'run_checks', return_value=unavailable) as host, \
+                patch.object(api.sandbox, 'run_checks') as container:
+            response = self.client.post('/api/scans', json={
+                'source': str(self.source), 'ai_review': False, 'run_checks': True,
+                'trust_confirmed': True, 'runtime_mode': 'host'})
+            job = self.finish(response.json()['id'])
+            host.assert_called_once()
+            container.assert_not_called()
+        self.assertEqual(job['checks'][0]['status'], 'skipped')
+        self.assertEqual(job['assessment']['implementation']['status'], 'not_established')
+
+    def test_initial_host_cancellation_reaches_runner_and_preserves_source(self):
+        entered = threading.Event()
+
+        def execute(path, commands, emit, cancelled, **options):
+            entered.set()
+            self.assertTrue(cancelled.wait(5), 'Host runner did not receive cancellation')
+            return [{'name': 'tests', 'kind': 'command', 'runtime': 'host',
+                     'status': 'cancelled', 'output': 'Stopped before completion'}]
+
+        with patch.object(scanner, 'run_checks', side_effect=execute), patch.object(api.sandbox, 'run_checks') as container:
+            response = self.client.post('/api/scans', json={
+                'source': str(self.source), 'ai_review': False, 'run_checks': True,
+                'trust_confirmed': True, 'runtime_mode': 'host'})
+            job_id = response.json()['id']
+            self.assertTrue(entered.wait(5))
+            self.assertEqual(self.client.post(f'/api/jobs/{job_id}/cancel', json={}).status_code, 200)
+            self.assertEqual(self.finish(job_id)['status'], 'cancelled')
+            container.assert_not_called()
+        self.assertEqual((self.source / 'app.py').read_text(), self.original)
+
     def test_docker_verify_never_dispatches_to_host(self):
         job = self.scan()
         with patch.object(scanner, 'run_checks') as host, patch.object(api.sandbox, 'run_checks', return_value=[{'name': 'Docker', 'status': 'skipped', 'output': 'Unavailable'}]) as container:

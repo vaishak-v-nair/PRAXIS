@@ -4,6 +4,7 @@ export interface Finding {
   location?: { file?: string; line?: number }; evidence?: string; fix?: string; fixable: boolean;
 }
 export interface Job {
+  review_goal?: string;
   collaboration?: { revision: number; participants: Array<{ session_id: string; name: string }>;
     notes: Array<{ id: string; author: string; kind: string; text: string; assigned_to: string; share_with_agents: boolean; created_at: string }> };
   team?: { status: string; phase: string; goal: string; max_parallel: number;
@@ -35,12 +36,13 @@ export interface Job {
     dimensions?: Array<{ id: string; label: string; status: string; detail: string; evidence_count: number;
       evidence?: Array<{ kind: string; label: string; status: string; detail?: string; source?: string }>; limits?: string[] }> };
 }
-export interface ScanOptions { ai_review: boolean; run_checks: boolean; trust_confirmed: boolean; allow_network: boolean }
+export type RuntimeMode = "host" | "docker";
+export interface ScanOptions { ai_review: boolean; run_checks: boolean; trust_confirmed: boolean; allow_network: boolean; runtime_mode: RuntimeMode }
 export interface Health {
   settings?: { provider?: string; model?: string; input_price?: number | null; output_price?: number | null };
   status?: string; providers?: Array<{ name: string; configured: boolean; verified?: boolean }>; tools?: unknown;
   docker?: { ready: boolean; engine: boolean; local_context: boolean; detail: string;
-    images: Record<string, { image: string; ready: boolean }> };
+    images?: Record<string, { image: string; ready: boolean }> };
   [key: string]: unknown;
 }
 export interface ConnectedModel {

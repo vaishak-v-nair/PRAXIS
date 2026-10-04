@@ -1,4 +1,4 @@
-"""Bounded, evidence-based repository inspection and isolated runtime checks.
+"""Bounded repository inspection and explicitly authorized host runtime checks.
 
 Repository content is data: scanning never imports it or executes its commands.
 The caller must obtain project trust before calling ``run_checks``.
@@ -251,7 +251,7 @@ def _kill(process: subprocess.Popen) -> None:
         pass
 
 
-def _executable(command: list[str], cwd: Path | None = None) -> list[str]:
+def _executable(command: list[str], cwd: Path | None = None) -> list[str] | str:
     if not command:
         raise ValueError('An empty command cannot be executed')
     candidate = Path(command[0])
@@ -265,11 +265,17 @@ def _executable(command: list[str], cwd: Path | None = None) -> list[str]:
         executable = str((cwd / candidate).resolve()) if cwd and not candidate.is_absolute() and len(candidate.parts) > 1 and (cwd / candidate).is_file() else shutil.which(command[0])
     if not executable:
         raise FileNotFoundError(f'Executable unavailable: {command[0]}')
-    # npm on Windows is a .cmd launcher; explicit argv with cmd avoids shell=True.
+    # Batch launchers need cmd's quoting, not a second CRT argv conversion.
     if os.name == 'nt' and executable.lower().endswith(('.cmd', '.bat')):
-        if any(re.search(r'[&|<>^%\r\n]', arg) for arg in command):
+        shell = os.environ.get('COMSPEC') or str(Path(os.environ.get('SYSTEMROOT', r'C:\Windows')) / 'System32/cmd.exe')
+        tokens = [executable, *command[1:]]
+        if any(re.search(r'["&|<>^%\r\n\x00]', arg) for arg in [shell, *tokens]):
             raise ValueError('Unsafe shell characters in Windows command')
-        return [os.environ.get('COMSPEC', 'cmd.exe'), '/d', '/s', '/c', subprocess.list2cmdline([executable, *command[1:]])]
+        # A raw Windows command line reaches CreateProcess unchanged (shell=False).
+        # Quote every token, disable AutoRun/delayed expansion and let /s strip
+        # only the outer pair. Quotes and expansion/command operators are rejected.
+        quoted = ' '.join('"' + arg + '"' for arg in tokens)
+        return subprocess.list2cmdline([shell]) + ' /d /v:off /s /c "' + quoted + '"'
     return [executable, *command[1:]]
 
 
@@ -783,27 +789,38 @@ def is_setup_command(command):
 
 
 def run_checks(path: Path, commands: list[list[str]], emit: Callable, cancelled: threading.Event,
-               start_command: list[str] | None = None) -> list[dict]:
+               start_command: list[str] | None = None, *, on_result=None) -> list[dict]:
+    """Execute trusted commands in a review copy with individual time limits.
+
+    Host execution is not an OS sandbox. Commands retain access to host files
+    and networking; only the inherited environment is restricted.
+    """
     results = []
+
+    def record(result):
+        results.append({**result, 'runtime': 'host', 'network': 'host'})
+        if on_result:
+            on_result(list(results))
+
     for command in commands:
         if cancelled.is_set():
             break
         if not isinstance(command, list) or not command or not all(isinstance(arg, str) for arg in command):
-            results.append({'name': 'Invalid command', 'status': 'skipped', 'output': 'Commands must be nonempty argument lists.'})
+            record({'name': 'Invalid command', 'status': 'skipped', 'output': 'Commands must be nonempty argument lists.'})
             continue
         _emit(emit, 'Running trusted project check: ' + ' '.join(command))
         install = is_setup_command(command)
         result = {'name': ' '.join(command),
                   'kind': 'setup' if install else 'command',
                   **_process(command, Path(path), cancelled, 600 if install else 120)}
-        results.append(result)
+        record(result)
         if result['status'] != 'passed' and install:
-            results.append({'name': 'Dependent runtime checks', 'status': 'skipped', 'output': 'Isolated Python environment setup failed; dependent checks and app startup were not run.'})
+            record({'name': 'Dependent runtime checks', 'status': 'skipped', 'output': 'Project environment setup failed; dependent checks and app startup were not run.'})
             start_command = None
             break
     if start_command and not cancelled.is_set():
         _emit(emit, 'Checking web interface in desktop and mobile browser viewports')
-        results.append({'kind': 'browser', **_browser_check(Path(path), start_command, emit, cancelled)})
+        record({'kind': 'browser', **_browser_check(Path(path), start_command, emit, cancelled)})
     if not results:
-        results.append({'name': 'Project checks', 'status': 'skipped', 'output': 'No supported project checks discovered or approved.'})
+        record({'name': 'Project checks', 'status': 'skipped', 'output': 'No supported project checks discovered or approved.'})
     return results

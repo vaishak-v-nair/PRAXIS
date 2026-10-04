@@ -122,7 +122,7 @@ function help() {
   ${dim('Not our lane, and we will not pretend otherwise:')}
   ${dim('token costs → npx ccusage    ·    live session monitoring → npx cctop')}
 
-  ${grey('Local-first. No server. No account. Nothing leaves your machine.')}${
+  ${grey('Local-first. No account required. Model review and remote services are optional.')}${
     c === 'praxis'
       ? ''
       : '\n  ' + grey('Tip: `npm install -g praxis-memory` gives you the short `praxis` command.')

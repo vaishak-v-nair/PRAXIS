@@ -51,26 +51,27 @@ const HEAD = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f8f3e7">
-<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#171009">
+<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f5f3ed">
+<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#10151b">
 <link rel="icon" href="${navicon}">
 <link rel="canonical" href="${SITE}/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PRAXIS">
-<meta property="og:title" content="PRAXIS — review what you built with AI.">
-<meta property="og:description" content="Local project review, isolated checks, reviewable repairs, and existing CLI evidence and memory tools. Model review uses your configured providers.">
+<meta property="og:title" content="PRAXIS — know what holds up before you ship.">
+<meta property="og:description" content="Bring your AI-built project. Understand source-backed problems and hand a clear plan to your coding agent. Start with a browser source review; local inspection needs no Docker.">
 <meta property="og:url" content="${SITE}/">
 <meta property="og:image" content="${SITE}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="PRAXIS — the axolotl mascot beside the command: npx praxis-memory demo.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PRAXIS — review what you built with AI.">
-<meta name="twitter:description" content="Review AI-built projects locally, inspect evidence, and plan repairs before making changes.">
+<meta name="twitter:title" content="PRAXIS — know what holds up before you ship.">
+<meta name="twitter:description" content="Understand your AI-built project's weak spots, inspect the evidence, and plan the next change. Start with source review, without Docker.">
 <meta name="twitter:image" content="${SITE}/og.png">
 `;
 
 let body = fs.readFileSync(SRC, 'utf8')
+  .replaceAll('__APPEARANCE__', fs.readFileSync(path.join(root, 'web', 'appearance.js'), 'utf8'))
   .replaceAll('__NAVICON__', navicon)
   .replaceAll('__PET__', uri('pet.webp', 'image/webp'))
   .replaceAll('__FLOW__', uri('flow.webp', 'image/webp'))

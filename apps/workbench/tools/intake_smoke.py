@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix='praxis-upload-ui-') as temp, sync_playw
     page.on('request', capture)
     def block_model_scan(route):
         scans.append(route.request.post_data_json)
-        route.fulfill(status=422, content_type='application/json', body=json.dumps({'detail': 'Intake smoke: model scan deliberately not started.'}))
+        route.fulfill(status=422, content_type='application/json', body=json.dumps({'detail': 'Intake smoke: source review deliberately not started.'}))
     page.route('**/api/scans', block_model_scan)
     page.goto('http://127.0.0.1:3000', wait_until='networkidle')
     page.get_by_text('Local service connected', exact=True).wait_for()
@@ -62,11 +62,12 @@ with tempfile.TemporaryDirectory(prefix='praxis-upload-ui-') as temp, sync_playw
         page.set_viewport_size({'width': width, 'height': 900})
         assert not page.evaluate('document.documentElement.scrollWidth > innerWidth + 2'), f'Upload overflow at {width}px'
     page.screenshot(path=str(artifacts / 'praxis-folder-upload.png'), full_page=True)
-    assert page.get_by_role('button', name='Run complete review', exact=True).is_disabled()
-    page.get_by_label('I trust this project and authorize').check()
-    page.get_by_role('button', name='Run complete review', exact=True).click()
-    page.get_by_role('alert').filter(has_text='model scan deliberately not started').first.wait_for()
+    assert page.get_by_role('button', name='Review project', exact=True).is_enabled()
+    assert page.get_by_label('I trust this project and authorize').count() == 0
+    page.get_by_role('button', name='Review project', exact=True).click()
+    page.get_by_role('alert').filter(has_text='source review deliberately not started').first.wait_for()
     assert scans and scans[0]['source'].startswith('upload://')
+    assert not scans[0]['ai_review'] and not scans[0]['run_checks'] and not scans[0]['trust_confirmed']
     with httpx.Client() as client:
         assert client.post('http://127.0.0.1:9123/api/uploads', json={}, headers={'origin':'https://evil.example'}).status_code == 403
         assert client.post('http://127.0.0.1:9123/api/uploads', content='files=bad', headers={'content-type':'application/x-www-form-urlencoded'}).status_code == 415

@@ -26,7 +26,7 @@ export function ReviewHistory({ jobs, loading, open }: {
         <div className="table-labels" aria-hidden="true"><span>Project</span><span>Review state</span><span>Created</span><span>Model spend</span><span /></div>
         {visible.map(job => <button className="review-row" key={job.id} onClick={() => open(job.id)}>
           <div><strong>{job.name || "Project"}</strong><span className="file-path">{job.source}</span></div>
-          <Status value={job.status} />
+          <Status value={job.status} label={job.status === "complete" ? "Review finished" : undefined} />
           <time>{job.created_at ? new Date(job.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"}</time>
           <span className="mono">{typeof job.cost === "number" ? money(job.cost) : "—"}</span><ArrowUpRight size={17} />
         </button>)}

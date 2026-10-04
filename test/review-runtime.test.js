@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { uvAsset, downloadVerified, ensureUv, runCommand, sha256, managedDirectory } from '../src/lib/review-runtime.js';
+import { uvAsset, downloadVerified, ensureUv, runCommand, sha256, managedDirectory, windowsPowerShell } from '../src/lib/review-runtime.js';
 
 function temporary(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-runtime-'));
@@ -51,4 +51,14 @@ test('setup command errors and timeouts propagate instead of becoming successful
   await assert.rejects(runCommand(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { timeout: 150 }), /time limit/);
   const controller = new AbortController(); controller.abort();
   await assert.rejects(runCommand(process.execPath, ['-e', 'process.exit(0)'], { signal: controller.signal }));
+});
+
+test('Windows archive extraction remains available without PowerShell on PATH', { skip: process.platform !== 'win32' }, async t => {
+  const root = temporary(t), archive = path.join(root, 'small runtime.zip'), extracted = path.join(root, 'extracted');
+  fs.writeFileSync(path.join(root, 'runtime.txt'), 'checked runtime');
+  const quote = text => "'" + text.replaceAll("'", "''") + "'";
+  const env = { ...process.env, PATH: path.dirname(process.execPath) };
+  await runCommand(windowsPowerShell(), ['-NoProfile', '-NonInteractive', '-Command',
+    `Compress-Archive -LiteralPath ${quote(path.join(root, 'runtime.txt'))} -DestinationPath ${quote(archive)}; Expand-Archive -LiteralPath ${quote(archive)} -DestinationPath ${quote(extracted)}`], { env, timeout: 30000 });
+  assert.equal(fs.readFileSync(path.join(extracted, 'runtime.txt'), 'utf8'), 'checked runtime');
 });

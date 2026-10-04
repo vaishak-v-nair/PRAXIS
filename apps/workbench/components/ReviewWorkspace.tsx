@@ -32,7 +32,7 @@ export function ReviewWorkspace({ job, connectedModel, openModels, busy, streami
     <button className="back-link" onClick={back}><ArrowLeft size={15} />All reviews</button>
     <header className="project-heading">
       <div><div className="section-label">FINAL PROJECT CHECK / {job.id.slice(0, 8)}</div><h1>{job.name || "Project"}</h1><p className="file-path">{job.source}</p></div>
-      <div className="project-actions"><Status value={job.status} />{running
+      <div className="project-actions"><Status value={job.status} label={job.status === "complete" ? "Review finished" : undefined} />{running
         ? <button className="button" disabled={busy} onClick={() => action("cancel", {})}><Square size={13} />Stop review</button>
         : <button className="button" disabled={busy || job.status !== "complete"} onClick={verify}><Play size={14} />Run checks</button>}</div>
     </header>
@@ -43,7 +43,7 @@ export function ReviewWorkspace({ job, connectedModel, openModels, busy, streami
     <nav className="workspace-nav" aria-label="Review sections">{[{ name: "overview", Icon: LayoutDashboard }, { name: "findings", Icon: ShieldAlert }, { name: "execution", Icon: Terminal }, { name: "changes", Icon: ListChecks }, { name: "workspace", Icon: BrainCircuit }, { name: "source map", Icon: Network }, { name: "activity", Icon: Activity }].map(({ name, Icon }) => <button key={name} aria-current={view === name ? "page" : undefined} onClick={() => setView(name)}><Icon size={15} aria-hidden="true" />{name}{name === "findings" && <span>{findings.length}</span>}{name === "changes" && job.fix?.diff && <span className="new-marker" />}</button>)}</nav>
     <div key={view} className="workspace-body">
       {view === "overview" && <ReviewOverview job={job} running={running} navigate={setView} openAttention={openAttention} />}
-      {view === "findings" && <Findings findings={findings} canRepair={["complete", "error"].includes(job.status)} busy={busy || running} repair={ids => { setView("changes"); action("fix-plan", { finding_ids: ids }); }} />}
+      {view === "findings" && <Findings job={job} findings={findings} modelConfigured={!!connectedModel?.configured} openModels={openModels} canRepair={["complete", "error"].includes(job.status)} busy={busy || running} repair={ids => { setView("changes"); action("fix-plan", { finding_ids: ids }); }} />}
       {view === "workspace" && <SharedWorkspace job={job} busy={busy} action={action} />}
       {view === "execution" && <Execution job={job} verify={verify} disabled={busy || job.status !== "complete"} />}
       {view === "changes" && <Changes job={job} connectedModel={connectedModel} openModels={openModels} verify={verify} apply={apply} busy={busy || running} repair={() => job.fix_plan && action("fix", { finding_ids: job.fix_plan.finding_ids, plan_id: job.fix_plan.id, run_checks: false, trust_confirmed: false })} />}

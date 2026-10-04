@@ -67,6 +67,41 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(result['implementation']['status'], 'contradicted')
         self.assertEqual(result['readiness']['status'], 'blocked')
 
+    def test_execution_attention_uses_actual_runtime_without_changing_verdicts(self):
+        for runtime, environment in (('host', 'local review copy'), ('docker', 'container'),
+                                     (None, 'recorded execution environment')):
+            with self.subTest(runtime=runtime):
+                check = {'name': 'quality-check', 'kind': 'command', 'status': 'failed', 'output': 'Check failed'}
+                if runtime:
+                    check['runtime'] = runtime
+                result = assessment({'status': 'complete', 'checks': [check]})
+                action = next(item for item in result['attention_items'] if item['source'] == 'quality-check')
+                self.assertIn(environment, action['title'])
+                self.assertEqual(result['implementation']['status'], 'contradicted')
+                self.assertEqual(result['readiness']['status'], 'blocked')
+                self.assertEqual(result['checks_failed'], 1)
+                if runtime == 'host':
+                    self.assertNotIn('isolat', str(action))
+                    self.assertNotIn('container', str(action))
+
+    def test_host_disk_failure_does_not_invent_container_limits(self):
+        result = assessment({'status': 'complete', 'checks': [
+            {'name': 'pip install .', 'kind': 'setup', 'runtime': 'host',
+             'status': 'failed', 'output': 'No space left on device'}]})
+        action = next(item for item in result['attention_items'] if item['source'] == 'pip install .')
+        self.assertIn('local review copy', action['summary'])
+        self.assertNotIn('container', str(action))
+        self.assertNotIn('isolated disk limit', str(action))
+        self.assertEqual(result['implementation']['status'], 'not_established')
+
+    def test_source_only_next_action_offers_checks_without_claiming_setup_failure(self):
+        result = assessment({'status': 'complete', 'checks': []})
+        action = next(item for item in result['attention_items'] if item['source'] == 'behavioral tests')
+        self.assertIn('Run checks', action['action'])
+        self.assertIn('trusted project', action['action'])
+        self.assertNotIn('Resolve setup or test failures', action['action'])
+        self.assertEqual(result['commands_passed'], 0)
+
     def test_setup_failure_is_not_a_behavioral_contradiction_or_raw_log_in_main_summary(self):
         raw = 'Traceback (most recent call last):\nTimeoutError: package read timed out\nraw-private-looking-json'
         result = assessment({'status': 'complete', 'checks': [

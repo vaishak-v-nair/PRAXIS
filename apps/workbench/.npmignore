@@ -1,7 +1,12 @@
 # Development tests remain in the checkout, not in the CLI download.
 backend/tests/
 tools/*.py
+tools/*.test.mjs
 README.upstream.md
+# Checkout engineering and CI instructions are not managed runtime inputs.
+AGENTS.md
+CLAUDE.md
+.github/
 # Development provenance and duplicate checkout setup docs stay in Git.
 import-manifest.json
 README.md

@@ -3,10 +3,10 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X, AlertCircle, Terminal, Check, Minus, TriangleAlert, BrainCircuit } from "lucide-react";
 import { statusMeta } from "@/lib/status.mjs";
 
-export function Status({ value }: { value: string }) {
+export function Status({ value, label }: { value: string; label?: string }) {
   const meta = statusMeta(value);
   const Icon = meta.icon === "model" ? BrainCircuit : meta.icon === "check" ? Check : meta.icon === "error" ? AlertCircle : meta.icon === "warning" ? TriangleAlert : Minus;
-  return <span className={`status ${meta.tone}`}><Icon size={12} /><span>{meta.label}</span></span>;
+  return <span className={`status ${meta.tone}`}><Icon size={12} /><span>{label || meta.label}</span></span>;
 }
 export function Notice({ children, error = false }: { children: ReactNode; error?: boolean }) {
   return <div className={`notice ${error ? "notice-error" : ""}`} role={error ? "alert" : "status"}><AlertCircle size={17} /><div>{children}</div></div>;

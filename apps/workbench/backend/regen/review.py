@@ -91,7 +91,7 @@ def project_plan(root, commands, memory_available=None):
             'stages': [
                 {'name': 'Understand', 'detail': f'Indexed {len(files)} reviewable files and {len(graph.get("edges", []))} resolved local import relationships.'},
                 {'name': 'Inspect', 'detail': 'Run bounded local scanners, then record each configured model review independently.'},
-                {'name': 'Execute', 'detail': f'{len(commands)} project command(s) discovered. Container execution requires explicit authorization.'},
+                {'name': 'Execute', 'detail': f'{len(commands)} project command(s) discovered. Project execution requires explicit authorization.'},
                 {'name': 'Decide', 'detail': 'Trace every conclusion to inventory, scanner, finding, or execution evidence.'},
             ]}
 
@@ -247,37 +247,41 @@ def _attention_items(findings, coverage, checks, *, passed_tests, journey_passed
     failed = [check for check in checks if check.get('status') in FAILURE_STATUSES]
     for check in failed[:4]:
         name, detail, kind = str(check.get('name', 'Project check')), _check_detail(check, 24000), check.get('kind')
+        runtime = check.get('runtime')
+        environment = ('the container' if runtime == 'docker' else 'the local review copy'
+                       if runtime == 'host' else 'the recorded execution environment')
         missing = re.search(r'(?:sh:\s*\d+:\s*|command not found:\s*)([A-Za-z0-9_.-]+):?\s*not found', detail, re.I)
         if kind == 'setup' and 'no space left on device' in detail.lower():
-            title = 'Dependency setup reached the isolated disk limit'
-            summary = 'The disposable environment ran out of temporary space while installing dependencies. Application behavior was not checked by this setup step.'
-            action = 'Inspect the dependency cache location and the bounded workspace size, then retry in a fresh container.'
+            title = 'Dependency setup reached the container disk limit' if runtime == 'docker' else 'Dependency setup ran out of disk space'
+            summary = f'Dependency installation in {environment} ran out of space. Application behavior was not checked by this setup step.'
+            action = ('Inspect the dependency cache location and bounded workspace size, then retry in a fresh container.'
+                      if runtime == 'docker' else 'Check available disk space and the project dependency cache, then rerun the authorized checks.')
         elif kind == 'setup' and ('read timed out' in detail.lower() or 'timeouterror' in detail.lower()):
             title = 'Dependencies could not finish downloading'
-            summary = 'The isolated environment lost the package download before setup completed.'
-            action = 'Confirm network access and rerun checks; PRAXIS will rebuild the disposable environment.'
+            summary = f'The package download in {environment} stopped before setup completed.'
+            action = 'Check package-service access and rerun the authorized checks.'
         elif missing:
             title = f'The project check could not find {missing.group(1)}'
-            summary = 'The command started in isolation, but a required project tool was not installed in that environment.'
+            summary = f'The command started in {environment}, but a required project tool was not installed there.'
             action = 'Review the detected setup commands, install the missing tool through the project manifest, and rerun checks.'
         elif re.search(r'OCI runtime exec failed|sh:\s*\d+:\s*[^:\n]+:\s*Permission denied', detail, re.I):
-            title = 'The isolated runtime could not start a required tool'
-            summary = 'The environment rejected the tool executable before the project check could run. This is not a completed behavioral result.'
-            action = 'Check the container execution settings, then rerun against a fresh disposable environment.'
+            title = 'The execution environment could not start a required tool'
+            summary = f'Execution in {environment} rejected the tool before the project check could run. This is not a completed behavioral result.'
+            action = 'Check the executable and permissions shown in Execution, then rerun the authorized checks.'
         elif check.get('status') == 'timeout':
             title = 'A project check exceeded its time limit'
-            summary = 'PRAXIS stopped the isolated command when its bounded runtime expired.'
+            summary = f'PRAXIS stopped the command in {environment} when its time limit expired.'
             action = 'Open Execution, inspect the last output, and split or optimize the command before retrying.'
         elif kind == 'setup':
-            title = 'The isolated dependency setup failed'
-            summary = 'PRAXIS could not prepare the required project environment. This does not establish that application behavior is broken.'
+            title = f'Dependency setup failed in {environment}'
+            summary = f'PRAXIS could not prepare project dependencies in {environment}. This does not establish that application behavior is broken.'
             action = 'Open Execution, resolve the dependency or environment error, and retry before assessing runtime behavior.'
         elif check.get('status') == 'cancelled':
             title = 'A project check stopped before completion'
             summary = 'The interrupted command provides no completed behavioral result.'
             action = 'Rerun the check when the project environment is ready.'
         else:
-            title = 'A project command failed in isolation'
+            title = f'A project command failed in {environment}'
             summary = 'The command returned a failing exit status. Its exact output remains available under Execution.'
             action = 'Open Execution, fix the first failing command, and rerun checks.'
             results = re.findall(r'(\d+) (failed|passed|skipped|errors?)\b', detail[-4000:])
@@ -294,7 +298,7 @@ def _attention_items(findings, coverage, checks, *, passed_tests, journey_passed
     if dependent_skips:
         items.append(_attention(
             'execution', f'{len(dependent_skips)} check(s) waited for failed setup',
-            'PRAXIS did not run dependent commands after their isolated toolchain setup failed.',
+            'PRAXIS did not run dependent commands after the required toolchain setup failed.',
             'Resolve the setup failure shown first in Execution, then rerun the complete check set.',
             priority='high', source='execution order'))
     for check in checks:
@@ -322,7 +326,8 @@ def _attention_items(findings, coverage, checks, *, passed_tests, journey_passed
         items.append(_attention(
             'execution', 'No behavioral test completed successfully',
             'Production behavior remains unproven until at least one discovered test command passes on the current snapshot.',
-            'Resolve setup or test failures, then rerun checks against the unchanged snapshot.',
+            ('Select Run checks, inspect the commands, and choose local execution for a trusted project or optional Docker.'
+             if not checks else 'Resolve setup or test failures, then rerun checks against the unchanged snapshot.'),
             priority='high', source='behavioral tests'))
     if not journey_passed:
         items.append(_attention(

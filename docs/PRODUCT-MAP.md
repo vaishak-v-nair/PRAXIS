@@ -1,6 +1,7 @@
 # PRAXIS product and codebase map
 
-Current audit and release evidence: [2026-10-01 codebase audit](CODEBASE-AUDIT-2026-10-01.md).
+Current consumer rebuild: [2026-10-04 architecture and validation](PRODUCT-REBUILD-2026-10-04.md).
+Earlier audit and release evidence: [2026-10-01 codebase audit](CODEBASE-AUDIT-2026-10-01.md).
 Manual publishing: [npm release guide](MANUAL-NPM-RELEASE.md).
 
 PRAXIS is a local project review tool for software built with AI. The current
@@ -10,10 +11,11 @@ not another folder to import or a reason to overwrite working code.
 ## The user workflow
 
 1. Add a local path, GitHub URL, or folder upload.
-2. Choose server-side model settings, a shared spending limit, runtime trust,
-   and independent network permission.
-3. Review a separate source snapshot. Inspect findings, executed checks, and
-   missing evidence together; each assessment retains its limitations.
+2. Describe the goal and start a source review. By default, the interface requests
+   no model calls or project commands; Docker and provider keys are unnecessary.
+3. Review a separate source snapshot. Add configured model review under a shared
+   spending limit, or explicitly authorize local/Docker checks. Inspect findings,
+   executed checks and missing evidence together; each retains its limitations.
 4. Select issues and draft a source-aware repair plan. Confirm model handoff
    or copy the plan to an existing coding agent.
 5. Inspect proposed changes and rerun authorized checks. Export GitHub/upload
@@ -28,12 +30,12 @@ reclassify failed checks. A finished review is not a claim that all code works.
 | --- | --- | --- |
 | Project review | `apps/workbench/app`, `components`, `lib` | Next.js/React interface, same-origin API, live job updates, findings, execution, plans, patches, source map |
 | Review backend | `apps/workbench/backend/regen` | FastAPI, local SQLite jobs, bounded intake/snapshots, scanners, provider adapters, shared budget, repairs |
-| Isolated execution | Workbench `sandbox.py`, `scanner.py` | Trusted Node/Python commands in disposable Linux Docker containers; no host mounts or inherited credentials |
+| Optional execution | Workbench `sandbox.py`, `scanner.py` | Explicitly trusted host checks retain host file/network permissions; disposable Linux Docker checks retain separate network consent and never fall back to host execution |
 | Evidence decision | Workbench `review.py`, `reality.py`, `harness.py` | Deterministic assessment from recorded source/runtime evidence; model findings remain hypotheses |
 | Memory and coding agents | `src/commands`, `src/lib`, `src/templates`, `src/tray` | Existing CLI commands, supported hooks/transcripts, adapters, private portable memory, tray |
 | Claim verification | `src/lib/verify`, `src/commands/verify.js` | Exact Git binding, independent checks, four per-claim states, separate Ed25519 Verify receipt |
 | Presentations | `src/lib/live`, `web/live`, CLI demo/deck | Rehearsed verified scenarios; optional LangGraph.js orchestration; native verifier remains authoritative |
-| Public site | `web/_src.html`, `scripts/build-web.mjs` | Static information and setup links; not a remotely accessible review API |
+| Public site and trial | `web/_src.html`, `web/test-your-project`, site build scripts | Static information, release-checked setup and browser-memory source inspection; no hosted Workbench API or project execution |
 | Quality gates | `test`, Workbench `backend/tests` and `tools`, `evals/verify`, `.github/workflows`, `scripts/ci` | Regression, UI/accessibility, golden/red-team, privacy, installed-package and size checks |
 | Local state | `.praxis`, Workbench `.regen`, server-side `.env` | Private machine-local evidence, memory, snapshots, budgets, keys and backups; never automatically published |
 
@@ -77,16 +79,23 @@ software correctness or a third-party identity.
 The review workspace stays local, but configured model reviews send bounded,
 redacted source excerpts to providers. Repository downloads and advisory lookup
 also use the network. Private conversation memory is excluded from review/model
-payloads. Submitted-project networking remains independently opt-in.
+payloads. Docker networking has separate consent; authorized host commands retain
+the computer's network access and are not represented as an OS sandbox.
 
 ## Public product upgrade
 
-The interface now uses a shared paper/rose/graphite token system with an optional
+The interface now uses paper, slate and peach with an optional
 dark appearance, readable evidence typography, progressive disclosure for review
 details, reusable navigation/history/guide components, and explicit model setup.
 Both appearances keep the same API and consent contracts.
 
-The Windows entry point resolves its own checkout directory, prepares Workbench's
+The managed `review` command prepares a separate versioned app runtime and private
+Python, and retains persistent data outside npm's cache. Node.js 22+ is still a
+prerequisite; Git, system Python and Docker are not needed for the first source
+review. It waits for both real services before opening the page. The manual npm
+release is separate from source deployment.
+
+The retained Windows developer entry point resolves its own checkout directory, prepares Workbench's
 locked Node and pinned Python dependencies, stops on failed setup, and leaves
 memory/hooks unchanged unless `-InitMemory` is selected. `-Check` is inert;
 `-SkipInstall` launches a prepared checkout. It does not install core development

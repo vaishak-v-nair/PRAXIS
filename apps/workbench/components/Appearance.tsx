@@ -6,12 +6,12 @@ type Theme = "light" | "dark";
 const key = "praxis-appearance";
 
 export function Appearance() {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
   useEffect(() => {
     setTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
     const sync = (event: StorageEvent) => {
       if (event.key !== key) return;
-      const next = event.newValue === "light" ? "light" : "dark";
+      const next = event.newValue === "dark" ? "dark" : "light";
       document.documentElement.dataset.theme = next;
       setTheme(next);
     };

@@ -140,6 +140,7 @@ class ScanInput(BaseModel):
     review_mode: Literal['standard', 'deep', 'ultra', 'team'] = 'standard'
     review_goal: str = Field(default='', max_length=4000)
     run_checks: bool = False
+    runtime_mode: Literal['host', 'docker'] = 'docker'
     trust_confirmed: bool = False
     allow_network: bool = False
 
@@ -157,6 +158,7 @@ class FixInput(BaseModel):
     finding_ids: list[str] = Field(min_length=1, max_length=500)
     plan_id: str | None = Field(default=None, min_length=24, max_length=24, pattern=r'^[a-f0-9]+$')
     run_checks: bool = False
+    runtime_mode: Literal['host', 'docker'] = 'host'
     trust_confirmed: bool = False
     start_command: str | None = Field(default=None, max_length=2000)
 
@@ -209,6 +211,23 @@ def command_override(value):
     return [arg.strip('"') for arg in args]
 
 
+def run_project_checks(subject, commands, emit, cancelled, *, runtime_mode='host',
+                       allow_network=False, start_command=None, on_result=None):
+    """Dispatch only the explicitly chosen runtime; never attempt a fallback.
+
+    The network option controls Docker networking only. Trusted host commands
+    can access host files and networking regardless of this option.
+    """
+    scanner, _ = modules()
+    if runtime_mode not in {'host', 'docker'}:
+        raise ValueError('Unsupported project execution environment')
+    runner = sandbox.run_checks if runtime_mode == 'docker' else scanner.run_checks
+    options = {'start_command': start_command, 'on_result': on_result}
+    if runtime_mode == 'docker':
+        options['allow_network'] = allow_network
+    return runner(Path(subject), commands, emit, cancelled, **options)
+
+
 def work(job_id, stage, options, cancelled):
     scanner, provider = modules()
     emit = emit_for(job_id)
@@ -255,7 +274,8 @@ def work(job_id, stage, options, cancelled):
                 emit(str(exc))
             if options.get('run_checks') and options.get('trust_confirmed') and not cancelled.is_set():
                 update(job_id, status='verifying')
-                checks = sandbox.run_checks(Path(job['snapshot']), job['commands'], emit, cancelled,
+                checks = run_project_checks(job['snapshot'], job['commands'], emit, cancelled,
+                                            runtime_mode=options.get('runtime_mode', 'docker'),
                                             allow_network=options.get('allow_network', False), start_command=job.get('start_command'),
                                             on_result=lambda items: update(job_id, checks=items, checks_for=job['snapshot']))
                 update(job_id, checks=checks, checks_for=job['snapshot'])
@@ -274,14 +294,18 @@ def work(job_id, stage, options, cancelled):
                 raise provider.ProviderError(result["error"])
             if options.get("run_checks") and not cancelled.is_set():
                 update(job_id, status="verifying")
-                checks = scanner.run_checks(Path(result["path"]), job["commands"], emit, cancelled, start_command=options.get("start_command") or job.get("start_command"))
+                checks = run_project_checks(result['path'], job['commands'], emit, cancelled,
+                                            runtime_mode=options.get('runtime_mode', 'host'),
+                                            start_command=options.get('start_command') or job.get('start_command'),
+                                            on_result=lambda items: update(job_id, checks=items, checks_for=str(result['path'])))
                 update(job_id, checks=checks, checks_for=str(result['path']))
         elif stage == "verifying":
-            runner = sandbox.run_checks if options.get('runtime_mode') == 'docker' else scanner.run_checks
             subject = job.get('fix_path') or job['snapshot']
-            extra = {'allow_network': options.get('allow_network', False),
-                     'on_result': lambda items: update(job_id, checks=items, checks_for=subject)} if runner is sandbox.run_checks else {}
-            checks = runner(Path(job.get("fix_path") or job["snapshot"]), job["commands"], emit, cancelled, start_command=options.get("start_command") or job.get("start_command"), **extra)
+            checks = run_project_checks(subject, job['commands'], emit, cancelled,
+                                        runtime_mode=options.get('runtime_mode', 'host'),
+                                        allow_network=options.get('allow_network', False),
+                                        start_command=options.get('start_command') or job.get('start_command'),
+                                        on_result=lambda items: update(job_id, checks=items, checks_for=subject))
             update(job_id, checks=checks, checks_for=subject)
         update(job_id, status="cancelled" if cancelled.is_set() else "complete", resume=None)
     except provider.BudgetExceeded as exc:
@@ -374,9 +398,9 @@ def list_jobs():
 def scan(body: ScanInput):
     scanner, _ = modules()
     if body.run_checks and not body.trust_confirmed:
-        raise HTTPException(403, 'Confirm trust before executing project commands in containers')
+        raise HTTPException(403, 'Confirm trust before executing project commands in the selected environment')
     if body.allow_network and not (body.run_checks and body.trust_confirmed):
-        raise HTTPException(422, 'Network access requires authorized container execution')
+        raise HTTPException(422, 'The network option requires authorized project execution')
     if scanner.redact(body.source) != body.source:
         raise HTTPException(422, "Do not include credentials in the project input; use existing local Git authentication")
     if body.source.strip().startswith('upload://'):
@@ -385,7 +409,7 @@ def scan(body: ScanInput):
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from None
     job_id = uuid.uuid4().hex
-    job = dict(id=job_id, source=body.source.strip(), name="Project", status="scanning", findings=[], coverage=[], languages=[], files_scanned=0, commands=[], budget=body.budget, cost=0, events=[], fix=None, fix_plan=None, checks=[], error=None, created_at=now(), revision=0)
+    job = dict(id=job_id, source=body.source.strip(), review_goal=scanner.redact(body.review_goal, limit=None), name="Project", status="scanning", findings=[], coverage=[], languages=[], files_scanned=0, commands=[], budget=body.budget, cost=0, events=[], fix=None, fix_plan=None, checks=[], error=None, created_at=now(), revision=0)
     store.save(job)
     return start(job_id, "scanning", body.model_dump(exclude={'source', 'budget'}))
 

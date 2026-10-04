@@ -290,6 +290,54 @@ def validate_config():
         self.assertEqual(result[0]['status'], 'passed')
         self.assertIn('absent', result[0]['output'])
 
+    def test_host_provenance_and_streamed_results_never_imply_network_isolation(self):
+        partial = []
+        outcomes = [{'status': 'passed', 'output': 'tests completed', 'exit_code': 0},
+                    {'status': 'failed', 'output': 'build failed', 'exit_code': 1}]
+        with patch('regen.scanner._process', side_effect=outcomes):
+            results = run_checks(self.project, [['python', '-m', 'unittest'], ['npm', 'run', 'build']],
+                                 lambda _: None, self.cancelled, on_result=partial.append)
+        self.assertEqual(len(partial), 2)
+        self.assertEqual(len(partial[0]), 1)
+        self.assertEqual(partial[-1], results)
+        self.assertEqual([item['status'] for item in results], ['passed', 'failed'])
+        self.assertTrue(all(item['runtime'] == 'host' and item['network'] == 'host' for item in results))
+
+    def test_unavailable_host_command_stays_skipped_with_provenance(self):
+        with patch('regen.scanner._process', return_value={'status': 'skipped', 'output': 'Executable unavailable: missing', 'exit_code': None}):
+            result = run_checks(self.project, [['missing', 'test']], lambda _: None, self.cancelled)
+        self.assertEqual(result[0]['status'], 'skipped')
+        self.assertEqual(result[0]['runtime'], 'host')
+
+    def test_host_browser_unavailability_retains_homepage_scope_and_provenance(self):
+        with patch('regen.scanner._browser_check', return_value={
+                'name': 'Browser checks', 'kind': 'browser', 'evidence_scope': 'homepage_smoke',
+                'status': 'skipped', 'output': 'Playwright Chromium is not installed'}):
+            result = run_checks(self.project, [], lambda _: None, self.cancelled, ['python', 'app.py'])
+        self.assertEqual(result[0]['status'], 'skipped')
+        self.assertEqual(result[0]['evidence_scope'], 'homepage_smoke')
+        self.assertEqual(result[0]['runtime'], 'host')
+
+    def test_host_cancellation_stops_before_any_later_command_or_browser(self):
+        def execute(*args, **kwargs):
+            self.cancelled.set()
+            return {'status': 'cancelled', 'output': 'Stopped', 'exit_code': -1}
+        with patch('regen.scanner._process', side_effect=execute) as process, \
+                patch('regen.scanner._browser_check') as browser:
+            result = run_checks(self.project, [['python', '-m', 'unittest'], ['npm', 'run', 'build']],
+                                lambda _: None, self.cancelled, ['python', 'app.py'])
+        self.assertEqual(process.call_count, 1)
+        browser.assert_not_called()
+        self.assertEqual(result[0]['status'], 'cancelled')
+
+    def test_host_time_limit_keeps_timeout_and_stops_dependent_setup(self):
+        with patch('regen.scanner._process', return_value={'status': 'timeout', 'output': 'Setup timed out', 'exit_code': -1}) as process:
+            result = run_checks(self.project, [['python', '-m', 'venv', '.regen-runtime'], ['python', '-m', 'unittest']],
+                                lambda _: None, self.cancelled)
+        self.assertEqual(process.call_args.args[3], 600)
+        self.assertEqual([item['status'] for item in result], ['timeout', 'skipped'])
+        self.assertTrue(all(item['runtime'] == 'host' for item in result))
+
     def test_long_command_output_keeps_redacted_tail_and_test_summary(self):
         import sys
         secret = 'gsk_' + 'a' * 35

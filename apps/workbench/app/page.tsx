@@ -33,7 +33,7 @@ export default function Home() {
       {workspace.loadingJob ? <section className="loading-surface" aria-busy="true"><div className="skeleton" /><div className="skeleton short" /><p>Loading review…</p></section> : workspace.job ? <ReviewWorkspace key={workspace.job.id} job={workspace.job} connectedModel={connectedModel} openModels={() => setDialog("models")} busy={workspace.busy} streaming={workspace.streaming} back={() => workspace.open(null)} action={(name, body) => jobAction(name, body).catch(() => undefined)} verify={() => setDialog("verify")} apply={() => setDialog("apply")} /> : workspace.id ? <Empty title="Review could not be loaded"><p>Check the local connection or return to your reviews.</p><button className="button" onClick={() => workspace.open(null)}>All reviews</button></Empty> : <>
         <div className="home-heading"><div><div className="section-label"><span className="accent-dot" />Your local inspection workspace</div>
           <h1>Before you ship,<br /><span>see what holds up.</span></h1>
-          <p>Bring the project you built with AI. Find what works, what could fail, and what to fix next—with evidence you can inspect.</p>
+          <p>For people building with AI, developers and teams. Understand what could fail in your project and what to check next—with evidence you can inspect.</p>
         </div><InspectionIllustration /></div>
         <Intake disabled={workspace.busy || !workspace.online} health={workspace.health}
           models={() => setDialog("models")} start={body => workspace.mutate("/scans", body)} />

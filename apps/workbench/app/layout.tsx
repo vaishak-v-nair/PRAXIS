@@ -9,12 +9,12 @@ const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", dis
 
 export const metadata: Metadata = {
   title: "PRAXIS · Project Review",
-  description: "Review your project locally, run isolated checks, and turn source-backed findings into a repair plan.",
+  description: "Inspect your project locally, understand source-backed findings, and choose optional checks or an agent handoff.",
   icons: { icon: "/praxis-mark.png" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="en" className={`${geist.variable} ${mono.variable}`} suppressHydrationWarning><body>{children}
-    <Script id="praxis-appearance" strategy="beforeInteractive">{`try { document.documentElement.dataset.theme = localStorage.getItem('praxis-appearance') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }`}</Script>
+    <Script id="praxis-appearance" strategy="beforeInteractive">{`try { document.documentElement.dataset.theme = localStorage.getItem('praxis-appearance') === 'dark' ? 'dark' : 'light'; } catch { document.documentElement.dataset.theme = 'light'; }`}</Script>
   </body></html>;
 }

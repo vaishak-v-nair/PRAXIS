@@ -10,15 +10,23 @@ formats are preserved; a successful process is not automatically verified work.
 
 Run `npm run dev` from PRAXIS and open `http://127.0.0.1:3000`.
 
-1. Choose **Local path**, **GitHub URL**, or **Upload folder**.
+1. Choose **Upload folder**, **GitHub URL**, or **Local path**.
 2. A folder upload uses the browser's directory picker. Selection stages an
    isolated copy locally without running a scan or model call. The ready-file
-   count shows exclusions. Describe the intended workflow, choose your budget,
-   and confirm runtime trust before clicking **Run complete review**.
-3. Inspect findings and coverage gaps. **Draft a fix plan** maps the files,
+   count shows exclusions. Describe the intended workflow and start a source
+   review. The default review inspects a copy without running project commands,
+   requiring Docker, or making paid model calls. Optional model review retains
+   provider configuration, excerpt redaction, and the shared budget.
+3. Inspect findings and coverage gaps. Copy the evidence-backed agent brief to
+   your coding agent, or use **Draft a fix plan** to map the files,
    validation and risks without editing source. Review the plan before an AI
    handoff, or copy it into your existing coding agent.
-4. Authorize runtime checks only for a project you trust. Download a patch or
+4. Authorize runtime checks only for a project you trust. Select **Local** to
+   run in the review copy with this computer's file and network permissions,
+   or **Docker** for container execution. Local checks are not an OS sandbox;
+   missing Docker never causes an automatic switch to local execution. A
+   completed source review does not establish test or user-journey success.
+   Download a patch or
    project copy for GitHub and uploaded sources. Local path submissions retain
    explicit source-apply confirmation, freshness checks, backups, and rollback.
 

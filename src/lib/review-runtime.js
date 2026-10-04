@@ -21,6 +21,12 @@ export function uvAsset(platform = process.platform, arch = process.arch) {
 }
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
+// The built-in extractor must not depend on a developer's optional PATH tools.
+export function windowsPowerShell(env = process.env) {
+  return path.win32.join(env.SystemRoot || env.WINDIR || 'C:\\Windows',
+    'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+}
+
 export function managedDirectory(directory, base) {
   if (!path.isAbsolute(base) || !path.isAbsolute(directory)) throw new Error('Managed runtime directories must be absolute.');
   const relative = path.relative(base, directory);
@@ -116,7 +122,7 @@ export async function ensureUv(home, { run = runCommand, fetchImpl, signal, plat
   }
   if (platform === 'win32') {
     const literal = value => "'" + value.replaceAll("'", "''") + "'";
-    await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Expand-Archive -LiteralPath ${literal(archive)} -DestinationPath ${literal(directory)} -Force`], { signal, timeout: 120000 });
+    await run(windowsPowerShell(), ['-NoProfile', '-NonInteractive', '-Command', `Expand-Archive -LiteralPath ${literal(archive)} -DestinationPath ${literal(directory)} -Force`], { signal, timeout: 120000 });
   } else {
     await run('tar', ['-xzf', archive, '-C', directory], { signal, timeout: 120000 });
   }
