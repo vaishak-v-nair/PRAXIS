@@ -19,6 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { projectPaths } from '../lib/paths.js';
 import { updatePlan } from '../lib/update.js';
 import { praxisCmd } from '../lib/runner.js';
+import { agentSpawn } from '../lib/jobs/spawn.js';
 import { miniHeader, sage, amber, rose, bold, grey, dim } from '../lib/ui.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -27,14 +28,11 @@ const TEMPLATES = path.join(HERE, '..', 'templates');
 /**
  * Run a tool that ships as a .cmd shim on Windows (npm, praxis).
  *
- * Two constraints meet here. Windows cannot exec a .cmd or .bat directly —
- * execFile gives EINVAL — and `shell: true` is deprecated (DEP0190) precisely
- * because it CONCATENATES arguments instead of escaping them, which node now
- * warns the user about on every run. Handing the shim to cmd.exe with the args
- * still in an array satisfies both: it runs, and nothing is string-joined.
- *
- * This is the same trick src/lib/jobs/runner.mjs uses for agent shims. One
- * problem, one answer.
+ * Reuse the agent launcher's resolver: standard npm shims expose a JavaScript
+ * entry that Node can run directly. Timing out a cmd.exe wrapper alone leaves
+ * npm alive, holding the current project folder. The direct process also keeps
+ * argv literal without shell concatenation. Other launchers retain the existing
+ * resolver's guarded behavior.
  */
 function runTool(bin, args, opts = {}) {
   // windowsHide is forced HERE, last, so no caller can turn it off even by
@@ -43,7 +41,8 @@ function runTool(bin, args, opts = {}) {
   // and why it wants to read the guarantee at the call itself rather than trust
   // that a variable three lines up still contains it.
   if (process.platform === 'win32') {
-    return execFileSync(process.env.ComSpec || 'cmd.exe', ['/c', bin, ...args], { ...opts, windowsHide: true });
+    const launch = agentSpawn([bin, ...args], { env: opts.env || process.env });
+    return execFileSync(launch.file, launch.args, { ...opts, windowsHide: true });
   }
   return execFileSync(bin, args, { ...opts, windowsHide: true });
 }

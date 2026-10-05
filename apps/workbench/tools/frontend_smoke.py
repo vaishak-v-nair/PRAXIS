@@ -5,12 +5,15 @@ This suite uses explicitly synthetic API states for errors/paused/patch controls
 """
 import copy
 import json
+import os
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-ARTIFACTS = ROOT / '.regen' / 'artifacts'
+ARTIFACTS = Path(os.environ.get('PRAXIS_SMOKE_ARTIFACT_DIR', str(ROOT / '.regen' / 'artifacts')))
+if not ARTIFACTS.is_absolute():
+    raise ValueError('PRAXIS_SMOKE_ARTIFACT_DIR must be an absolute path')
 ARTIFACTS.mkdir(parents=True, exist_ok=True)
 BASE = 'http://127.0.0.1:3000'
 reports = []

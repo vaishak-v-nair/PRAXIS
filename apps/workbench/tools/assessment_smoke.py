@@ -1,6 +1,7 @@
 """Real browser -> API -> explicitly selected runtime. Synthetic projects, no model calls."""
 import argparse
 import json
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -8,7 +9,9 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 root = Path(__file__).resolve().parents[1]
-artifacts = root / '.regen' / 'artifacts'
+artifacts = Path(os.environ.get('PRAXIS_SMOKE_ARTIFACT_DIR', str(root / '.regen' / 'artifacts')))
+if not artifacts.is_absolute():
+    raise ValueError('PRAXIS_SMOKE_ARTIFACT_DIR must be an absolute path')
 artifacts.mkdir(parents=True, exist_ok=True)
 parser = argparse.ArgumentParser()
 parser.add_argument('--runtime', choices=('docker', 'host'), default='docker')

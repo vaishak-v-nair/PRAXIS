@@ -1,6 +1,7 @@
 """Real folder upload and optional GitHub clone; never calls a model or executes projects."""
 import argparse
 import json
+import os
 import tempfile
 import threading
 import uuid
@@ -17,7 +18,9 @@ from regen.scanner import prepare_project, safe_files
 parser = argparse.ArgumentParser()
 parser.add_argument('--github', action='store_true')
 args = parser.parse_args()
-artifacts = root / '.regen' / 'artifacts'
+artifacts = Path(os.environ.get('PRAXIS_SMOKE_ARTIFACT_DIR', str(root / '.regen' / 'artifacts')))
+if not artifacts.is_absolute():
+    raise ValueError('PRAXIS_SMOKE_ARTIFACT_DIR must be an absolute path')
 artifacts.mkdir(parents=True, exist_ok=True)
 report = {'model_calls': 0, 'source_application': False}
 if args.github:

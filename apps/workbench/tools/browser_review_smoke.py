@@ -10,7 +10,9 @@ from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[3]
-ARTIFACTS = ROOT / 'apps/workbench/.regen/artifacts'
+ARTIFACTS = Path(os.environ.get('PRAXIS_SMOKE_ARTIFACT_DIR', str(ROOT / 'apps/workbench/.regen/artifacts')))
+if not ARTIFACTS.is_absolute():
+    raise ValueError('PRAXIS_SMOKE_ARTIFACT_DIR must be an absolute path')
 BASE = os.environ.get('PRAXIS_BROWSER_BASE', 'http://127.0.0.1:4188').rstrip('/')
 
 

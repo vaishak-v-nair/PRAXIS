@@ -18,9 +18,47 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { updatePlan, compareVersions } from '../src/lib/update.js';
-import { shippedTemplates, installedCommands } from '../src/commands/update.js';
+import { shippedTemplates, installedCommands, latestPublished } from '../src/commands/update.js';
 
 const CLI = path.resolve('src', 'cli.js');
+
+test('a Windows registry timeout leaves no npm process holding the project folder', { skip: process.platform !== 'win32' }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-upd-timeout-'));
+  const entry = path.join(root, 'slow.cjs');
+  const marker = path.join(root, 'owned-child.json');
+  const originalPath = process.env.PATH;
+  const originalCwd = process.cwd();
+  // Standard npm-shim layout, but entirely offline and owned by this test.
+  fs.writeFileSync(entry, `require('node:fs').writeFileSync(${JSON.stringify(marker)}, JSON.stringify({pid:process.pid,entry:__filename})); setInterval(()=>{},1000);`);
+  fs.writeFileSync(path.join(root, 'npm.cmd'), `@echo off\r\nset "dp0=%~dp0"\r\n"${process.execPath}" "%dp0%\\slow.cjs" %*\r\n`);
+  try {
+    process.chdir(root);
+    process.env.PATH = root + path.delimiter + originalPath;
+    assert.equal(latestPublished({ timeout: 1000 }), null, 'Unavailable registry remains an honest unknown.');
+    assert.ok(fs.existsSync(marker), 'The real npm child must have started before timeout.');
+    const child = JSON.parse(fs.readFileSync(marker, 'utf8'));
+    let alive = false;
+    try { process.kill(child.pid, 0); alive = true; }
+    catch (error) { assert.equal(error.code, 'ESRCH', 'Permission or probe failures must not masquerade as process exit.'); }
+    assert.equal(alive, false, 'Timed-out npm must not survive the registry probe.');
+  } finally {
+    process.env.PATH = originalPath;
+    process.chdir(originalCwd);
+    if (fs.existsSync(marker)) {
+      const child = JSON.parse(fs.readFileSync(marker, 'utf8'));
+      assert.equal(child.entry, entry, 'Cleanup is restricted to this test-owned child.');
+      let alive = false;
+      try { process.kill(child.pid, 0); alive = true; }
+      catch (error) { assert.equal(error.code, 'ESRCH'); }
+      if (alive) {
+        execFileSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true, timeout: 5000 });
+      }
+    }
+    const within = path.relative(os.tmpdir(), root);
+    assert.ok(within && !within.startsWith('..') && !path.isAbsolute(within));
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+  }
+});
 
 test('nothing to do is a real answer, and the common one', () => {
   const plan = updatePlan({ running: '0.12.0', latest: '0.12.0', global: '0.12.0' });
