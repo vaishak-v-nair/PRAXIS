@@ -1,5 +1,79 @@
 # PRAXIS introduction
 
+Video production is paused at the user's request. All sources, media, reports
+and exports are saved; [VIDEO-RESUME.md](VIDEO-RESUME.md) records the exact resume
+point. Prioritize PRAXIS software testing. Do not automatically render again.
+
+The current launch cut is **53.4 seconds at 30 fps**. It shows the redesigned
+local app filling the frame: choose a folder, describe its goal, inspect source,
+explicitly approve host tests, see a real missing-order failure, compare a
+separate correct project, and copy a review-bound brief. Source review needs no
+Docker or model key. Host tests retain this computer's file/network permissions;
+the filmed projects are controlled demo fixtures. Copying does not approve edits.
+
+`index.html`, `LAUNCH-STORYBOARD.md`, `LAUNCH-SCRIPT.md`, `frame.md`, and the nine
+`launch-*.html` source fragments describe this cut. The accepted longer film and
+all media remain intact. Its exact root source is archived as
+`archive/walkthrough.source.html.txt`, outside automatic entry-point discovery.
+
+The narration is the natural conversational ElevenLabs Chris voice, generated
+from the authored public script. All 116 words were independently checked in
+nine final clips; the original decoded speech samples remain intact. Licensed
+Mixkit music and actual-action click cues remain private production inputs.
+Distribute the incorporated video, never standalone music or raw library media.
+
+The current preview uses pinned HyperFrames 0.8.120. Capture and browser QA need
+the Workbench Python environment with Playwright/httpx; the pure helper tests
+also run in a standard-library-only Python environment:
+
+```powershell
+npx --yes hyperframes@0.8.120 preview --background
+node --test scripts/assemble-launch.test.mjs scripts/assemble-film.test.mjs
+python -m unittest discover -s scripts -p "test_*.py"
+python scripts/qa-launch.py
+```
+
+The final browser CTA is source-only. Local execution is a separate approved
+step. npm publishing remains a manual user action. Measured QA and sampled
+visual review do not replace an actual listening review.
+
+The launch browser audit checks 22 phrases over 55 actual seeks, all seven
+native recordings, the final source-only CTA, repeatable reverse seeking, and a
+deliberate two-caption collision. The baked track contains 111 words; the final
+five spoken words appear in the closing hero instead of a duplicate caption.
+While the recorded permission dialog is visible, annotations sit in the empty
+right backdrop, leaving its disclosures and approval button visible. This lasts
+from frame 559 through 695 (18.633333–23.2 seconds, end excluded). Before and after
+that interval, local captions use the fixed footer and leave dashboard details clear.
+Its WebVTT sidecar is `renders/praxis-launch.vtt`. Do not enable a second caption
+overlay over the baked picture.
+
+`scripts/fixtures/launch-caption-clock.json` is the public authoring-clock test
+fixture. It includes display text and times, not raw ASR responses, review jobs,
+provider credentials, media, or private provenance. Production alignment and
+audio metadata remain local. Assembly tests therefore run in a clean source
+checkout without uploading the local evidence used to produce the film.
+
+The exact native export command is:
+
+```powershell
+npx --yes hyperframes@0.8.120 render --quality delivery --fps 30 --resolution landscape-4k --workers 2 --video-frame-format png --frames-cache-dir .hyperframes/extract-cache --strict --no-best-effort --output renders/praxis-launch-render-v3-4k.mp4
+```
+
+`LAUNCH-QA.md` records the delivery checks and their limits. Final incorporated
+MP4s remain local; authoring sources may be pushed. The 4K narrated master,
+1080p narrated copy, and 1080p music-only version use separate filenames, so no
+accepted older film is replaced.
+
+The launch recorder requires `--comparison-review <actual-local-review-id>`.
+It never embeds this machine's historical review ID as a reusable default.
+Use only the controlled fixture projects and an already completed comparison;
+the recorder checks real API state, source preservation and zero model spend.
+Voice alignment reports music as pending unless a prepared bed with a matching
+hash exists. It does not fabricate missing media or a successful transcript.
+
+## Preserved October 4 walkthrough
+
 A 124.69-second product walkthrough, delivered in 4K and 1080p at 30 fps: an original axolotl opening,
 real browser/local demonstrations and a warm branded ending. Creative choices
 are in CREATIVE-DIRECTION.md. The source vault is reviewed, not replaced.
@@ -18,7 +92,9 @@ is still a separate manual action.
 
 ## Open and export
 
-From this directory, using the updated installed Hyperframes skills:
+These are historical commands, retained for that accepted walkthrough. Restore
+its archived root and `walkthrough-frame.md` in a separate copy before using
+them; running them on the current launch root would export the wrong version.
 
 ```powershell
 npx --yes hyperframes@0.8.114 preview --background

@@ -201,3 +201,39 @@ Actual parsed source map. Cut on the activity cue to real backend records. Plann
 - asset_candidates: assets/brand/happy.webm
 
 Owned happy mascot, PRAXIS, official URL and Start with the browser check. No fake clickable button or narrated paragraph as a second title.
+
+## Launch version — 2026-10-04, provisional 54-second proposal
+
+This is an appended version of the same 16:9 product-launch film. The historical
+124.69-second timing above remains unchanged. Product QA precedes production.
+This proposal is superseded by the measured 53.4-second, 1602-frame cut in
+LAUNCH-STORYBOARD.md and launch-timing.json. That cut presents the failure before
+the separate correct comparison and uses nine checked narration clips. The
+historical walkthrough above remains intact.
+
+Message: understand what could fail in your AI-built project, and what to fix next.
+Audience: AI-assisted builders, developers and teams, equally.
+Arc: finished-looking project → source review → observed failure → clear handoff.
+Spine: one project outline becomes a real review, then returns as a fix brief.
+Brand: capture the redesigned paper/ink/peach interface before locking tokens.
+Bans: no fake UI, miniature dashboard, AI stars, decorative verdict badges,
+unlabeled customer incident, automatic fix, or readiness percentage.
+
+| Time | Visible action and exact main words | Purpose and seam | Truth boundary |
+| --- | --- | --- | --- |
+| 0–4 | Owned project outline; "Built with AI." | Complete first frame; a folder outline grows into the next view | Original brand motion, not a product result |
+| 4–7 | "Does it actually work?"; owned curious mascot | One held question, then outline continues into real intake | No invented test result |
+| 7–12 | Actual folder selection and project goal | Click leads directly to the source-review result | Rehearsed demo folder; no private code |
+| 12–17 | Actual source review; "Start without Docker." | Read the useful source-backed issue before optional deeper checks | No model request or project execution |
+| 17–22 | Actual explicit Local selection and consent | A purposeful click, then real execution view | Host permissions disclosed; no Docker fallback |
+| 22–27 | Actual passing order test | Establish what correct behavior demonstrates | Deliberately correct fixture, real execution |
+| 27–33 | Actual failed order test; missing SQLite row | Hard cut on the failure cue; one evidence result stays large | Deliberately broken fixture, no fabricated failure |
+| 33–38 | Actual finding, consequence and location | Finding stays continuous through the next action | Source finding and runtime evidence remain distinct |
+| 38–44 | Actual preview and clipboard copy of agent brief | A click turns evidence into a usable next step | Source-bound prompt; no implementation authorized |
+| 44–49 | "For builders. Developers. Teams." | Project outline returns as a shared handoff | Local team capabilities, no remote-service claim |
+| 49–54 | Owned logo; "Build with AI. Check with PRAXIS." and website address | Logo lands while the project outline settles; music resolves | Browser trial is the available CTA; npm release still manual |
+
+Clicks follow measured real pointer-down times. The music has an immediate pulse,
+room for narration, and a resolved ending. Captions have one separate track and
+occupy inspected empty space; main titles never repeat an entire caption.
+The encoded picture, seams and sound receive a fresh independent critic pass.

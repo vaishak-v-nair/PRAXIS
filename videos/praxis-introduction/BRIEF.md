@@ -108,3 +108,59 @@ are restricted to website/browser actions; tests and authorization stay uncroppe
 The findings chapter cuts to actual skipped coverage on the spoken Checks cue.
 Goal/budget and source-map/activity edits also follow measured voice/action marks.
 No new review, source apply, synthetic evidence or narrator regeneration.
+
+## Outcome-led launch version — 2026-10-04
+
+The user requested analyzing the complete Doks.AI and LangEase launch ads,
+removing Docker as a consumer prerequisite, rebuilding the product, testing it,
+then producing a new film. AI-assisted builders, developers and teams have
+equal priority. Keep this 124.69-second walkthrough and its exports intact.
+The new version remains product-launch-video, 16:9; target 52–55 seconds,
+native 4K with a 1080p derivative. Append the new story instead of replacing
+the historical plan. Existing accepted ElevenLabs Chris voice quality is the
+reference; avoid the local robotic fallback.
+
+Five directions considered:
+
+1. **The missing order.** A project becomes a source review; a real test exposes
+   a success response with no saved data; its finding becomes an agent handoff.
+2. **Before you share.** A launch invitation pauses while a builder checks the
+   product; the inspection supplies an actionable next step.
+3. **The project relay.** The same project passes between builder, developer and
+   team, each using the same evidence and copyable plan.
+4. **An unsent message.** A claimed success becomes an absent database row;
+   restrained typography reveals the difference between words and behavior.
+5. **The working notebook.** A continuous project sheet unfolds into commands,
+   recorded results and an agent brief without introducing a new panel each beat.
+
+Selected direction: the missing order, with the project relay as the closing
+callback. It gives every audience a concrete reason to care: understand a real
+failure and take a useful next step. The persistent project outline, actual
+cursor actions and finding-to-brief transition carry the story. No framework
+tour, invented readiness percentage, testimonial, receipt promise or fake UI.
+
+The complete reference study and contact sheets remain private under
+capture/reference-research-20261004/reference_analysis. Borrow cause-and-effect
+motion, scale changes and click-to-result timing; reuse no reference footage,
+layout, logos or audio. Product footage must be freshly captured after QA from
+the redesigned real interface. The order projects are deliberate demonstration
+fixtures, clearly labeled. A source-only review cannot prove runtime success.
+
+The new first review needs neither Docker nor a model key. Optional host tests
+need explicit consent and have this computer's permissions; optional Docker
+tests retain their own isolation and network policy. npm publishing remains
+manual; the film CTA is the working browser trial while 0.14.2 is unpublished.
+
+Music: licensed human-made instrumental pulse, edited to the actual picture;
+clean recorded/library clicks at observed pointer actions, no synthesized thocks.
+Music underneath narration receives voice-following spectral carve and level
+automation. Deliver a music-only video fallback, retain editable audio tracks,
+document licenses and measure decoded export loudness/peaks. Actual listening
+must be recorded separately from signal analysis.
+
+Tooling: CLI pin moved from 0.8.114 to 0.8.120; the historical composition passed
+lint/runtime/layout/contrast with one reviewed file-length warning. The specific
+workflow skill refresh timed out while cloning its official repository; installed
+skills remain intact. Usage is available in 0.8.120 and is checked at milestones.
+HeyGen is signed out. The same conversational voice is used for the new public
+script, with licensed library music; no different narration engine is substituted.
