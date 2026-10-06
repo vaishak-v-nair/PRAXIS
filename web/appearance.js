@@ -3,8 +3,8 @@
   'use strict';
   var root = document.documentElement;
   var key = 'praxis-appearance';
-  var theme = 'light';
-  try { theme = localStorage.getItem(key) === 'dark' ? 'dark' : 'light'; } catch {}
+  var theme = 'dark';
+  try { theme = localStorage.getItem(key) === 'light' ? 'light' : 'dark'; } catch {}
   root.dataset.theme = theme;
 
   function update() {
@@ -29,7 +29,7 @@
   else initialize();
   window.addEventListener('storage', function (event) {
     if (event.key !== key) return;
-    root.dataset.theme = event.newValue === 'dark' ? 'dark' : 'light';
+    root.dataset.theme = event.newValue === 'light' ? 'light' : 'dark';
     update();
   });
 })();

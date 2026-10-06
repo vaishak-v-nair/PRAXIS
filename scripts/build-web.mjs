@@ -51,22 +51,21 @@ const HEAD = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" media="(prefers-color-scheme:light)" content="#f5f3ed">
-<meta name="theme-color" media="(prefers-color-scheme:dark)" content="#10151b">
+<meta name="theme-color" content="#150d0b">
 <link rel="icon" href="${navicon}">
 <link rel="canonical" href="${SITE}/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PRAXIS">
-<meta property="og:title" content="PRAXIS — know what holds up before you ship.">
-<meta property="og:description" content="Bring your AI-built project. Understand source-backed problems and hand a clear plan to your coding agent. Start with a browser source review; local inspection needs no Docker.">
+<meta property="og:title" content="PRAXIS — check what works in the project you built with AI.">
+<meta property="og:description" content="Start with a browser source review. See grounded findings, choose deeper local checks, and give your coding agent a clear next step. Docker is optional.">
 <meta property="og:url" content="${SITE}/">
 <meta property="og:image" content="${SITE}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="PRAXIS — the axolotl mascot beside the command: npx praxis-memory demo.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PRAXIS — know what holds up before you ship.">
-<meta name="twitter:description" content="Understand your AI-built project's weak spots, inspect the evidence, and plan the next change. Start with source review, without Docker.">
+<meta name="twitter:title" content="PRAXIS — check what works in the project you built with AI.">
+<meta name="twitter:description" content="Review your AI-built project in the browser or locally. See source-backed findings and choose the next change.">
 <meta name="twitter:image" content="${SITE}/og.png">
 `;
 
