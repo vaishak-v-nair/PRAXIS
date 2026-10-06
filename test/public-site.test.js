@@ -16,6 +16,9 @@ test('Cloudflare staging replaces only its owned output and excludes private fil
   fs.writeFileSync(path.join(root, 'web/index.html'), '<title>PRAXIS</title>');
   fs.writeFileSync(path.join(root, 'web/_headers'), '/*\n  X-Content-Type-Options: nosniff\n');
   fs.writeFileSync(path.join(root, 'web/.env'), 'private-fixture');
+  fs.mkdirSync(path.join(root, 'web/_qa'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'web/_qa/capture.html'), 'private-qa-fixture');
+  fs.writeFileSync(path.join(root, 'web/notes.html'), 'unreviewed-fixture');
   fs.writeFileSync(path.join(root, 'web/test-your-project/index.html'), '<title>Trial</title>');
   fs.writeFileSync(path.join(root, 'web/test-your-project/release.json'), '{}');
   const first = buildPublicSite(root);
@@ -24,6 +27,8 @@ test('Cloudflare staging replaces only its owned output and excludes private fil
   assert.ok(second.files.some(file => file.file === '_headers'));
   assert.ok(second.files.some(file => file.file === 'test-your-project/index.html'));
   assert.equal(fs.existsSync(path.join(second.destination, '.env')), false);
+  assert.equal(fs.existsSync(path.join(second.destination, '_qa/capture.html')), false);
+  assert.equal(fs.existsSync(path.join(second.destination, 'notes.html')), false);
   assert.equal(fs.existsSync(path.join(second.destination, 'obsolete.js')), false);
   assert.match(fs.readFileSync(path.join(second.destination, '.assetsignore'), 'utf8'), /manifest-for-upload/);
   assert.equal(fs.readFileSync(path.join(root, 'web/.env'), 'utf8'), 'private-fixture');

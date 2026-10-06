@@ -17,13 +17,32 @@ if (fs.existsSync(destination)) {
 }
 fs.mkdirSync(destination, {recursive:true});
 const files = [];
+// Only deploy reviewed website files. Local QA captures and other untracked
+// files may live under web/ but must never become public assets.
+const publicFiles = new Set([
+  '_headers', 'appearance.js', 'index.html', 'og.png',
+  '_assets/demo.gif', '_assets/flow.webp', '_assets/navicon.png', '_assets/pet.webp',
+  'live/app.js', 'live/engine-visual.js', 'live/graph.js', 'live/index.html', 'live/style.css',
+  'receipt/explorer.js', 'receipt/index.html', 'receipt/style.css', 'receipt/verify.js',
+  'test-your-project/app.js', 'test-your-project/index.html', 'test-your-project/install.mjs',
+  'test-your-project/local.html', 'test-your-project/report.js', 'test-your-project/style.css',
+  'test-your-project/worker.js', 'test-your-project/release.json',
+  'test-your-project/engine/browser.py', 'test-your-project/engine/manifest.json',
+  'test-your-project/engine/reality.py', 'test-your-project/engine/scanner.py',
+]);
+const publicDirectories = new Set([...publicFiles].flatMap(file => {
+  const parts = file.split('/');
+  return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'));
+}));
 function copy(directory, prefix = '') {
   for (const entry of fs.readdirSync(directory, {withFileTypes:true})) {
-    if (entry.isSymbolicLink() || entry.name.startsWith('.') || entry.name === '_src.html' ||
-        (!prefix && ['dist', 'vercel.json'].includes(entry.name))) continue;
+    if (entry.isSymbolicLink()) continue;
     const relative = prefix + entry.name;
-    if (entry.isDirectory()) { copy(path.join(directory,entry.name), relative + '/'); continue; }
-    if (!/\.(?:html|js|mjs|css|json|py|png|webp|gif|svg)$/i.test(entry.name) && entry.name !== '_headers') continue;
+    if (entry.isDirectory()) {
+      if (publicDirectories.has(relative)) copy(path.join(directory,entry.name), relative + '/');
+      continue;
+    }
+    if (!publicFiles.has(relative)) continue;
     let bytes = fs.readFileSync(path.join(directory, entry.name));
     if (relative === 'index.html') {
       let html = bytes.toString('utf8');
