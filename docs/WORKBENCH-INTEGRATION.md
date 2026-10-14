@@ -20,6 +20,7 @@ For the user workflow and evidence limits, see
 | `apps/workbench/app`, `components` | Imported Next.js review-and-repair interface |
 | `apps/workbench/backend` | Imported Python API, scanners, model adapters, budgets, repair workers, and regressions |
 | `apps/workbench/tools` | Imported development, pressure-test, and optional live-provider tools |
+| `apps/desktop` | Optional Tauri shell, fixed bundled runtimes and native release gates; the same review engine |
 | `apps/workbench/repos/Zentara` | Imported sample application's source and tests |
 | `apps/workbench/.regen` | Ignored local job history, snapshots, patches, and apply backups |
 
@@ -43,6 +44,31 @@ sandbox; unavailable Docker never falls back to host execution.
 This explicit command alone prepares the optional app; postinstall and the existing
 default CLI remain inert with respect to these dependencies. See the
 [consumer quickstart](PROJECT-REVIEW-QUICKSTART.md) for paths and options.
+
+The managed launcher and optional desktop share the protected per-user service
+owner in `src/lib/review-service.js`; consumers attach only after an instance
+challenge and matching engine fingerprint. Source review does not require Docker.
+Managed instances use private, dynamically selected local API and UI ports behind
+their authenticated gateway; the fixed 3000/9123 ports below are only for source
+checkout development.
+The additive project registry and coordination tables reference existing jobs;
+they never migrate memory, rewrite receipts or silently relink historical source.
+The project home first reads `GET /api/workspace?scope=projects&quick=true&limit=30&offset=0`,
+a paged, path-free projection of project identity and latest run. Page totals and
+offsets count projects, so older reviews cannot consume an invisible page. This fast read
+does not hash project folders or present saved checks as current. The browser
+then fetches `/api/projects/{id}/status` for visible projects, at most two at a
+time, to check source and snapshot freshness and load deterministic assessment.
+Status responses only update the matching project revision and review; a failed
+or malformed response stays unavailable rather than retaining a success label.
+The original `GET /api/workspace` still returns the fully assessed projection
+for existing clients. A newer intake is visible without borrowing checks from
+an older snapshot. Unlinked historical jobs remain separate review runs, not
+automatically registered projects. `/api/jobs` and the original project status
+endpoints remain compatible. Folder fingerprinting runs outside the SQLite
+write transaction, so a large review cannot hold up unrelated local writes.
+The [Approach C architecture](designs/PRAXIS-ASSURANCE-PLATFORM-2026-10-06.md)
+records implementation, boundaries and remaining native release obligations.
 
 The launcher copies only allowlisted runtime source to a version/fingerprint
 release directory in the user's application-data folder. Jobs and provider settings
@@ -177,3 +203,17 @@ quality or change the status of previous review findings.
 - No model calls, submitted project execution, or source application occurred
   during these checks. Live Gemini/OpenCode authentication remains untested;
   those CLIs are not installed on this machine.
+# Installed coding agents
+
+Project work discovers installed Claude, Codex, Gemini, OpenCode and explicitly
+configured CLI adapters. Discovery does not certify login or available credits.
+Assign and share a task with an installed agent, then choose **Run assigned agent
+plan**. Confirm local access and its separate account charges. The review API
+budget cannot cap an external CLI account.
+
+The existing core adapters run in plan mode on a disposable copy. Project keys
+and agent startup configuration are excluded. A changed copy, stale assignment,
+revoked lease, nonzero exit, timeout or cancellation cannot become accepted
+completion. The original source remains separate. Local agent tools are not a
+security sandbox. Reports are unverified claims; use independent checks and the
+existing approved repair/apply flow before accepting changes.

@@ -57,7 +57,7 @@ app/page.tsx                           workspace and action ownership
 │   ├── Changes                        plan, consent, diffs, export and confirmed apply
 │   ├── SourceExplorer                 existing source graph, loaded on demand
 │   └── Activity                       recorded job events
-├── StatusBar                          persistent local state and New review
+├── AppHeader and project controls      local state and New review
 └── ProviderModal / ActionModal / Guide keyboard-accessible dialogs
 ```
 

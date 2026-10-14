@@ -14,6 +14,7 @@ import { transcriptDir, newestTranscript } from '../transcript.js';
 import { verify, receiptFile, readEntries } from '../receipt/store.js';
 import { recordReceipt } from '../receipt/record.js';
 import { judge as realJudge } from '../receipt/judge.js';
+import { readReviewStatus } from '../review-status.js';
 
 // summarizeVerdicts lives with the shared record path now; re-exported here so
 // existing consumers/tests that import it from the tool registry still resolve.
@@ -42,6 +43,18 @@ export function buildTools(ctx = {}) {
   const now = () => ctx.now || new Date().toISOString();
 
   return [
+    {
+      name: 'praxis_project_review_status',
+      description: 'Read sanitized current project review status from the authenticated local PRAXIS owner. Reports stale/unavailable evidence explicitly. It never starts work, shares conversations, authorizes commands, applies a patch, or creates a receipt.',
+      inputSchema: { type: 'object', additionalProperties: false, properties: {
+        project_id: { type: 'string', description: 'Optional opaque project ID; omit to list linked project status.' },
+        previous_revision: { type: 'integer', minimum: 0 },
+      } },
+      handler: args => {
+        if (Object.keys(args).some(key => !['project_id', 'previous_revision'].includes(key))) throw new Error('Only project identity and status revision are accepted.');
+        return (ctx.readReviewStatus || readReviewStatus)({ projectId: args.project_id, previousRevision: args.previous_revision });
+      },
+    },
     {
       name: 'praxis_receipt',
       description:

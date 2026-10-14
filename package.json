@@ -34,7 +34,7 @@
     "release:check": "node scripts/ci/release-check.mjs",
     "release:metadata": "node scripts/ci/release-check.mjs --metadata-only",
     "postinstall": "node scripts/postinstall.js",
-    "test": "node --test \"test/*.test.js\"",
+    "test": "node --test --test-concurrency=4 \"test/*.test.js\"",
     "dev": "node src/cli.js workbench",
     "workbench": "node src/cli.js workbench",
     "review": "node src/cli.js review",
@@ -47,6 +47,8 @@
     "build:workbench": "npm --prefix apps/workbench run build",
     "start:workbench": "node src/cli.js workbench --production",
     "test:workbench": "npm --prefix apps/workbench run test:backend",
+    "test:assurance": "node scripts/ci/assurance-smoke.mjs",
+    "test:desktop": "npm --prefix apps/desktop test",
     "eval:verify": "promptfoo eval -c evals/verify/promptfooconfig.yaml --no-cache && node evals/verify/metrics.mjs",
     "redteam:verify": "promptfoo redteam run -c evals/verify/redteam-config.yaml -o evals/verify/redteam-cases.yaml --no-cache --strict --remote"
   },
@@ -72,10 +74,15 @@
     "@langchain/langgraph": "1.4.17",
     "@libsql/client": "0.17.4",
     "ffmpeg-static": "^5.3.0",
-    "promptfoo": "0.123.1",
-    "sharp": "^0.35.3",
+    "promptfoo": "0.124.0",
+    "sharp": "^0.35.5",
     "three": "0.181.2",
     "zod": "4.6.5"
+  },
+  "overrides": {
+    "get-uri": {
+      "basic-ftp": "6.2.2"
+    }
   },
   "repository": {
     "type": "git",

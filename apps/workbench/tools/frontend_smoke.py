@@ -7,6 +7,7 @@ import copy
 import json
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import sync_playwright
 
@@ -17,6 +18,22 @@ if not ARTIFACTS.is_absolute():
 ARTIFACTS.mkdir(parents=True, exist_ok=True)
 BASE = 'http://127.0.0.1:3000'
 reports = []
+
+
+def open_review_view(page, view):
+    nav = page.get_by_role('navigation', name='Review sections')
+    primary = {'overview': 'Overview', 'findings': 'Findings', 'execution': 'Checks', 'changes': 'Plan & changes'}
+    if view in primary:
+        nav.get_by_role('button', name=primary[view], exact=False).click()
+    else:
+        nav.get_by_label('More review sections').select_option(view)
+
+
+def expand_review_details(page):
+    if not page.locator('.review-more').evaluate('(element) => element.open'):
+        page.locator('.review-more > summary').click()
+    if not page.locator('.review-metrics').evaluate('(element) => element.open'):
+        page.locator('.review-metrics > summary').click()
 
 
 def audit(page, name):
@@ -35,7 +52,7 @@ def audit(page, name):
             page.wait_for_timeout(80)
             assert not page.evaluate('document.documentElement.scrollWidth > innerWidth + 2'), (name, theme, width)
             escaped = page.evaluate("""() => {
-                const cards = '.metric-strip > article,.pressure-grid > article,.dimension-grid > article,.attention-item,.evidence-inspector,.method-panel,.handoff-option,.priority-finding,.agent-brief,.runtime-controls';
+                const cards = '.metric-strip > article,.pressure-grid > article,.dimension-grid > article,.attention-item,.evidence-inspector,.method-panel,.handoff-option,.agent-brief,.runtime-controls';
                 const failures = [];
                 const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
                 while (walker.nextNode()) {
@@ -62,8 +79,9 @@ with sync_playwright() as runtime:
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(BASE, wait_until='networkidle')
-    page.get_by_text('Local service connected', exact=True).wait_for()
-    assert page.locator('html').get_attribute('data-theme') == 'light', 'First-run appearance should use warm paper'
+    page.get_by_text('Connected locally', exact=True).wait_for()
+    assert page.evaluate("getComputedStyle(document.querySelector('.lab'), '::before').animationName") == 'none', 'Aurora motion must respect reduced motion'
+    assert page.locator('html').get_attribute('data-theme') == 'light', 'First-run appearance should use the light theme'
     page.get_by_role('button', name='Use dark theme').click()
     assert page.locator('html').get_attribute('data-theme') == 'dark'
     page.reload(wait_until='networkidle')
@@ -71,20 +89,33 @@ with sync_playwright() as runtime:
     assert page.locator('html').get_attribute('data-theme') == 'dark', 'Appearance did not survive reload'
     page.get_by_role('button', name='Use light theme').click()
     audit(page, 'home')
+    page.evaluate('document.activeElement instanceof HTMLElement && document.activeElement.blur()')
+    page.evaluate('window.scrollTo(0, 0)')
     page.screenshot(path=str(ARTIFACTS / 'lab-home-desktop.png'), full_page=True)
     page.set_viewport_size({'width': 390, 'height': 844})
     page.screenshot(path=str(ARTIFACTS / 'lab-home-mobile.png'), full_page=True)
+    page.keyboard.press('Control+k')
+    project_search = page.get_by_role('searchbox', name='Search loaded projects')
+    assert project_search.evaluate('(element) => element === document.activeElement')
+    project_search.fill('project-name-that-does-not-exist-in-this-smoke')
+    page.get_by_role('region', name='Project search results').get_by_text('No loaded project matches.', exact=False).wait_for()
+    audit(page, 'project-command')
+    project_search.fill('')
+    page.keyboard.press('Escape')
+    assert page.get_by_role('region', name='Project search results').count() == 0
     models = page.get_by_role('button', name='Models', exact=True)
     models.focus(); page.keyboard.press('Enter')
     page.get_by_role('dialog', name='Model connection').wait_for()
     audit(page, 'model-dialog')
+    page.keyboard.press('Control+k')
+    assert page.evaluate("!!document.activeElement.closest('dialog')"), 'Project shortcut must not take focus from a modal'
     for _ in range(18):
         page.keyboard.press('Tab')
         assert page.evaluate("!!document.activeElement.closest('dialog')"), 'Focus escaped modal'
     page.keyboard.press('Escape')
     page.wait_for_function("document.activeElement?.textContent.includes('Models')")
     assert models.evaluate('(element) => element === document.activeElement'), 'Focus did not restore'
-    page.get_by_role('button', name='Guide', exact=True).click()
+    page.get_by_role('navigation', name='Workspace settings').get_by_role('button', name='Help', exact=True).click()
     audit(page, 'guide-dialog')
     page.keyboard.press('Escape')
 
@@ -186,13 +217,13 @@ with sync_playwright() as runtime:
     page.route('**/api/health', lambda route: route.fulfill(status=200, content_type='application/json',
                                                             body=json.dumps(fixture_health)))
     page.route('**/api/scans', fixture_api)
-    page.goto(BASE, wait_until='networkidle')
+    page.goto(BASE + '/?new=1', wait_until='networkidle')
     assert page.get_by_role('button', name='Upload folder', exact=True).get_attribute('aria-pressed') == 'true'
     assert not page.locator('.review-details').evaluate('(element) => element.open')
     assert page.get_by_label('I trust this project and authorize').count() == 0
     page.get_by_role('button', name='Local path', exact=True).click()
     page.get_by_label('Project folder path', exact=False).fill('C:/synthetic/project')
-    page.get_by_label('What should this project do?', exact=False).fill(fixture['review_goal'])
+    page.get_by_label('What should it do?', exact=False).fill(fixture['review_goal'])
     assert page.get_by_role('button', name='Review project', exact=True).is_enabled()
     page.get_by_role('button', name='Review project', exact=True).click()
     page.get_by_role('heading', name='UI contract fixture', exact=True).wait_for()
@@ -200,7 +231,7 @@ with sync_playwright() as runtime:
     assert actions[-1]['body'] == {'source': 'C:/synthetic/project', 'budget': 5, 'ai_review': False,
                                   'review_mode': 'team', 'review_goal': fixture['review_goal'], 'run_checks': False,
                                   'trust_confirmed': False, 'allow_network': False, 'runtime_mode': 'docker'}
-    page.goto(BASE, wait_until='networkidle')
+    page.goto(BASE + '/?new=1', wait_until='networkidle')
     page.get_by_role('button', name='GitHub URL', exact=True).click()
     page.get_by_label('Repository URL', exact=False).fill('https://github.com/example/synthetic')
     assert page.get_by_role('button', name='Review project', exact=True).is_enabled()
@@ -210,12 +241,12 @@ with sync_playwright() as runtime:
     assert actions[-1]['body']['allow_network'] is False
     assert actions[-1]['body']['ai_review'] is False and actions[-1]['body']['run_checks'] is False
     # Explicit local execution remains available without Docker or a provider.
-    page.goto(BASE, wait_until='networkidle')
+    page.goto(BASE + '/?new=1', wait_until='networkidle')
     page.get_by_role('button', name='Local path', exact=True).click()
     source_input = page.get_by_label('Project folder path', exact=False)
     source_input.fill('C:/synthetic/project')
     page.locator('.review-details > summary').click()
-    assert page.get_by_label('Add connected model review', exact=False).is_disabled()
+    assert page.get_by_label('Use AI for a deeper review', exact=False).is_disabled()
     page.get_by_label('Also run project commands', exact=False).check()
     assert page.get_by_role('button', name='Review project', exact=True).is_disabled()
     assert page.get_by_label('I trust this project and authorize').count() == 0
@@ -244,17 +275,22 @@ with sync_playwright() as runtime:
     assert not actions[-1]['body']['allow_network'] and not actions[-1]['body']['ai_review']
     # These are synthetic request-contract assertions, not proof of host isolation.
     fixture_health['providers'].append({'name': 'nvidia', 'configured': True})
-    page.reload(wait_until='networkidle')
+    page.goto(BASE + '/?new=1', wait_until='networkidle')
+    assert page.get_by_label('Use AI for a deeper review', exact=False).is_disabled(), 'A different provider key must not enable the selected model'
+    page.goto(BASE + '/?job=ui-fixture', wait_until='networkidle')
     before_plan = len(actions)
-    page.get_by_role('navigation', name='Review sections').get_by_role('button', name='findings', exact=False).click()
+    open_review_view(page, 'findings')
     assert page.get_by_role('button', name='Draft a fix plan', exact=True).is_disabled()
+    assert page.locator('.evidence-inspector .agent-brief-actions > .primary').count() == 1
     page.get_by_text('Drafting a plan needs a configured AI provider.', exact=False).wait_for()
     page.get_by_label('Select Debug mode enabled for repair', exact=True).check()
     assert page.get_by_role('button', name='Draft plan for 1', exact=True).is_disabled()
     assert page.get_by_role('button', name='Copy findings to my agent', exact=True).is_enabled()
     assert len(actions) == before_plan, 'Another configured provider must not enable planning for an unconfigured selected provider'
-    page.get_by_role('navigation', name='Review sections').get_by_role('button', name='overview', exact=True).click()
+    open_review_view(page, 'overview')
     before_brief = len(actions)
+    assert not page.locator('.review-share').evaluate('(element) => element.open'), 'Agent handoff should not crowd the primary result'
+    page.locator('.review-share > summary').click()
     page.get_by_role('button', name='Copy findings to my agent', exact=True).click()
     page.get_by_role('button', name='Findings copied', exact=True).wait_for()
     # Windows clipboard can normalize LF to CRLF; retain every other character.
@@ -282,19 +318,36 @@ with sync_playwright() as runtime:
     page.goto(BASE + '/?job=ui-fixture', wait_until='networkidle')
     page.get_by_role('heading', name='UI contract fixture', exact=True).wait_for()
     page.get_by_role('heading', name='Production readiness is blocked', exact=True).wait_for()
+    page.screenshot(path=str(ARTIFACTS / 'lab-overview-desktop.png'), full_page=True)
+    page.set_viewport_size({'width': 390, 'height': 844})
+    page.screenshot(path=str(ARTIFACTS / 'lab-overview-mobile.png'), full_page=True)
+    expand_review_details(page)
     page.get_by_role('heading', name='Observed behavior is failing', exact=True).wait_for()
     page.get_by_text('Evidence still required', exact=True).wait_for()
     page.get_by_role('heading', name='What still needs attention', exact=True).wait_for()
-    page.locator('.priority-finding').get_by_role('heading', name='Debug mode enabled', exact=True).wait_for()
-    assert 'Debug output may expose details.' in page.locator('.priority-finding').inner_text()
-    assert 'app.py:1' in page.locator('.priority-finding').inner_text()
-    page.locator('.project-actions').get_by_text('Review finished', exact=True).wait_for()
+    page.locator('.result-focus').get_by_text('Debug mode enabled', exact=True).wait_for()
+    assert page.locator('.decision-grid > section').count() == 2, 'The default review should show only result and next step cards'
+    page.locator('.project-actions').get_by_text('Review recorded', exact=True).wait_for()
     page.set_viewport_size({'width': 390, 'height': 844})
     assert page.locator('.metric-strip article').nth(1).locator('small').is_visible()
+    ring_labels = page.locator('.metric-ring').evaluate_all('(nodes) => nodes.map(node => node.getAttribute("aria-label"))')
+    assert '1 high priority of 2 recorded findings' in ring_labels, ring_labels
+    assert len(ring_labels) == 2
     assert all(item.is_visible() for item in page.locator('.metric-note').all()), 'Mobile metric details must remain available'
     position = lambda selector: page.locator(selector).bounding_box()['y']
-    assert position('.final-verdict') < position('.priority-finding') < position('#review-agent-brief') < position('.decision-next')
-    assert page.locator('.decision-shortcuts').get_by_role('link', name='Open agent brief').is_visible()
+    assert position('.final-verdict') < position('.decision-next') < position('.review-share')
+    nav = page.get_by_role('navigation', name='Review sections')
+    assert nav.bounding_box()['height'] < 70, 'Mobile review navigation should stay on one row'
+    plan_tab = nav.get_by_role('button', name='Plan & changes')
+    tab_bounds = nav.locator('.workspace-primary-tabs').bounding_box()
+    assert plan_tab.is_visible() and plan_tab.bounding_box()['x'] + plan_tab.bounding_box()['width'] <= tab_bounds['x'] + tab_bounds['width'] + 1, 'Plan must not be hidden behind the mobile overflow menu'
+    plan_tab.click()
+    page.get_by_role('heading', name='Disable debug mode safely.').wait_for()
+    open_review_view(page, 'overview')
+    page.locator('.decision-next').get_by_role('button', name='Inspect 2 findings').click()
+    page.get_by_role('heading', name='What PRAXIS found', exact=True).wait_for()
+    open_review_view(page, 'overview')
+    expand_review_details(page)
     page.set_viewport_size({'width': 1440, 'height': 1000})
     assert page.locator('.pressure-grid > article').count() == 4
     assert page.get_by_text('Model says works', exact=True).count() == 1
@@ -308,7 +361,8 @@ with sync_playwright() as runtime:
     assert page.locator('.attention-item').count() == 3
     page.locator('.attention-item').get_by_role('button', name='Open execution', exact=True).click()
     page.get_by_role('heading', name='Execution results', exact=True).wait_for()
-    page.get_by_role('navigation', name='Review sections').get_by_role('button', name='overview', exact=True).click()
+    open_review_view(page, 'overview')
+    expand_review_details(page)
     page.get_by_text('2 displayed evidence records', exact=True).wait_for()
     page.get_by_text('Inspect evidence', exact=True).first.click()
     page.get_by_text('Reviewable source inventory', exact=True).wait_for()
@@ -321,6 +375,7 @@ with sync_playwright() as runtime:
             'position': 'challenges', 'reason': 'Synthetic source-backed disagreement for layout testing.',
             'location': {'file': long_token, 'line': 1}, 'evidence': long_token}]}
     page.reload(wait_until='networkidle')
+    expand_review_details(page)
     page.get_by_role('heading', name='Specialists working together').wait_for()
     page.get_by_text('Inspect 1 peer comments', exact=False).click()
     page.get_by_text('Challenges finding', exact=True).wait_for()
@@ -332,8 +387,9 @@ with sync_playwright() as runtime:
                    'share_with_agents': False, 'created_at': '2026-10-02T00:00:01Z'}]}
     page.reload(wait_until='networkidle')
     for view in ('overview', 'findings', 'execution', 'changes', 'workspace', 'source map', 'activity'):
-        page.get_by_role('navigation', name='Review sections').get_by_role('button', name=view, exact=(view != 'findings')).click()
+        open_review_view(page, view)
         if view == 'overview':
+            expand_review_details(page)
             page.locator('.perspective-body details, .perspective-gaps, .dimension-limits').evaluate_all('(nodes) => nodes.forEach(node => node.open = true)')
         audit(page, view)
         if view == 'workspace':
@@ -342,7 +398,12 @@ with sync_playwright() as runtime:
             assert page.get_by_role('button', name='Post contribution').is_disabled()
         if view == 'findings':
             page.get_by_role('heading', name='What PRAXIS found', exact=True).wait_for()
-            page.get_by_text('Fix before release', exact=False).first.wait_for()
+            page.locator('.finding-row').get_by_text('Debug mode enabled', exact=True).first.wait_for()
+            page.locator('.evidence-inspector').get_by_text('Debug output may expose details.', exact=True).wait_for()
+            assert not page.locator('.finding-source').evaluate('(element) => element.open')
+            page.locator('.finding-source > summary').click()
+            assert 'DEBUG = True' in page.locator('.finding-source').inner_text(), 'Recorded source must remain inspectable'
+            page.locator('.finding-source > summary').click()
             page.screenshot(path=str(ARTIFACTS / 'lab-findings-desktop.png'), full_page=True)
             page.get_by_label('Search findings').fill('absent')
             page.get_by_role('heading', name='No matching findings').wait_for()
@@ -363,6 +424,7 @@ with sync_playwright() as runtime:
             assert 'Finding ID: f2' in manual_brief and 'Finding ID: f1' not in manual_brief
             assert len(actions) == before_copy, 'Manual-review findings should remain copyable without a model'
             page.locator('.finding-row').filter(has_text='Debug mode enabled').get_by_role('button').click()
+            assert page.locator('.evidence-inspector .agent-brief-actions > .primary').count() == 1
             page.get_by_role('button', name='Draft a fix plan', exact=True).click()
             page.wait_for_timeout(250)
             assert actions[-1]['body']['finding_ids'] == ['f1']
@@ -370,6 +432,12 @@ with sync_playwright() as runtime:
             page.locator('.source-canvas canvas').wait_for()
             page.locator('.file-list').get_by_role('button', name='test_app.py', exact=True).click()
             assert page.locator('.relationship-detail > code').inner_text() == 'test_app.py'
+        if view == 'execution':
+            assert not page.locator('.log-list details').first.evaluate('(element) => element.open'), 'Command output should be disclosed on request'
+            page.locator('.log-list details').first.locator('summary').click()
+            assert 'Synthetic assertion failed' in page.locator('.log-list details').first.inner_text()
+            page.locator('.check-coverage > summary').click()
+            assert page.locator('.coverage-list').is_visible(), 'Coverage limits must remain inspectable'
         if view == 'changes':
             page.get_by_role('heading', name='Disable debug mode safely.').wait_for()
             page.screenshot(path=str(ARTIFACTS / 'lab-fix-plan-desktop.png'), full_page=True)
@@ -384,7 +452,7 @@ with sync_playwright() as runtime:
             page.get_by_role('button', name='Send plan to Groq', exact=True).click()
             page.wait_for_timeout(250)
             assert actions[-1]['body']['plan_id'] == 'a' * 24
-    page.get_by_role('navigation', name='Review sections').get_by_role('button', name='changes', exact=True).click()
+    open_review_view(page, 'changes')
     page.get_by_role('button', name='Apply to source', exact=True).click()
     audit(page, 'apply-dialog')
     assert page.get_by_role('button', name='Apply changes', exact=True).is_disabled()
@@ -392,7 +460,8 @@ with sync_playwright() as runtime:
     page.get_by_role('button', name='Apply changes', exact=True).click()
     page.wait_for_timeout(250)
     assert actions[-1]['body'] == {'confirm': True}
-    page.locator('.project-actions').get_by_role('button', name='Run checks').click()
+    open_review_view(page, 'execution')
+    page.get_by_role('button', name='Run checks', exact=True).click()
     audit(page, 'runtime-dialog')
     assert page.get_by_role('button', name='Run authorized checks').is_disabled()
     assert page.get_by_label('I trust this project and authorize').count() == 0
@@ -446,6 +515,7 @@ with sync_playwright() as runtime:
     assert 'no runtime check was executed' in page.locator('.final-verdict').inner_text()
     page.get_by_text('Inspect saved assessment', exact=True).click()
     assert 'Production readiness is blocked' in page.locator('.final-verdict').inner_text()
+    expand_review_details(page)
     page.locator('.dimension-grid').get_by_text('needs human review', exact=True).wait_for()
     fixture['checks'] = [{'name': 'Behavioral test', 'status': 'failed', 'runtime': 'host', 'exit_code': 1}]
     fixture['assessment']['checks_failed'] = 1
@@ -455,19 +525,21 @@ with sync_playwright() as runtime:
     assert page.locator('.final-verdict').get_attribute('class') == 'final-verdict blocked'
     assert page.get_by_text('Inspect saved assessment', exact=True).count() == 0
 
-    page.goto(BASE, wait_until='networkidle')
+    page.goto(BASE + '/?new=1', wait_until='networkidle')
     page.route('**/api/scans', lambda route: route.fulfill(status=422, content_type='application/json', body=json.dumps({'detail': 'Synthetic invalid repository URL'})))
     page.get_by_role('button', name='GitHub URL').click()
     page.get_by_label('Repository URL', exact=False).fill('https://github.com/example/invalid')
     page.get_by_role('button', name='Review project', exact=True).click()
     page.get_by_role('alert').filter(has_text='Synthetic invalid repository URL').first.wait_for()
     page.route('**/api/jobs', lambda route: route.fulfill(status=200, content_type='application/json', body='[]'))
+    page.route('**/api/workspace*', lambda route: route.fulfill(status=200, content_type='application/json',
+        body=json.dumps({'schema_version': 1, 'items': [], 'total': 0, 'next_offset': None})))
     page.goto(BASE, wait_until='networkidle')
-    page.get_by_role('heading', name='Your first review starts here').wait_for()
+    page.get_by_role('heading', name='Start a review', exact=True).wait_for()
     page.route('**/api/health', lambda route: route.fulfill(status=503, content_type='application/json', body='{}'))
     page.reload(wait_until='networkidle')
-    page.get_by_text('Local service offline', exact=True).wait_for()
-    assert page.locator('.footer-state').get_attribute('data-state') == 'offline'
+    page.locator('.service-indicator').get_by_text('Service offline', exact=True).wait_for()
+    assert 'online' not in (page.locator('.service-indicator').get_attribute('class') or '').split()
     assert page.get_by_role('button', name='Review project', exact=True).is_disabled()
     # Appearance must remain usable with browser storage blocked. This is a
     # presentation failure case, not an API or model execution.
@@ -489,6 +561,8 @@ with sync_playwright() as runtime:
     key_probes = []
     key_page.route('**/api/health', lambda route: route.fulfill(status=200, content_type='application/json', body=json.dumps(key_health)))
     key_page.route('**/api/jobs', lambda route: route.fulfill(status=200, content_type='application/json', body='[]'))
+    key_page.route('**/api/workspace*', lambda route: route.fulfill(status=200, content_type='application/json',
+        body=json.dumps({'schema_version': 1, 'items': [], 'total': 0, 'next_offset': None})))
     def save_key_fixture(route):
         key_requests.append(route.request.post_data_json)
         key_health['providers'][0].update(configured=True, key_source='local')
@@ -507,6 +581,44 @@ with sync_playwright() as runtime:
     assert 'fixture-not-a-real-provider-key' not in key_page.evaluate('JSON.stringify({...localStorage})')
     audit(key_page, 'local-provider-key-dialog')
     key_context.close()
+    # UI-to-API paging contract: thirty projects plus one more, with legacy
+    # history present. The first page must never be mostly invisible reviews.
+    paging_context = browser.new_context()
+    paging_page = paging_context.new_page()
+    paging_page.on('pageerror', lambda error: errors.append(str(error)))
+    paging_requests = []
+    paging_items = [{'kind': 'project', 'id': f'prj_{index:02d}', 'project_revision': 0,
+        'name': f'Project {index:02d}', 'source_kind': 'local', 'updated_at': '2026-10-10T12:00:00Z',
+        'activity_at': '2026-10-10T12:00:00Z', 'latest_job_id': None, 'open_job_id': None,
+        'phase': 'not_started', 'freshness': 'unavailable', 'source_freshness': 'unknown',
+        'readiness': 'not_established', 'implementation': 'not_established', 'assessment': 'incomplete',
+        'findings_count': 0, 'checks_passed': 0, 'checks_failed': 0} for index in range(31)]
+    paging_page.route('**/api/health', lambda route: route.fulfill(status=200, content_type='application/json',
+        body=json.dumps({'status': 'ok', 'settings': {}, 'providers': [], 'docker': {}})))
+    paging_page.route('**/api/jobs', lambda route: route.fulfill(status=200, content_type='application/json',
+        body=json.dumps([{'id': 'old-review', 'name': 'Earlier review', 'source': 'E:/archived',
+                          'status': 'complete', 'created_at': '2026-09-01T00:00:00Z'}])))
+    def page_projects(route):
+        params = parse_qs(urlsplit(route.request.url).query)
+        assert params.get('scope') == ['projects'] and params.get('quick') == ['true'], params
+        offset = int(params.get('offset', ['0'])[0])
+        limit = int(params.get('limit', ['30'])[0])
+        paging_requests.append(offset)
+        route.fulfill(status=200, content_type='application/json', body=json.dumps({
+            'schema_version': 1, 'items': paging_items[offset:offset + limit], 'total': 31,
+            'next_offset': offset + limit if offset + limit < 31 else None}))
+    paging_page.route('**/api/workspace*', page_projects)
+    paging_page.goto(BASE, wait_until='networkidle')
+    assert paging_page.locator('.project-list-row').count() == 30
+    paging_page.get_by_role('button', name='Load more projects, 30 of 31 loaded').click()
+    paging_page.get_by_role('button', name='Start a review for Project 30').wait_for()
+    assert paging_page.locator('.project-list-row').count() == 31
+    assert paging_page.get_by_role('button', name='Load more projects', exact=False).count() == 0
+    paging_page.locator('.review-history-disclosure > summary').click()
+    paging_page.get_by_role('heading', name='Review runs', exact=False).wait_for()
+    assert paging_page.locator('.review-row').count() == 1
+    assert paging_requests[0] == 0 and 30 in paging_requests and set(paging_requests) == {0, 30}, paging_requests
+    paging_context.close()
     assert not errors, errors
     browser.close()
     (ARTIFACTS / 'frontend-smoke.json').write_text(json.dumps({'views': reports, 'synthetic_actions': actions, 'javascript_errors': errors}, indent=2))

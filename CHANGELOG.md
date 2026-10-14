@@ -24,9 +24,31 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
   First-run setup is explicit; the dependency-free CLI's default remains unchanged.
 - Cloudflare Workers static-asset configuration serves the complete public
   browser trial and local setup guide. Deployment remains a separate manual action.
+- Structured local browser workflows observe accessible controls and independently
+  check selected API state before, after and again after actions. UI-only success
+  remains distinct from a complete observed workflow.
+- Opaque project identities, revisioned assignments, selected model context,
+  decisions and handoffs preserve completion reports as claims. CLI/MCP status
+  reads the authenticated local service without starting work.
+- Supplementary read-only Workbench adapters reuse the official MCP registry for
+  GitHub, Playwright, Sentry and Supabase. Configuration is not verified access.
+- An optional Tauri desktop prototype reuses the same UI/backend with bundled
+  Node/Python, native folder selection and tray lifecycle. Public installers
+  remain gated on signed exact-artifact clean-install evidence.
 
 ### Fixed
 
+- Desktop builds remove stale copied runtime resources and validate incremental
+  copies. Windows native resource paths are normalized before Node startup;
+  unsupported device paths are rejected. Release guards check actual native
+  signatures instead of trusting self-reported signature metadata.
+- Current source drift and stale review copies no longer retain demonstrated
+  runtime readiness. Empty MCP results and unrelated browser listeners cannot
+  become successful observations; historical evidence stays unchanged.
+- Updated the optional Workbench's image, source-map and development shell
+  dependencies to patched versions. Updated Promptfoo evaluation tooling and
+  its FTP parser; the remaining upstream development-only forge advisory is
+  documented in the release guide without suppressing the audit.
 - Card layouts wrap long model names, source paths, status labels and repair
   files without clipping evidence. Responsive checks inspect individual cards.
 - Browser setup instructions distinguish a published launcher from a pending
@@ -35,6 +57,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com); versions follow
   Existing checkout state, secrets, memory and hooks are never migrated automatically.
 - The npm package excludes development-only Python tools while keeping the
   runtime launcher and the existing package-size budget.
+- Changed original source and review copies have separate freshness states;
+  browser/status presentation cannot reuse stale success for readiness. Empty
+  MCP responses and unrelated/stopped browser listeners cannot become evidence.
+- Real rendered-workflow and native artifact tests complement core/backend,
+  privacy, installed-package and golden verification gates. Native binaries ship
+  separately; the source package budget is 3.75 MiB for the measured additions.
 
 ## [0.14.1] — 2026-10-01
 

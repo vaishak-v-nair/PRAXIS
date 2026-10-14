@@ -101,9 +101,11 @@ jobs:
       - run: python -m venv apps/workbench/.venv
       - run: apps/workbench/.venv/bin/python -m pip install -r apps/workbench/backend/requirements.txt
       - run: apps/workbench/.venv/bin/python -m pip check
+      - run: apps/workbench/.venv/bin/python -m playwright install --with-deps chromium
       - run: npm run test:workbench
       - run: npm run typecheck:workbench
       - run: npm run build:workbench
+      - run: npm run test:assurance
       - run: npm --prefix apps/workbench audit --omit=dev --audit-level=high
 
   publish:

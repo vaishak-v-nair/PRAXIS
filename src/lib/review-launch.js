@@ -32,13 +32,13 @@ export async function waitForReview({ fetchImpl = fetch, signal, timeout = 90000
   throw new Error('The local interface and API did not become ready in time. No successful startup was reported. Check the service logs above.');
 }
 
-export function openReview({ platform = process.platform, spawnImpl = spawn, log = console.log } = {}) {
+export function openReview({ url = REVIEW_URL, platform = process.platform, spawnImpl = spawn, log = console.log } = {}) {
   const command = platform === 'win32' ? 'rundll32.exe' : platform === 'darwin' ? 'open' : 'xdg-open';
-  const args = platform === 'win32' ? ['url.dll,FileProtocolHandler', REVIEW_URL] : [REVIEW_URL];
+  const args = platform === 'win32' ? ['url.dll,FileProtocolHandler', url] : [url];
   try {
     const child = spawnImpl(command, args, { stdio: 'ignore', windowsHide: true, shell: false });
-    child.once('error', () => log(`Open ${REVIEW_URL} in your browser.`));
-    child.once('close', code => { if (code) log(`Open ${REVIEW_URL} in your browser.`); });
+    child.once('error', () => log(`Open ${url} in your browser.`));
+    child.once('close', code => { if (code) log(`Open ${url} in your browser.`); });
     child.unref();
-  } catch { log(`Open ${REVIEW_URL} in your browser.`); }
+  } catch { log(`Open ${url} in your browser.`); }
 }

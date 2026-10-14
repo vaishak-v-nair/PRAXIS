@@ -57,6 +57,79 @@ class ScannerSecurityTests(unittest.TestCase):
         library.write_text('changed generated dependency')
         self.assertEqual(fingerprint(self.project), before)
 
+    def test_unreal_generated_caches_are_excluded_without_hiding_game_content_or_other_saved_folders(self):
+        game = self.project / 'game'
+        game.mkdir()
+        (game / 'game.uproject').write_text('{}')
+        content = game / 'Content'
+        content.mkdir()
+        (content / 'map.txt').write_text('real level source')
+        for directory in ('DerivedDataCache', 'Intermediate', 'Saved', 'Binaries'):
+            generated = game / directory
+            generated.mkdir()
+            (generated / 'cache.py').write_text('print("generated")')
+        ordinary = self.project / 'Saved'
+        ordinary.mkdir()
+        (ordinary / 'notes.py').write_text('print("ordinary project source")')
+        selected = {file.relative_to(self.project).as_posix() for file in safe_files(self.project)}
+        self.assertIn('game/Content/map.txt', selected)
+        self.assertIn('Saved/notes.py', selected)
+        self.assertFalse(any('/cache.py' in name for name in selected))
+        first = fingerprint(self.project)
+        (game / 'Intermediate' / 'cache.py').write_text('changed cache')
+        self.assertEqual(fingerprint(self.project), first)
+        (content / 'map.txt').write_text('changed real level source')
+        self.assertNotEqual(fingerprint(self.project), first)
+        prepared = prepare_project(str(self.project), self.root / 'job', lambda _: None, self.cancelled)
+        snapshot = Path(prepared['path'])
+        self.assertTrue((snapshot / 'game' / 'Content' / 'map.txt').exists())
+        self.assertTrue((snapshot / 'Saved' / 'notes.py').exists())
+        self.assertFalse((snapshot / 'game' / 'Intermediate').exists())
+
+    def test_cancelled_fingerprint_stops_before_reading_source(self):
+        (self.project / 'app.py').write_text('print("source")')
+        self.cancelled.set()
+        with patch.object(Path, 'read_bytes', side_effect=AssertionError('source read after cancellation')):
+            with self.assertRaisesRegex(RuntimeError, 'Job cancelled'):
+                fingerprint(self.project, self.cancelled)
+
+    def test_bounded_snapshot_keeps_source_and_reports_original_omissions(self):
+        (self.project / 'src').mkdir()
+        (self.project / 'tests').mkdir()
+        (self.project / 'src/app.py').write_text('print(1)\n')
+        (self.project / 'tests/test_app.py').write_text('assert 1\n')
+        (self.project / 'a-media.png').write_bytes(b'x' * 20)
+        with patch('regen.scanner.MAX_TOTAL_BYTES', 25):
+            prepared = prepare_project(str(self.project), self.root / 'job', lambda _: None, self.cancelled)
+            snapshot = Path(prepared['path'])
+            self.assertTrue((snapshot / 'src/app.py').exists())
+            self.assertTrue((snapshot / 'tests/test_app.py').exists())
+            self.assertFalse((snapshot / 'a-media.png').exists())
+            self.assertEqual(prepared['source_scope']['omitted_files'], 1)
+            scanned = scan_project(snapshot, lambda _: None, self.cancelled, external_checks=False,
+                                   source_scope=prepared['source_scope'])
+        local = next(item for item in scanned['coverage'] if item['name'] == 'Local source inspection')
+        self.assertEqual(local['status'], 'limited')
+        self.assertEqual(local['limits']['snapshot_omitted_files'], 1)
+
+    def test_nested_git_project_is_separate_and_reported_as_limited_scope(self):
+        (self.project / 'src').mkdir()
+        (self.project / 'src/app.py').write_text('print(1)')
+        nested = self.project / 'vendor'
+        (nested / '.git').mkdir(parents=True)
+        (nested / 'app.py').write_text('raise NotImplementedError')
+        self.assertEqual([file.relative_to(self.project).as_posix() for file in safe_files(self.project)],
+                         ['src/app.py'])
+        self.assertEqual([file.name for file in safe_files(nested)], ['app.py'])
+        prepared = prepare_project(str(self.project), self.root / 'job', lambda _: None, self.cancelled)
+        self.assertFalse((Path(prepared['path']) / 'vendor').exists())
+        self.assertEqual(prepared['source_scope']['excluded_nested_repositories'], 1)
+        scanned = scan_project(Path(prepared['path']), lambda _: None, self.cancelled,
+                               external_checks=False, source_scope=prepared['source_scope'])
+        local = next(item for item in scanned['coverage'] if item['name'] == 'Local source inspection')
+        self.assertEqual(local['status'], 'limited')
+        self.assertEqual(local['limits']['snapshot_nested_repositories'], 1)
+
     def test_private_praxis_memory_is_never_scanned_or_snapshotted(self):
         (self.project / 'app.py').write_text('print("source")')
         memory = self.project / '.praxis'

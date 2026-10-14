@@ -1,0 +1,19 @@
+{
+  "name": "praxis-desktop",
+  "version": "0.14.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "node scripts/develop.mjs",
+    "prepare:runtime": "node scripts/prepare-runtime.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "smoke:runtime": "node scripts/smoke-runtime.mjs",
+    "smoke:native": "node scripts/smoke-native-shell.mjs",
+    "check:release": "node scripts/release-gate.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.1"
+  }
+}

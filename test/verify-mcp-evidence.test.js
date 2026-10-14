@@ -165,3 +165,46 @@ test('the integrated MCP path binds evidence to the commit and signs a receipt',
     fs.rmSync(parent, { recursive: true, force: true });
   }
 });
+
+test('trusted MCP evidence retains diff binding and false-success checks before judging claims', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-trusted-mcp-'));
+  const root = path.join(parent, 'repo');
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  try {
+    fs.mkdirSync(root);
+    git('init', '-q'); git('config', 'user.email', 'verify@example.test'); git('config', 'user.name', 'AI Agent');
+    fs.writeFileSync(path.join(root, 'app.js'), 'export function saveOrder() { throw new Error("unfinished"); }\n');
+    git('add', '.'); git('commit', '-qm', 'initial'); const base = git('rev-parse', 'HEAD');
+    fs.writeFileSync(path.join(root, 'app.js'), 'export function saveOrder() { return { success: true }; }\n');
+    git('add', '.'); git('commit', '-qm', 'AI agent claims a real save and a missing file change');
+    const claims = [
+      { id: 'save', sourceText: 'app.js saves an order.', predicate: 'Saving produces a real backend side effect',
+        scope: { kind: 'behavior-change', paths: ['app.js'], expectsSideEffect: true },
+        source: { kind: 'fixture' }, requiredEvidence: ['false-success'], required: true },
+      { id: 'missing', sourceText: 'Updated missing.js.', predicate: 'The bound diff changes missing.js',
+        scope: { kind: 'file-change', paths: ['missing.js'] },
+        source: { kind: 'fixture' }, requiredEvidence: ['git-diff'], required: true },
+    ];
+    const trustPolicy = path.join(parent, 'trust.json'), mcpPolicy = path.join(parent, 'mcp.json');
+    fs.writeFileSync(trustPolicy, JSON.stringify({ schema: 'praxis.verify.trust/v1', commands: [{
+      id: 'supporting-ci', argv: [process.execPath, '-e', 'process.exit(0)'], evidence: 'ci-result', claimIds: ['save', 'missing'],
+    }] }));
+    fs.writeFileSync(mcpPolicy, JSON.stringify({ schema: MCP_EVIDENCE_POLICY_SCHEMA, checks: [{
+      id: 'supporting-pr', source: 'github', claimIds: ['save', 'missing'],
+      calls: [{ tool: 'pull_request_read', arguments: {} }], expectation: { type: 'text-includes', value: 'reviewed PR' },
+    }] }));
+    const result = await verifyWithMcp({ cwd: root, base, head: 'HEAD', mode: 'trusted',
+      manifestObject: { schema: CLAIM_SCHEMA, claims }, trustPolicy, mcpPolicy,
+      keyDir: path.join(parent, 'keys'), receiptDir: path.join(parent, 'receipts'),
+      mcpRuntime: { clientFactory: () => ({ initialize: async () => {},
+        callTool: async () => ({ content: [{ type: 'text', text: 'reviewed PR' }] }) }) },
+    });
+    assert.equal(result.mode, 'trusted+mcp');
+    assert.deepEqual(result.decision.decisions.map(item => item.verdict), ['CONTRADICTED', 'CONTRADICTED']);
+    const observers = result.observations.map(item => item.observer);
+    assert.ok(observers.includes('regen-static-diff'));
+    assert.ok(observers.includes('regen-false-success'));
+    assert.ok(observers.indexOf('regen-static-diff') < observers.indexOf('ci-result'));
+    assert.equal(result.artifact.signatureVerified, true);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});

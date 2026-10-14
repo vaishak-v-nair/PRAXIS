@@ -51,7 +51,7 @@ const HEAD = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#150d0b">
+<meta name="theme-color" content="#f6f7f6">
 <link rel="icon" href="${navicon}">
 <link rel="canonical" href="${SITE}/">
 <meta property="og:type" content="website">
@@ -62,7 +62,7 @@ const HEAD = `<!DOCTYPE html>
 <meta property="og:image" content="${SITE}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="PRAXIS — the axolotl mascot beside the command: npx praxis-memory demo.">
+<meta property="og:image:alt" content="PRAXIS project review with the axolotl mascot.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="PRAXIS — check what works in the project you built with AI.">
 <meta name="twitter:description" content="Review your AI-built project in the browser or locally. See source-backed findings and choose the next change.">

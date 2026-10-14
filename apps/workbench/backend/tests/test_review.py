@@ -181,6 +181,20 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(e2e['evidence_count'], 1)
         self.assertEqual(e2e['evidence'][0]['label'], 'Browser checks')
 
+    def test_visible_ui_interaction_does_not_prove_backend_side_effects(self):
+        result = assessment({'status': 'complete', 'plan': {'files': 3, 'test_file_count': 1},
+                             'coverage': [{'name': 'Local source inspection', 'status': 'passed', 'detail': '3 files'}],
+                             'checks': [{'name': 'tests', 'kind': 'command', 'status': 'passed'},
+                                        {'name': 'Browser checks', 'kind': 'browser',
+                                         'evidence_scope': 'homepage_smoke', 'status': 'passed'},
+                                        {'name': 'Open settings', 'kind': 'browser',
+                                         'evidence_scope': 'ui_interaction', 'status': 'passed'}]})
+        self.assertEqual(result['readiness']['status'], 'not_established')
+        self.assertNotEqual(result['implementation']['status'], 'demonstrated')
+        e2e = next(item for item in result['dimensions'] if item['id'] == 'e2e')
+        self.assertEqual(e2e['status'], 'interaction_passed')
+        self.assertIn('backend state', e2e['detail'])
+
     def test_dimension_counts_are_actual_inspectable_records(self):
         result = assessment({'status': 'complete',
                              'plan': {'files': 20, 'manifests': ['package.json'], 'test_file_count': 1,

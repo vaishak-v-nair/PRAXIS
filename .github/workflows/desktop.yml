@@ -1,0 +1,70 @@
+name: Desktop runtime and native builds
+on:
+  pull_request:
+    paths: ['apps/desktop/**', 'apps/workbench/**', 'src/lib/jobs/**', 'src/lib/review-service*.js', 'src/lib/review-install.js', 'src/lib/verify/mcp-client.js', 'src/lib/verify/mcp-sources.js', 'src/lib/verify/schema.js', 'test/review-service*.test.js', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux WebKit and tray development libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install isolated desktop development dependencies
+        run: npm ci --prefix apps/desktop
+      - name: Shared service lifecycle pressure tests
+        run: node scripts/ci/run-tests.mjs test/review-service.test.js test/review-service-runtime.test.js
+      - name: Desktop artifact pressure tests
+        run: npm run test --prefix apps/desktop
+      - name: Bundle native existing engine and UI
+        env:
+          PRAXIS_DESKTOP_BUILD_PYTHON: python
+        run: npm run prepare:runtime --prefix apps/desktop
+      - name: Native control and navigation unit tests
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
+      - name: Real packaged source-review smoke (no global runtime PATH)
+        run: npm run smoke:runtime --prefix apps/desktop
+      - name: Build Windows native acceptance executable
+        if: runner.os == 'Windows'
+        run: cargo build --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
+      - name: Real Windows native duplicate-launch and recovery smoke
+        if: runner.os == 'Windows'
+        run: npm run smoke:native --prefix apps/desktop
+      - name: Build native development artifacts (not signed public releases)
+        run: npm run build --prefix apps/desktop -- --target ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: praxis-desktop-development-${{ matrix.target }}
+          path: |
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/
+            apps/desktop/src-tauri/runtime/manifest.json
+            apps/desktop/artifacts/runtime-smoke.json
+            apps/desktop/artifacts/native-smoke.json
+          if-no-files-found: error
+      # Signing/public release intentionally needs the separate exact-artifact
+      # release-evidence gate. Forks receive no signing credentials or publisher.

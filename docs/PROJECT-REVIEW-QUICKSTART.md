@@ -19,7 +19,21 @@ the actual API and page respond. Initial setup needs internet and several minute
 Git, system Python and Docker are not required to start the tool or inspect source.
 Repeat the same command for later sessions.
 `review --check [--json]` is inert; `review --setup-only` installs without launching;
-`review --no-open` keeps automatic browser opening off. Ctrl+C stops both services.
+`review --no-open` keeps automatic browser opening off. The launcher owns one
+authenticated local service. Another compatible CLI/desktop client attaches to
+it instead of starting a second engine. Ctrl+C in the owning launcher stops its
+services; closing an attached CLI leaves the owner running.
+
+Read the running service without starting or modifying it:
+
+```powershell
+node src/cli.js review --status
+node src/cli.js review --status --json
+```
+
+Status reports review-copy and original-source freshness separately and contains
+no source excerpts, local paths, conversation or provider keys. The read-only MCP
+tool `praxis_project_review_status` exposes the same projection.
 
 After **0.14.2** is manually published, the public command is
 `npx praxis-memory@0.14.2 review`. The website checks the exact npm release before
@@ -58,16 +72,27 @@ For a fresh checkout, follow the separate Node/Python installation steps in
 
 ## Review your project
 
+The home screen lists projects, with the latest saved review and its source
+freshness. A completed review is a recorded run, not proof that a product works.
+When the original folder or review copy changes, the home screen asks for a
+fresh review. Older unlinked runs remain under **Earlier reviews** and **All
+review runs**; opening them does not migrate or relink their evidence.
+
 1. Choose your project folder, paste a GitHub repository URL, or provide a local path.
 2. Describe what the project should do, then select **Review project**. The default
    source review needs no provider key, Docker, or project-command authorization.
    It inspects a separate copy and reports source-backed findings and limits.
+   For a large folder, PRAXIS selects source, tests, and manifests before media
+   within its bounded snapshot. It reports omitted file counts and treats a
+   partial snapshot as limited evidence. Nested Git checkouts are separate
+   projects; select one directly if it belongs in the review.
 3. Read the prioritized issues, successful observations, and checks that have not
    been performed. A finished review does not mean the project works end to end.
    Copy the findings into your coding agent; the brief includes source locations,
    review scope, and a requirement to validate the current source before edits.
-4. Optionally add model review in the review options. Open **Models**, select a
-   provider, and save its key locally. Set actual token rates and a shared spending
+4. Optionally enable **AI analysis** in the review form. Open **Models**, select a
+   provider, and save its key locally. The selected provider must have a configured
+   key; a key for another provider cannot silently enable it. Set actual token rates and a shared spending
    limit. A configured key does not guarantee access or remaining credit. Source
    inspection still works when models are unavailable.
 5. For runtime evidence, inspect the discovered commands and explicitly choose
@@ -75,10 +100,28 @@ For a fresh checkout, follow the separate Node/Python installation steps in
    execution uses a review copy but can access your computer and network; it is
    not an OS sandbox. Docker needs its local Linux engine and prepared images,
    and retains separate network consent. There is no automatic environment fallback.
+   In **Run project checks**, provide a start command for local port 4173 and
+   enable **Observe a user workflow**. Choose a single click or a bounded
+   multi-step workflow: routes, accessible fields/controls and expected text.
+   Add a read-only local JSON API route, value path and expected scalar outcome
+   to independently check backend state before, after and again after the action.
+   Use non-sensitive test data; form values are transient, not stored in history.
+   An occupied port or stopped owned process cannot supply successful evidence.
 6. For a model-generated plan, select relevant Findings and **Draft a fix plan**.
    Review it before confirming a model handoff, or copy it into your existing
    coding agent. A copied brief, generated plan, implementation, and source apply
    are distinct actions. Planning does not authorize source changes.
+7. Open **Workspace** to assign current-snapshot tasks to a person or selected
+   model reviewer, record goals/decisions and prepare handoffs. Sharing is
+   explicit; local-only context is not sent to model reviewers. A completion
+   report stays a claim until independently checked. This local shared workspace
+   is not an authenticated internet collaboration service or autonomous coding
+   agent task runner.
+8. Open **Evidence** for supplementary read-only observations from official
+   GitHub, Microsoft Playwright, Sentry or Supabase MCP servers. Vendor tokens
+   stay in the local service environment; this page never accepts credentials.
+   You choose and authorize the remote scope. A configured token is not proof of
+   access, and remote scope is not automatically bound to the local deployment.
 
 Local projects use guarded apply with freshness checks, backup, and rollback.
 GitHub and uploaded projects provide downloadable patches or project copies;
@@ -95,9 +138,24 @@ copy and a stripped process environment, with host permissions explicitly disclo
   failure leaves behavior unproven; it does not prove a broken implementation.
 - Passing tests establish the recorded test outcomes. Homepage reachability
   does not establish a complete user journey.
+- A passing browser interaction establishes only that the expected text became
+  visible after one control was clicked in the local review app. It does not establish a
+  backend state change or external side effect and cannot alone satisfy the
+  release-candidate user-journey gate.
+- A structured workflow earns user-journey evidence only when the new visible
+  outcome and every selected independent API state check succeed, including a
+  repeated confirmation. A static success response, absent expected change or
+  partial outcome cannot pass. Selected JSON fields do not establish database
+  durability, complete business behavior or external side effects.
+- A changed or missing reviewed copy cannot reuse earlier successful checks for
+  readiness. A changed original folder remains separate from its saved review;
+  start a new review or explicitly relink a moved folder. Historical evidence is
+  kept, not rewritten. Freshness covers the bounded file selection, not excluded
+  generated dependencies or oversized data.
 - Missing analyzers, provider quotas, unsupported runtimes, and safety limits
   remain visible. The Docker runner currently does not drive browser journeys;
-  use separate task-specific Playwright evidence for those workflows.
+  it rejects a requested interaction rather than silently switching to local
+  execution.
 - Agent plugin and skill directories are excluded from product inspection so
   vendored tooling does not overwhelm application evidence. Root `AGENTS.md`,
   `CLAUDE.md`, and project documentation remain eligible. Original files are
@@ -110,3 +168,13 @@ projects, use a local path and inspect the recorded scope limits.
 PRAXIS is a local review tool. A release-candidate assessment does not certify
 live production health, complete security, or all user workflows. Workbench
 evidence does not automatically become a signed CLI verification receipt.
+
+## Optional desktop prototype
+
+The Tauri desktop app uses the same review engine, data store, source trust and
+model budget. Its native folder picker only prefills the review form. Bundled
+Node/Python remove those manual consumer prerequisites; submitted-project
+builds still need their own toolchain or explicitly selected Docker. Development
+installer instructions and exact-artifact release gates are in
+[apps/desktop/README.md](../apps/desktop/README.md). A successful local build does
+not imply a signed public installer or clean-install validation on every OS.

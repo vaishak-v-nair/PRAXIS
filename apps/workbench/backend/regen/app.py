@@ -6,6 +6,7 @@ import io
 import json
 import os
 import shlex
+import secrets
 import threading
 import uuid
 import zipfile
@@ -14,10 +15,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .store import Store
 from .intake import (MAX_UPLOAD_BODY, append_upload_batch, cancel_upload_session,
@@ -25,6 +27,11 @@ from .intake import (MAX_UPLOAD_BODY, append_upload_batch, cancel_upload_session
                      prune_upload_sessions, uploaded_project)
 from . import review, sandbox
 from .paths import runtime_paths
+from .journey_schema import JourneyInput
+from .evidence import EvidenceInput
+from .projects import ProjectError, ProjectRegistry
+from .workspace import WorkspacePage, page as workspace_page
+from .coordination import Coordination
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA, _ = runtime_paths(ROOT)
@@ -33,9 +40,23 @@ lock = threading.RLock()
 workers: dict[str, threading.Thread] = {}
 upload_slots = threading.BoundedSemaphore(2)
 probe_slot = threading.BoundedSemaphore(1)
+evidence_slot = threading.BoundedSemaphore(1)
 cancellations: dict[str, threading.Event] = {}
 app = FastAPI(title="PRAXIS Workbench", docs_url=None, redoc_url=None)
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"], allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+
+
+@app.exception_handler(ProjectError)
+async def project_error(request: Request, exc: ProjectError):
+    return JSONResponse({'detail': str(exc)}, status_code=exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_validation_error(request: Request, exc: RequestValidationError):
+    # Pydantic's default response echoes submitted values, including transient
+    # form input. Return actionable field errors without reflecting that data.
+    return JSONResponse({'detail': [{'loc': error['loc'], 'msg': error['msg'],
+                                    'type': error['type']} for error in exc.errors()]}, status_code=422)
 
 
 def modules():
@@ -71,7 +92,41 @@ def get_job(job_id):
 def public_job(job):
     # Render existing evidence using the current presentation contract. No stored
     # source, checks, receipts, or job history are migrated or overwritten.
-    return sanitize({**job, 'assessment': review.assessment(job)})
+    result = {**job}
+    if job.get('project_id'):
+        registry = ProjectRegistry(store)
+        result['evidence_freshness'] = registry.job_freshness(job)
+        result['project'] = registry.get(job['project_id'])
+        result['coordination'] = Coordination(store, registry=registry).get(job['project_id'], job_id=job['id'])
+    result['assessment'] = review.assessment(result)
+    return sanitize(result)
+
+
+def attach_current_project(job_id):
+    current = get_job(job_id)
+    if current.get('project_id') and current.get('snapshot'):
+        registry = ProjectRegistry(store)
+        project = registry.get(current['project_id'])
+        project = registry.attach_job(project['id'], job_id, expected_revision=project['revision'])
+        update(job_id, project_snapshot_id=project['latest_snapshot_id'])
+
+
+def shared_project_context(job_id):
+    current = get_job(job_id)
+    stored = current.get('collaboration', {})
+    discussion = {'revision': stored.get('revision', 0),
+                  'notes': [note for note in stored.get('notes', []) if note.get('share_with_agents')]} if stored else {}
+    if not current.get('project_id'):
+        return discussion
+    board = Coordination(store)
+    notes = list(discussion.get('notes', []))
+    revision = discussion.get('revision', 0)
+    for actor in ('agent-1', 'agent-2', 'agent-3', 'agent-4'):
+        context = board.agent_context(current['project_id'], actor, job_id=job_id)
+        notes.extend(context['notes']); revision += context['revision']
+    if not notes and not revision:
+        return discussion
+    return {**discussion, 'revision': revision, 'notes': notes}
 
 
 def update(job_id, **changes):
@@ -115,9 +170,17 @@ async def local_only(request: Request, call_next):
     client = request.client.host if request.client else ""
     if hostname not in {"localhost", "127.0.0.1", "::1", "testserver"} or client not in {"127.0.0.1", "::1", "localhost", "testclient"}:
         return JSONResponse({"detail": "ReGen only accepts local connections"}, status_code=403)
+    service_token = os.getenv('PRAXIS_REVIEW_SERVICE_TOKEN')
+    if service_token and request.url.path.startswith('/api'):
+        provided = request.headers.get('authorization', '')
+        if not secrets.compare_digest(provided.encode(), ('Bearer ' + service_token).encode()):
+            return JSONResponse({'detail': 'Connect through the authorized PRAXIS local service.'}, status_code=401)
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
-        if origin and origin not in {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:9123", "http://127.0.0.1:9123"}:
+        origins = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:9123", "http://127.0.0.1:9123"}
+        if service_token:
+            origins.add(str(request.base_url).rstrip('/'))
+        if origin and origin not in origins:
             return JSONResponse({"detail": "Untrusted origin"}, status_code=403)
         # JSON-only writes prevent cross-site form submissions when Origin is absent.
         if "application/json" not in request.headers.get("content-type", ""):
@@ -134,9 +197,11 @@ def recover():
 
 
 class ScanInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     source: str = Field(min_length=1, max_length=4096)
     budget: float = Field(default=5, gt=0, le=1000)
-    ai_review: bool = True
+    ai_review: bool = False
     review_mode: Literal['standard', 'deep', 'ultra', 'team'] = 'standard'
     review_goal: str = Field(default='', max_length=4000)
     run_checks: bool = False
@@ -152,6 +217,60 @@ class CollaborationInput(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     assigned_to: Literal['team', 'agent-1', 'agent-2', 'agent-3', 'agent-4'] = 'team'
     share_with_agents: bool = False
+
+
+class RevisionInput(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    expected_revision: int = Field(ge=0)
+    idempotency_key: str | None = Field(default=None, pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$')
+
+
+class AssignmentInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    kind: Literal['human', 'agent']
+    id: str = Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$')
+
+
+class TaskInput(RevisionInput):
+    title: str = Field(min_length=1, max_length=160)
+    description: str = Field(default='', max_length=4000)
+    depends_on: list[str] = Field(default_factory=list, max_length=20)
+    assigned_to: AssignmentInput | None = None
+    share_with_agents: bool = False
+
+
+class TaskUpdateInput(RevisionInput):
+    changes: dict = Field(min_length=1, max_length=7)
+
+
+class AgentPlanInput(RevisionInput):
+    tool: str = Field(pattern=r'^[a-zA-Z0-9_-]{1,64}$')
+    trust_confirmed: bool = False
+    external_spend_confirmed: bool = False
+    timeout_seconds: int = Field(default=120, ge=15, le=300)
+
+
+class DecisionInput(RevisionInput):
+    text: str = Field(min_length=1, max_length=2000)
+    kind: Literal['goal', 'question', 'decision'] = 'decision'
+    share_with_agents: bool = False
+
+
+class HandoffInput(RevisionInput):
+    task_id: str = Field(min_length=1, max_length=128)
+    recipient: AssignmentInput
+    text: str = Field(min_length=1, max_length=4000)
+    share_with_agents: bool = False
+
+
+class RelinkInput(RevisionInput):
+    source: str = Field(min_length=1, max_length=4096)
+    confirmed: bool = False
+
+
+class LinkProjectInput(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    confirmed: bool = False
 
 
 class FixInput(BaseModel):
@@ -172,6 +291,7 @@ class VerifyInput(BaseModel):
     start_command: str | None = Field(default=None, max_length=2000)
     runtime_mode: Literal['host', 'docker'] = 'host'
     allow_network: bool = False
+    journey: JourneyInput | None = None
 
 
 class BudgetInput(BaseModel):
@@ -195,11 +315,23 @@ def start(job_id, stage, options=None):
             raise HTTPException(409, "This job already has work in progress")
         cancelled = threading.Event()
         cancellations[job_id] = cancelled
-        update(job_id, status=stage, error=None, resume={"stage": stage, "options": options or {}})
+        update(job_id, status=stage, error=None, resume=None if (options or {}).get('agent_task_id') else {"stage": stage, "options": durable_options(options or {})})
         thread = threading.Thread(target=work, args=(job_id, stage, options or {}, cancelled), daemon=True)
         workers[job_id] = thread
         thread.start()
     return public_job(get_job(job_id))
+
+
+def durable_options(options):
+    """Form values exist only in worker memory, never in resume/history state."""
+    result = {key: value for key, value in options.items() if key != 'agent_lease_token'}
+    if result.get('journey'):
+        result['journey'] = {**result['journey']}
+        result['journey']['steps'] = [{key: value for key, value in step.items() if key != 'value'}
+                                     for step in result['journey'].get('steps', [])]
+        result['journey']['state_assertions'] = [{key: value for key, value in check.items() if key != 'expected'}
+                                                for check in result['journey'].get('state_assertions', [])]
+    return result
 
 
 def command_override(value):
@@ -212,7 +344,7 @@ def command_override(value):
 
 
 def run_project_checks(subject, commands, emit, cancelled, *, runtime_mode='host',
-                       allow_network=False, start_command=None, on_result=None):
+                       allow_network=False, start_command=None, journey_spec=None, on_result=None):
     """Dispatch only the explicitly chosen runtime; never attempt a fallback.
 
     The network option controls Docker networking only. Trusted host commands
@@ -221,10 +353,14 @@ def run_project_checks(subject, commands, emit, cancelled, *, runtime_mode='host
     scanner, _ = modules()
     if runtime_mode not in {'host', 'docker'}:
         raise ValueError('Unsupported project execution environment')
+    if journey_spec and runtime_mode != 'host':
+        raise ValueError('Task-specific browser journeys require authorized local execution')
     runner = sandbox.run_checks if runtime_mode == 'docker' else scanner.run_checks
     options = {'start_command': start_command, 'on_result': on_result}
     if runtime_mode == 'docker':
         options['allow_network'] = allow_network
+    else:
+        options['journey_spec'] = journey_spec
     return runner(Path(subject), commands, emit, cancelled, **options)
 
 
@@ -241,25 +377,62 @@ def work(job_id, stage, options, cancelled):
             if uploaded:
                 prepared.update(source=job['source'], name=name)
             update(job_id, snapshot=str(prepared["path"]), source=prepared.get("source", job["source"]), name=prepared["name"], source_fingerprint=prepared.get("source_fingerprint"), languages=prepared.get("languages", []), commands=prepared.get("commands", []), start_command=prepared.get("start_command"))
-            scan = scanner.scan_project(Path(prepared["path"]), emit, cancelled)
+            scan = scanner.scan_project(Path(prepared["path"]), emit, cancelled,
+                                        source_scope=prepared.get('source_scope'))
             scan["findings"] = prepared.get("findings", []) + scan.get("findings", [])
             update(job_id, **scan)
             update(job_id, plan=review.project_plan(Path(prepared['path']), prepared.get('commands', []),
                                                      prepared.get('praxis_memory_available', False)))
+            attach_current_project(job_id)
             stage = "analyzing"
-            update(job_id, status=stage, resume={"stage": stage, "options": options})
+            update(job_id, status=stage, resume={"stage": stage, "options": durable_options(options)})
         job = get_job(job_id)
         if cancelled.is_set():
             update(job_id, status="cancelled")
             return
-        if stage == "analyzing":
-            scan = {key: job.get(key) for key in ("findings", "coverage", "languages", "files_scanned")}
+        if stage == "analyzing" and options.get('agent_task_id'):
+            from .agent_work import run_plan
+            board = Coordination(store)
+            actor_id = 'cli-' + options['agent_tool']
+            context = board.agent_context(job['project_id'], actor_id, job_id=job_id)
+            task = next(item for item in context['tasks'] if item['id'] == options['agent_task_id'])
+            if not options.get('agent_lease_token'):
+                raise ValueError('The agent plan has no active execution lease. Start it again explicitly from the current assignment.')
             try:
-                if options.get('ai_review', True):
+                result = run_plan(job, tool=options['agent_tool'], task=task, context=context, data=DATA,
+                                  cancelled=cancelled, timeout_seconds=options['timeout_seconds'], emit=emit)
+            except Exception:
+                result = {'status': 'failed', 'tool': options['agent_tool'], 'mode': 'plan', 'report': '',
+                          'detail': 'The coding-agent plan could not finish. No completion was accepted.',
+                          'verification': 'not_evaluated', 'billing': 'agent_account_not_capped_by_review_budget'}
+            if cancelled.is_set():
+                result.update(status='cancelled', detail='The coding-agent plan was cancelled. No completion was accepted.')
+            result.update(task_id=task['id'], ended_at=now())
+            update(job_id, agent_run=result)
+            # A revoked lease, changed assignment or stale snapshot must never
+            # be overwritten by an agent which completed late.
+            for attempt in range(3):
+                scoped = board.get(job['project_id'], job_id=job_id)
+                try:
+                    board.update_task(job['project_id'], task['id'], expected_revision=scoped['revision'],
+                        actor_kind='agent', actor_id=actor_id, lease_token=options['agent_lease_token'],
+                        changes={'state': 'completed' if result['status'] == 'completed' else 'blocked',
+                                 'completion_report': (result['report'] or result['detail'])[:4000]})
+                    break
+                except ProjectError as exc:
+                    if exc.status_code != 409 or attempt == 2:
+                        update(job_id, agent_run={**result, 'status': 'failed',
+                            'detail': 'The task changed or its execution lease was revoked. Agent completion was not accepted.'})
+                        raise
+            emit(result['detail'])
+        elif stage == "analyzing":
+            scan = {key: job.get(key) for key in ("findings", "coverage", "languages", "files_scanned", "review_goal")}
+            try:
+                if options.get('ai_review', False):
                     if options.get('review_mode') == 'team':
                         from .team import analyze_team
-                        result = analyze_team(Path(job["snapshot"]), scan, emit, cancelled, budget, goal=options.get('review_goal', ''),
-                                              human_context=lambda: get_job(job_id).get('collaboration', {}))
+                        result = analyze_team(Path(job["snapshot"]), scan, emit, cancelled, budget, goal=job.get('review_goal') or options.get('review_goal', ''),
+                                              human_context=lambda: shared_project_context(job_id))
                     else:
                         reviewer = provider.analyze_deep if options.get('review_mode') in {'deep', 'ultra'} else provider.analyze
                         result = reviewer(Path(job["snapshot"]), scan, emit, cancelled, budget)
@@ -305,14 +478,17 @@ def work(job_id, stage, options, cancelled):
                                         runtime_mode=options.get('runtime_mode', 'host'),
                                         allow_network=options.get('allow_network', False),
                                         start_command=options.get('start_command') or job.get('start_command'),
+                                        journey_spec=options.get('journey'),
                                         on_result=lambda items: update(job_id, checks=items, checks_for=subject))
             update(job_id, checks=checks, checks_for=subject)
+        if not cancelled.is_set():
+            attach_current_project(job_id)
         update(job_id, status="cancelled" if cancelled.is_set() else "complete", resume=None)
     except provider.BudgetExceeded as exc:
         if cancelled.is_set():
             update(job_id, status="cancelled", resume=None)
         else:
-            update(job_id, status="paused", error=scanner.redact(str(exc)), resume={"stage": stage, "options": options})
+            update(job_id, status="paused", error=scanner.redact(str(exc)), resume={"stage": stage, "options": durable_options(options)})
             emit("Model budget reached. Add budget to resume this stage.")
     except Exception as exc:
         update(job_id, status="cancelled" if cancelled.is_set() else "error", error=scanner.redact(str(exc)))
@@ -324,7 +500,44 @@ def work(job_id, stage, options, cancelled):
 @app.get("/api/health")
 def health():
     _, provider = modules()
-    return sanitize({**provider.health(), 'docker': sandbox.health()})
+    result = {**provider.health(), 'docker': sandbox.health()}
+    if os.getenv('PRAXIS_REVIEW_SERVICE_TOKEN'):
+        result['service_instance'] = os.getenv('PRAXIS_REVIEW_SERVICE_INSTANCE')
+    return sanitize(result)
+
+
+@app.get('/api/evidence/sources')
+def evidence_sources():
+    modules()  # Load server-side environment without exposing its values.
+    from .evidence import availability
+    return sanitize(availability())
+
+
+@app.post('/api/jobs/{job_id}/evidence')
+def external_evidence(job_id: str, body: EvidenceInput):
+    if not body.authorized:
+        raise HTTPException(403, 'Authorize the selected vendor request before gathering external evidence.')
+    current = get_job(job_id)
+    if current['status'] != 'complete' or not current.get('snapshot'):
+        raise HTTPException(409, 'Finish the current review before gathering external evidence.')
+    if len(current.get('external_evidence', [])) >= 50:
+        raise HTTPException(409, 'This review has reached its external observation limit. Start a new review.')
+    if not evidence_slot.acquire(blocking=False):
+        raise HTTPException(409, 'An external evidence request is already running.')
+    try:
+        scanner, _ = modules()
+        from .evidence import collect
+        subject = current.get('fix_path') or current['snapshot']
+        snapshot_ref = scanner.fingerprint(Path(subject))
+        result = collect(body, snapshot_ref=snapshot_ref)
+        # A slow vendor call must never attach its observation to a newer copy.
+        with lock:
+            latest = get_job(job_id)
+            if (latest.get('fix_path') or latest['snapshot']) != subject or scanner.fingerprint(Path(subject)) != snapshot_ref:
+                raise HTTPException(409, 'The review copy changed during the request. Gather evidence again.')
+            return public_job(update(job_id, external_evidence=[*latest.get('external_evidence', []), result]))
+    finally:
+        evidence_slot.release()
 
 
 class SettingsInput(BaseModel):
@@ -391,7 +604,134 @@ async def save_provider_key(request: Request):
 
 @app.get("/api/jobs")
 def list_jobs():
-    return [sanitize({key: j.get(key) for key in ("id", "source", "name", "status", "created_at", "cost", "budget", "error")}) for j in store.all()]
+    return [sanitize({key: j.get(key) for key in ("id", "source", "name", "status", "created_at", "cost", "budget", "error", "project_id")}) for j in store.all()]
+
+
+@app.get('/api/projects')
+def projects():
+    return sanitize(ProjectRegistry(store).all())
+
+
+@app.get('/api/workspace', response_model=WorkspacePage)
+def workspace(offset: int = Query(0, ge=0), limit: int = Query(30, ge=1, le=100),
+              quick: bool = Query(False), scope: Literal['all', 'projects'] = Query('all')):
+    return workspace_page(store, instance_id=os.getenv('PRAXIS_REVIEW_SERVICE_INSTANCE', 'local-development'),
+                          offset=offset, limit=limit, quick=quick, scope=scope)
+
+
+@app.get('/api/projects/{project_id}/status')
+def project_status(project_id: str, previous_revision: int | None = None):
+    return ProjectRegistry(store).status(project_id, instance_id=os.getenv('PRAXIS_REVIEW_SERVICE_INSTANCE', 'local-development'), previous_revision=previous_revision)
+
+
+@app.post('/api/projects/{project_id}/relink')
+def relink_project(project_id: str, body: RelinkInput):
+    scanner, _ = modules()
+    if scanner.redact(body.source) != body.source:
+        raise HTTPException(422, 'Do not include credentials in a project path.')
+    return ProjectRegistry(store).relink(project_id, body.source, expected_revision=body.expected_revision, confirmed=body.confirmed, actor_kind='human')
+
+
+@app.post('/api/jobs/{job_id}/project')
+def link_existing_project(job_id: str, body: LinkProjectInput):
+    if not body.confirmed:
+        raise HTTPException(403, 'Confirm linking this existing review to a local project identity.')
+    current = get_job(job_id)
+    if not current.get('snapshot') or current['status'] not in {'complete', 'error', 'cancelled'}:
+        raise HTTPException(409, 'Finish this review before linking it.')
+    registry = ProjectRegistry(store)
+    project = registry.register(current['source'])
+    # Attach validates source/copy association before the job gains a project ID.
+    project = registry.attach_job(project['id'], job_id, expected_revision=project['revision'])
+    return public_job(update(job_id, project_id=project['id'], project_snapshot_id=project['latest_snapshot_id']))
+
+
+@app.post('/api/jobs/{job_id}/project-relink')
+def relink_review_project(job_id: str, body: RelinkInput):
+    current, _ = project_work(job_id)
+    ProjectRegistry(store).relink(current['project_id'], body.source, expected_revision=body.expected_revision,
+                                 confirmed=body.confirmed, actor_kind='human')
+    return public_job(update(job_id, project_link_status='relinked_new_review_required'))
+
+
+def project_work(job_id):
+    current = get_job(job_id)
+    if not current.get('project_id'):
+        raise HTTPException(409, 'Link this review to a project before coordinating work.')
+    return current, Coordination(store)
+
+
+@app.get('/api/agents')
+def installed_coding_agents():
+    from .agent_work import available
+    return sanitize(available())
+
+
+@app.post('/api/jobs/{job_id}/work/tasks/{task_id}/run-agent')
+def run_assigned_agent(job_id: str, task_id: str, body: AgentPlanInput):
+    from .agent_work import available
+    if not body.trust_confirmed or not body.external_spend_confirmed:
+        raise HTTPException(403, 'Confirm local coding-agent access and charges to its own account. The review budget cannot cap this agent.')
+    with lock:
+        current, board = project_work(job_id)
+        if current['status'] not in {'complete', 'error', 'cancelled'} or (workers.get(job_id) and workers[job_id].is_alive()):
+            raise HTTPException(409, 'Finish the active work before starting a coding-agent plan.')
+        freshness = ProjectRegistry(store).job_freshness(current)
+        if freshness['freshness'] != 'current' or freshness['source_freshness'] in {'stale', 'unavailable'}:
+            raise HTTPException(409, 'The project changed since this review. Review its current source before running an assignment.')
+        scoped = board.get(current['project_id'], job_id=job_id)
+        task = next((item for item in scoped['tasks'] if item['id'] == task_id), None)
+        if not task:
+            raise HTTPException(404, 'Task not found in this review.')
+        if task.get('assigned_to') != {'kind': 'agent', 'id': 'cli-' + body.tool}:
+            raise HTTPException(403, 'Assign this task to the selected installed coding agent first.')
+        if not any(agent['name'] == body.tool and agent['installed'] for agent in available()['agents']):
+            raise HTTPException(409, 'This coding agent is not installed or its adapter is unavailable. Check the local service PATH.')
+        claimed = board.claim_task(current['project_id'], task_id, expected_revision=body.expected_revision,
+                                   actor_id='cli-' + body.tool, lease_seconds=900)
+        update(job_id, agent_run={'status': 'running', 'tool': body.tool, 'task_id': task_id, 'mode': 'plan',
+                                 'verification': 'not_evaluated', 'started_at': now(), 'report': '',
+                                 'billing': 'agent_account_not_capped_by_review_budget'})
+        return start(job_id, 'analyzing', {'agent_task_id': task_id, 'agent_tool': body.tool,
+                     'agent_lease_token': claimed['lease_token'], 'timeout_seconds': body.timeout_seconds})
+
+
+def work_changed(job_id, board):
+    return public_job(update(job_id, coordination_revision=board['revision']))
+
+
+@app.post('/api/jobs/{job_id}/work/tasks')
+def create_work_task(job_id: str, body: TaskInput):
+    current, board = project_work(job_id)
+    return work_changed(job_id, board.create_task(current['project_id'], job_id=job_id,
+                        actor_kind='human', actor_id='local-user', **body.model_dump()))
+
+
+@app.post('/api/jobs/{job_id}/work/tasks/{task_id}')
+def update_work_task(job_id: str, task_id: str, body: TaskUpdateInput):
+    current, board = project_work(job_id)
+    scoped = board.get(current['project_id'], job_id=job_id)
+    if not any(task['id'] == task_id for task in scoped['tasks']):
+        raise HTTPException(404, 'Task not found in this review.')
+    return work_changed(job_id, board.update_task(current['project_id'], task_id,
+                        actor_kind='human', actor_id='local-user', **body.model_dump()))
+
+
+@app.post('/api/jobs/{job_id}/work/decisions')
+def record_work_decision(job_id: str, body: DecisionInput):
+    current, board = project_work(job_id)
+    return work_changed(job_id, board.record_decision(current['project_id'], job_id=job_id,
+                        actor_kind='human', actor_id='local-user', **body.model_dump()))
+
+
+@app.post('/api/jobs/{job_id}/work/handoffs')
+def record_work_handoff(job_id: str, body: HandoffInput):
+    current, board = project_work(job_id)
+    scoped = board.get(current['project_id'], job_id=job_id)
+    if not any(task['id'] == body.task_id for task in scoped['tasks']):
+        raise HTTPException(404, 'Task not found in this review.')
+    return work_changed(job_id, board.handoff(current['project_id'], actor_kind='human',
+                        actor_id='local-user', **body.model_dump()))
 
 
 @app.post("/api/scans")
@@ -410,6 +750,14 @@ def scan(body: ScanInput):
             raise HTTPException(422, str(exc)) from None
     job_id = uuid.uuid4().hex
     job = dict(id=job_id, source=body.source.strip(), review_goal=scanner.redact(body.review_goal, limit=None), name="Project", status="scanning", findings=[], coverage=[], languages=[], files_scanned=0, commands=[], budget=body.budget, cost=0, events=[], fix=None, fix_plan=None, checks=[], error=None, created_at=now(), revision=0)
+    # New reviews gain identity. Historical reviews are linked only on request;
+    # existing source/receipt records are not migrated or reinterpreted.
+    try:
+        project = ProjectRegistry(store).register(body.source.strip())
+        job['project_id'] = project['id']
+    except ProjectError:
+        # Keep legacy intake formats usable, with the missing identity explicit.
+        job['project_link_status'] = 'unavailable_for_source_format'
     store.save(job)
     return start(job_id, "scanning", body.model_dump(exclude={'source', 'budget'}))
 
@@ -513,7 +861,7 @@ def review_shared_notes(job_id: str):
     if current['status'] not in {'complete', 'error', 'cancelled'} or not current.get('snapshot') or current.get('fix_path'):
         raise HTTPException(409, 'Finish this review first. Proposed changes require their own fresh review.')
     return start(job_id, 'analyzing', {'ai_review': True, 'review_mode': 'team', 'run_checks': False,
-                                     'review_goal': current.get('team', {}).get('goal', '')})
+                                     'review_goal': current.get('review_goal') or current.get('team', {}).get('goal', '')})
 
 
 @app.get("/api/jobs/{job_id}/events")
@@ -571,7 +919,14 @@ def verify(job_id: str, body: VerifyInput):
         raise HTTPException(409, "Finish the current work before verification")
     if not body.trust_confirmed:
         raise HTTPException(403, "Confirm trust before executing project commands")
-    return start(job_id, "verifying", {**body.model_dump(), "start_command": command_override(body.start_command)})
+    if body.journey and body.runtime_mode != 'host':
+        raise HTTPException(422, 'Task-specific browser journeys currently require authorized local execution')
+    if body.journey and not (body.start_command or current.get('start_command')):
+        raise HTTPException(422, 'A browser start command is required for the journey')
+    options = body.model_dump(exclude_none=True)
+    if body.journey:
+        options['journey'] = body.journey.model_dump(exclude_unset=True)
+    return start(job_id, "verifying", {**options, "start_command": command_override(body.start_command)})
 
 
 @app.post("/api/jobs/{job_id}/budget")

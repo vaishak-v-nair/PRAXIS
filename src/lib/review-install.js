@@ -27,7 +27,8 @@ export function reviewSources(source = path.join(PACKAGE, 'apps/workbench')) {
       const relative = prefix + entry.name;
       const eligible = ROOT_FILES.has(relative) || SOURCE_DIRS.has(relative.split('/')[0]) ||
         relative === 'backend' || relative === 'backend/regen' || relative === 'backend/requirements.txt' ||
-        /^backend\/regen\/[^/]+\.py$/.test(relative) || relative === 'tools' || relative === 'tools/backend.mjs';
+        /^backend\/regen\/[^/]+\.py$/.test(relative) || relative === 'tools' ||
+        ['tools/backend.mjs', 'tools/mcp-evidence.mjs', 'tools/agent-work.mjs'].includes(relative);
       if (!eligible || entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === '__pycache__') continue;
       if (entry.isSymbolicLink()) throw new Error(`Review runtime source cannot be a symbolic link: ${relative}`);
       const file = path.join(directory, entry.name);
@@ -36,6 +37,21 @@ export function reviewSources(source = path.join(PACKAGE, 'apps/workbench')) {
     }
   }
   visit(source);
+  if (files.some(file => file.relative === 'tools/agent-work.mjs')) {
+    for (const name of ['adapters.js', 'discovery.js', 'execute.js', 'spawn.js']) {
+      files.push({ relative: `tools/agent/${name}`, bytes: fs.readFileSync(path.join(PACKAGE, 'src/lib/jobs', name)) });
+    }
+    files.push({ relative: 'tools/agent/package.json', bytes: Buffer.from('{"type":"module"}\n') });
+  }
+  if (files.some(file => file.relative === 'tools/mcp-evidence.mjs')) {
+    // One official source registry and transport, also used by installed Review.
+    // Never recursively copy core configuration, agent memory, or credentials.
+    for (const name of ['mcp-sources.js', 'mcp-client.js', 'schema.js']) {
+      const target = path.join(PACKAGE, 'src/lib/verify', name);
+      files.push({ relative: `tools/verify/${name}`, bytes: fs.readFileSync(target) });
+    }
+    files.push({ relative: 'tools/verify/package.json', bytes: Buffer.from('{"type":"module"}\n') });
+  }
   files.sort((a, b) => a.relative.localeCompare(b.relative, 'en'));
   for (const required of ['app/page.tsx', 'backend/regen/app.py', 'tools/backend.mjs']) {
     if (!files.some(file => file.relative === required)) throw new Error(`Review runtime source is incomplete: ${required}`);

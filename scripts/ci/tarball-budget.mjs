@@ -10,10 +10,15 @@
 
 import { spawnSync } from 'node:child_process';
 
-// PRAXIS Live adds the complete local UI, browser verifier and two deterministic
-// fixtures to the shipped CLI. The 50 KiB increase is deliberate and keeps the
-// zero-dependency first run self-contained instead of fetching demo assets.
-export const BUDGET_MB = 3.55;
+// Keep the complete local UI, browser verifier, Workbench review source, and
+// existing mascot animations in the zero-runtime-dependency package. The
+// The 2026-10-10 pack audit measured 3.79 MiB after adding the project-first
+// read model and UI. The six tray animations (all referenced by runtime state)
+// account for most of the package; excluding one breaks an existing feature.
+// Keep the optional Workbench source, existing assets, and zero runtime CLI
+// dependencies intact. The deliberate 3.85 MiB cap leaves about 0.06 MiB of
+// headroom; future additions must pass the same real npm-pack measurement.
+export const BUDGET_MB = 3.85;
 const MB = 1024 * 1024;
 
 /** Pure: is this size within budget? Separated so the rule is testable. */

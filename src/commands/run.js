@@ -17,7 +17,8 @@ import { projectPaths } from '../lib/paths.js';
 import { newJobId, createJob, updateMeta } from '../lib/jobs/store.js';
 import { bold, grey, sage, rose } from '../lib/ui.js';
 import { praxisCmd } from '../lib/runner.js';
-import { customAdapter, agentEnvironment, selectedTool } from '../lib/jobs/adapters.js';
+import { customAdapter, agentEnvironment, selectedTool, builtinAdapter, buildAgentArgv } from '../lib/jobs/adapters.js';
+export { buildAgentArgv } from '../lib/jobs/adapters.js';
 
 /** Resolve the agent argv for a tool name. PRAXIS_RUN_CMD (JSON array) wins. */
 export function resolveRunCmd(tool = 'claude', mode = 'plan') {
@@ -34,38 +35,7 @@ export function resolveRunCmd(tool = 'claude', mode = 'plan') {
   if (custom) return custom;
   // json output carries session_id/thread_id — how a job finds its own transcript and
   // seals its receipt (the deck's "done" vs "proven" columns).
-  if (tool === 'claude') return ['claude', '-p', '--output-format', 'json'];
-  if (tool === 'codex') return ['codex', 'exec', '--json'];
-  if (tool === 'gemini') return ['gemini', '-p', 'Complete the task provided on standard input.', '--output-format', 'json'];
-  if (tool === 'opencode') return ['opencode', 'run', '--format', 'json', '--file', '{taskFile}'];
-  return null;
-}
-
-/**
- * Build the agent's argv.
- *
- * Pure, and separated out because this line is a safety boundary: it decides
- * what the spawned agent is permitted to do. An injected command (tests, other
- * tools) gets exactly the argv it asked for and no permission flags invented
- * for it — otherwise a fixture would be handed claude's vocabulary.
- */
-export function buildAgentArgv(base, { mode = 'plan', extraArgs = [], injected = false } = {}) {
-  if (injected) return [...base];
-  if (base[0] === 'codex') {
-    const sandboxMap = {
-      plan: 'read-only',
-      acceptEdits: 'workspace-write',
-      bypassPermissions: 'danger-full-access',
-    };
-    const sandbox = sandboxMap[mode] || 'read-only';
-    return [...base, ...extraArgs, '--sandbox', sandbox, '-'];
-  }
-  if (base[0] === 'gemini') {
-    const approval = { plan: 'plan', acceptEdits: 'auto_edit', bypassPermissions: 'yolo' }[mode] || 'plan';
-    return [...base, ...extraArgs, '--approval-mode', approval];
-  }
-  if (base[0] === 'opencode') return [...base, ...extraArgs, '--agent', mode === 'plan' ? 'plan' : 'build', 'Complete the task in the attached task file.'];
-  return [...base, ...extraArgs, '--permission-mode', mode];
+  return builtinAdapter(tool);
 }
 
 /**

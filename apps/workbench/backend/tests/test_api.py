@@ -21,6 +21,54 @@ api = importlib.import_module('regen.app')
 
 
 class ApiIntegrationTests(unittest.TestCase):
+    def test_standard_and_independent_reviews_receive_the_captured_redacted_goal(self):
+        goal = 'Protect the checkout workflow. ' + self.secret
+        for mode in ('standard', 'deep', 'ultra'):
+            with self.subTest(mode=mode):
+                def review(path, scan, emit, cancelled, budget):
+                    self.assertEqual(scan.get('review_goal'), 'Protect the checkout workflow. [REDACTED]')
+                    return scan
+                target = 'analyze' if mode == 'standard' else 'analyze_deep'
+                with patch.object(provider, target, side_effect=review) as reviewer:
+                    response = self.client.post('/api/scans', json={'source': str(self.source),
+                        'ai_review': True, 'review_mode': mode, 'review_goal': goal})
+                    job = self.finish(response.json()['id'])
+                    self.assertEqual(job['status'], 'complete', job.get('error'))
+                    reviewer.assert_called_once()
+                    self.assertNotIn(self.secret, json.dumps(job))
+        self.assertEqual((self.source / 'app.py').read_text(), self.original)
+
+    def test_team_rereview_preserves_the_goal_of_an_initial_source_only_review(self):
+        response = self.client.post('/api/scans', json={'source': str(self.source),
+            'ai_review': False, 'review_goal': 'Protect the checkout workflow'})
+        job = self.finish(response.json()['id'])
+        def rereview(path, scan, emit, cancelled, budget, *, goal, human_context):
+            self.assertEqual(goal, 'Protect the checkout workflow')
+            return scan
+        with patch('regen.team.analyze_team', side_effect=rereview), patch.object(api, 'run_project_checks') as runtime:
+            response = self.client.post(f"/api/jobs/{job['id']}/team-review", json={})
+            self.assertEqual(response.status_code, 200)
+            reviewed = self.finish(job['id'])
+            self.assertEqual(reviewed['status'], 'complete', reviewed.get('error'))
+            runtime.assert_not_called()
+
+    def test_user_interaction_needs_trust_local_runtime_and_start_command(self):
+        job = self.scan()
+        url = f"/api/jobs/{job['id']}/verify"
+        journey = {'name': 'Open settings', 'path': '/', 'role': 'button',
+                   'control_name': 'Settings', 'expected_text': 'Account preferences'}
+        self.assertEqual(self.client.post(url, json={'journey': journey}).status_code, 403)
+        self.assertEqual(self.client.post(url, json={'trust_confirmed': True,
+                         'runtime_mode': 'docker', 'journey': journey}).status_code, 422)
+        self.assertEqual(self.client.post(url, json={'trust_confirmed': True,
+                         'runtime_mode': 'host', 'journey': journey}).status_code, 422)
+        with patch.object(api, 'run_project_checks', return_value=[]) as runner:
+            response = self.client.post(url, json={'trust_confirmed': True, 'runtime_mode': 'host',
+                                        'start_command': 'python -m http.server 4173', 'journey': journey})
+            self.assertEqual(response.status_code, 200)
+            self.finish(job['id'])
+            self.assertEqual(runner.call_args.kwargs['journey_spec'], journey)
+
     def test_team_progress_is_durable_and_keeps_runtime_consent_separate(self):
         def collaborative(path, scan, emit, cancelled, budget, *, goal, human_context):
             self.assertEqual(goal, 'Check the setup workflow')
@@ -34,8 +82,8 @@ class ApiIntegrationTests(unittest.TestCase):
             scan['team']['status'] = 'complete'
             return scan
         with patch('regen.team.analyze_team', side_effect=collaborative), patch('regen.sandbox.run_checks') as runtime:
-            response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'team',
-                                                          'review_goal': 'Check the setup workflow'})
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'ai_review': True,
+                                                          'review_mode': 'team', 'review_goal': 'Check the setup workflow'})
             self.assertEqual(response.status_code, 200)
             job = self.finish(response.json()['id'])
             runtime.assert_not_called()
@@ -49,7 +97,7 @@ class ApiIntegrationTests(unittest.TestCase):
             emit({'message': 'Limit reached', **scan})
             raise provider.BudgetExceeded('Shared limit reached')
         with patch('regen.team.analyze_team', side_effect=limited):
-            response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'team'})
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'ai_review': True, 'review_mode': 'team'})
             job = self.finish(response.json()['id'])
         self.assertEqual(job['status'], 'paused')
         self.assertEqual(job['team']['status'], 'paused')
@@ -186,7 +234,7 @@ class ApiIntegrationTests(unittest.TestCase):
         return response.json()
 
     def scan(self):
-        response = self.client.post('/api/scans', json={'source': str(self.source), 'budget': 5})
+        response = self.client.post('/api/scans', json={'source': str(self.source), 'budget': 5, 'ai_review': True})
         self.assertEqual(response.status_code, 200, response.text)
         return self.finish(response.json()['id'])
 
@@ -212,6 +260,24 @@ class ApiIntegrationTests(unittest.TestCase):
         self.assertNotIn(self.secret, json.dumps(stored))
         self.assertEqual(Store(self.data / 'jobs.sqlite3').get(job['id'])['status'], 'complete')
         self.assertEqual(self.client.get('/api/jobs').json()[0]['id'], job['id'])
+
+    def test_scan_without_ai_opt_in_never_calls_provider(self):
+        with patch.object(provider, 'analyze', side_effect=AssertionError('Model review requires explicit opt-in')) as model:
+            response = self.client.post('/api/scans', json={'source': str(self.source)})
+            self.assertEqual(response.status_code, 200, response.text)
+            job = self.finish(response.json()['id'])
+            model.assert_not_called()
+        self.assertEqual(job['status'], 'complete')
+        self.assertEqual(job['cost'], 0)
+        self.assertTrue(any(item['name'] == 'AI contextual review' and item['status'] == 'skipped'
+                            for item in job['coverage']))
+
+    def test_scan_rejects_unknown_review_and_execution_options(self):
+        for misspelled in ('ai_revew', 'run_check'):
+            with self.subTest(misspelled=misspelled):
+                response = self.client.post('/api/scans', json={'source': str(self.source), misspelled: True})
+                self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(api.store.all(), [])
 
     def test_scan_can_skip_ai_and_run_authorized_container_checks(self):
         with patch.object(provider, 'analyze') as model, patch.object(api.sandbox, 'run_checks', return_value=[{'name': 'tests', 'kind': 'command', 'runtime': 'docker', 'status': 'failed', 'output': 'Real failure'}]) as checks:
@@ -392,7 +458,8 @@ class ApiIntegrationTests(unittest.TestCase):
 
     def test_provider_failure_keeps_static_findings_and_runs_requested_checks(self):
         with patch.object(provider, 'analyze', side_effect=provider.ProviderError('Provider unavailable')), patch.object(api.sandbox, 'run_checks', return_value=[{'name': 'test', 'status': 'passed', 'kind': 'command'}]) as checks:
-            response = self.client.post('/api/scans', json={'source': str(self.source), 'run_checks': True, 'trust_confirmed': True})
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'ai_review': True,
+                                                          'run_checks': True, 'trust_confirmed': True})
             job = self.finish(response.json()['id'])
             self.assertEqual(job['status'], 'complete')
             self.assertTrue(job['findings'])
@@ -403,7 +470,7 @@ class ApiIntegrationTests(unittest.TestCase):
         def deep(path, scan, emit, cancelled, budget):
             return {**scan, 'pressure_tests': [{'agent': 'User journey agent', 'journeys': [], 'gaps': [], 'findings_added': 0}]}
         with patch.object(provider, 'analyze_deep', side_effect=deep) as review:
-            response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'deep'})
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'ai_review': True, 'review_mode': 'deep'})
             self.assertEqual(response.status_code, 200, response.text)
             job = self.finish(response.json()['id'])
         review.assert_called_once()
@@ -414,7 +481,7 @@ class ApiIntegrationTests(unittest.TestCase):
             return {**scan, 'pressure_tests': [{'agent': 'Production architecture agent', 'provider': 'fixture',
                                                 'model': 'fixture', 'journeys': [], 'gaps': [], 'findings_added': 0}]}
         with patch.object(provider, 'analyze_deep', side_effect=deep) as review:
-            response = self.client.post('/api/scans', json={'source': str(self.source), 'review_mode': 'ultra'})
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'ai_review': True, 'review_mode': 'ultra'})
             self.assertEqual(response.status_code, 200)
             job = self.finish(response.json()['id'])
         review.assert_called_once()
@@ -666,7 +733,7 @@ class ApiIntegrationTests(unittest.TestCase):
             self.assertTrue(cancelled.wait(5), 'Cancellation signal was not delivered')
             return scan
         with patch.object(provider, 'analyze', side_effect=blocking_review):
-            response = self.client.post('/api/scans', json={'source': str(self.source)})
+            response = self.client.post('/api/scans', json={'source': str(self.source), 'ai_review': True})
             self.assertEqual(response.status_code, 200)
             job_id = response.json()['id']
             self.assertTrue(entered.wait(5))

@@ -42,10 +42,10 @@ test('summarizeVerdicts rolls up honestly', () => {
   assert.equal(summarizeVerdicts([{ verdict: 'NOT_A_CLAIM' }]).headline, 'NO_CLAIMS');
 });
 
-test('all four tools are registered with schemas', () => {
+test('receipt tools and the additive read-only project status tool are registered with schemas', () => {
   const list = tools(sandbox());
   const names = list.map((t) => t.name).sort();
-  assert.deepEqual(names, ['praxis_recall', 'praxis_receipt', 'praxis_receipts', 'praxis_verify']);
+  assert.deepEqual(names, ['praxis_project_review_status', 'praxis_recall', 'praxis_receipt', 'praxis_receipts', 'praxis_verify']);
   for (const t of list) assert.equal(t.inputSchema.type, 'object');
 });
 

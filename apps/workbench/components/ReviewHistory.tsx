@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowUpRight, Search } from "lucide-react";
 import type { Job } from "@/lib/contracts";
 import { money } from "@/lib/contracts";
+import { sourceLabel } from "@/lib/source-label.mjs";
 import { Empty, Status } from "./ui";
 
 export function ReviewHistory({ jobs, loading, open }: {
@@ -14,9 +15,8 @@ export function ReviewHistory({ jobs, loading, open }: {
   const visible = search || showAll ? filtered : filtered.slice(0, 8);
   return <section className="history-section" aria-labelledby="history-title">
     <div className="section-heading">
-      <div><div className="section-label">Your workspace</div>
-        <h2 id="history-title">Recent reviews <span className="count">{jobs.length}</span></h2>
-        <p className="history-description">Return to the findings, evidence, and proposed changes from a saved review.</p>
+      <div>
+        <h2 id="history-title">Review runs <span className="count">{jobs.length}</span></h2>
       </div>
       <label className="search"><Search size={16} /><input type="search" aria-label="Search reviews"
         placeholder="Find a project…" value={search} onChange={event => setSearch(event.target.value)} /></label>
@@ -25,8 +25,8 @@ export function ReviewHistory({ jobs, loading, open }: {
       <div className="review-table">
         <div className="table-labels" aria-hidden="true"><span>Project</span><span>Review state</span><span>Created</span><span>Model spend</span><span /></div>
         {visible.map(job => <button className="review-row" key={job.id} onClick={() => open(job.id)}>
-          <div><strong>{job.name || "Project"}</strong><span className="file-path">{job.source}</span></div>
-          <Status value={job.status} label={job.status === "complete" ? "Review finished" : undefined} />
+          <div><strong>{job.name || "Project"}</strong><span className="review-source-label">{sourceLabel(job.source)}</span></div>
+          <Status value={job.status === "complete" ? "recorded" : job.status} label={job.status === "complete" ? "Recorded" : undefined} />
           <time>{job.created_at ? new Date(job.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"}</time>
           <span className="mono">{typeof job.cost === "number" ? money(job.cost) : "—"}</span><ArrowUpRight size={17} />
         </button>)}

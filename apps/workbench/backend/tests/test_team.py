@@ -10,6 +10,12 @@ from regen import provider, team
 
 
 class TeamTests(unittest.TestCase):
+    def test_missing_findings_is_unavailable_not_a_completed_clean_team_review(self):
+        result, _ = self.run_team(lambda model, prompt: {'summary': 'Everything is perfect'})
+        self.assertEqual(result['team']['status'], 'partial')
+        self.assertTrue(all(agent['status'] == 'unavailable' for agent in result['team']['agents']))
+        self.assertTrue(all(check['status'] == 'skipped' for check in result['coverage']))
+
     def run_team(self, respond, *, budget=None, selections=None, cancelled=None, events=None, human_context=lambda: {}):
         events = [] if events is None else events
         with tempfile.TemporaryDirectory() as temp:

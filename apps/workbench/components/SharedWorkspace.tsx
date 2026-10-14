@@ -3,6 +3,7 @@ import { MessageSquarePlus, Users, BrainCircuit, Lock } from "lucide-react";
 import type { Job } from "@/lib/contracts";
 import { Status } from "./ui";
 import { ModelPerspectives } from "./ModelPerspectives";
+import { ProjectWork } from "./ProjectWork";
 
 export function SharedWorkspace({ job, busy, action }: { job: Job; busy: boolean; action: (name: string, body: unknown) => Promise<unknown> }) {
   const session = useRef("");
@@ -26,8 +27,9 @@ export function SharedWorkspace({ job, busy, action }: { job: Job; busy: boolean
       <button type="submit" className="button primary" disabled={busy || !author.trim() || !text.trim() || notes.length >= 100}>Post contribution</button>
     </form><div className="shared-discussion"><header><h3>Project discussion</h3><span className="micro">{job.collaboration?.participants.length || 0} contributor sessions · {notes.length}/100 notes</span></header>
       {notes.length ? <ol>{notes.map(note => <li key={note.id}><header><strong>{note.author}</strong><Status value={note.kind} /></header><p>{note.text}</p><div className="micro">{roles.find(role => role.id === note.assigned_to)?.label || "AI team"} · {note.share_with_agents ? "Shared with agent rounds" : "Local discussion only"}</div></li>)}</ol> : <p className="muted">Add the first goal or question. All contributors will see it through the live review connection.</p>}
-      <button className="button" disabled={busy || active || !!job.fix?.diff || !notes.some(note => note.share_with_agents)} onClick={() => action("team-review", {})}><BrainCircuit size={16} />Ask agents to review shared notes</button><p className="micro">Uses the remaining review budget. This starts source review and peer challenge; it does not run project commands.</p>
+      <button className="button" disabled={busy || active || !!job.fix?.diff || !(notes.some(note => note.share_with_agents) || job.coordination?.tasks.some(task => task.share_with_agents && !task.stale) || job.coordination?.decisions.some(item => item.share_with_agents))} onClick={() => action("team-review", {})}><BrainCircuit size={16} />Ask agents to review shared notes</button><p className="micro">Uses the remaining review budget. This starts source review and peer challenge; it does not run project commands.</p>
     </div></div>
+    <ProjectWork job={job} busy={busy} action={action} />
     <ModelPerspectives perspectives={job.pressure_tests} team={job.team} />
   </section>;
 }

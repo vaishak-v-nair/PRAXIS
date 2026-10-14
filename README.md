@@ -24,6 +24,11 @@ Add model review or explicitly authorized project checks when you need them.
 People and AI specialists work around one review. Model opinions and recorded
 execution remain visibly separate.
 
+The public website offers a browser-only source trial. The full review engine
+runs on your computer; its API is bound to loopback and is not a hosted account
+service. The optional desktop shell uses that same Workbench engine. Desktop
+source is present, but signed consumer installers have a separate release gate.
+
 ## Start locally
 
 With Node.js 22+ in this checkout:
@@ -49,6 +54,27 @@ now; pushing does not publish npm packages. Node.js remains required. The existi
 `npx praxis-memory` memory CLI and Windows `.\start.ps1` developer launcher remain
 available. See [managed setup](docs/WORKBENCH-INTEGRATION.md) and
 [manual release instructions](docs/MANUAL-NPM-RELEASE.md).
+
+For a desktop development build, follow [the desktop guide](apps/desktop/README.md).
+It requires the Tauri toolchain and prepared Workbench; a local build does not
+establish that a signed installer is ready for public download.
+
+## Repository map
+
+| Path | What it contains |
+| --- | --- |
+| `src/` and `test/` | Dependency-free CLI, hooks, memory, agent adapters, Verify engine, tray, and core regressions |
+| `apps/workbench/` | Local Next.js interface, FastAPI review engine, tests, and optional dependencies |
+| `apps/desktop/` | Optional Tauri shell and packaged-runtime build checks |
+| `web/` | Static public website and browser-memory source trial |
+| `scripts/ci/` and `.github/workflows/` | Privacy, package, regression, and release gates |
+| `docs/` and `evals/` | Product/engineering contracts, testing evidence, and Verify evaluations |
+
+Local `.praxis` memory, `.regen` jobs, provider credentials, the personal vault,
+brand masters, and the separate Unreal/Blender experiments in this checkout are
+not public source. Git ignores them, and the privacy guard rejects those paths
+if they are accidentally staged. See [the codebase map](docs/PRODUCT-MAP.md)
+for the evidence boundaries between these surfaces.
 
 ## How it works
 
@@ -248,7 +274,11 @@ node scripts/ci/pack-smoke.mjs
 Core tests are in `test`; app tests in `apps/workbench/backend/tests`. Consumer
 packages omit dependencies, virtual environments, private jobs, generated
 builds, tests and import provenance. Source and detailed development references
-remain in Git. The package retains its 3.55 MiB limit.
+remain in Git. The current unpacked package budget is 3.85 MiB; the release
+check measures the actual package rather than assuming a fixed file count.
+
+See the [source cleanup and pre-push checks](docs/testing/SOURCE-CLEANUP-2026-10-14.md)
+for the audited removals, executed regressions, and testing limits.
 
 ## License
 

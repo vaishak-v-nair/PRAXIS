@@ -109,8 +109,9 @@ budget/trust controls and the separate planning, handoff and apply gates remain.
 
 `tokens.css` owns semantic colors; `globals.css` owns shared controls and dialogs;
 `product.css` owns the component layouts and responsive behavior. The separate
-`ReviewOverview` and `InspectionIllustration` components keep presentation out of
-the transport and verification logic. Reading panels remain still; selecting a
+`ReviewOverview` keeps presentation out of the transport and verification logic.
+The earlier `InspectionIllustration` was retired when the project-first workspace
+replaced that introductory panel. Reading panels remain still; selecting a
 section has a short entrance transition, disabled under reduced motion.
 
 The production build and TypeScript pass. The unchanged backend suite reports

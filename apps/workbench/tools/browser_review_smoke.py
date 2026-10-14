@@ -58,8 +58,9 @@ def main():
         context.on('request', lambda request: requests.append({'url': request.url, 'method': request.method}))
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(BASE + '/')
-        page.get_by_role('link', name='Test Your Project').click()
-        page.get_by_role('heading', name='Test your project', exact=True).wait_for()
+        page.get_by_role('link', name='Test your project').first.click()
+        page.locator('#folder').wait_for(state='attached')
+        assert page.get_by_role('heading', level=1).count() == 1, 'The project test needs one clear page heading'
         audit(page, 'empty')
         page.locator('#folder').set_input_files(str(folder))
         page.locator('#run').click()

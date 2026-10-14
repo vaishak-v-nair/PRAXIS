@@ -134,7 +134,7 @@ def analyze_team(path, scan, emit, cancelled, budget, *, goal='', human_context=
                                         'reason': p.clean(item['reason'])[:800],
                                         'location': valid[0]['location'], 'evidence': valid[0]['evidence'][:800]})
                         else:
-                            added, _ = p._validated_findings(path, result.get('findings', []), 12)
+                            added, _ = p._validated_findings(path, result.get('findings'), 12)
                             existing = {item.get('id') for item in scan['findings']}
                             unique = list({item['id']: item for item in added if item['id'] not in existing}.values())
                             scan['findings'].extend(unique)

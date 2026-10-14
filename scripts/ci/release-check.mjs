@@ -15,6 +15,8 @@ export const REQUIRED_FILES = [
   'src/cli.js', 'src/lib/verify/index.js', 'scripts/postinstall.js', 'start.ps1',
   'apps/workbench/package.json', 'apps/workbench/package-lock.json',
   'apps/workbench/backend/requirements.txt', 'apps/workbench/backend/regen/app.py',
+  'apps/workbench/backend/regen/agent_work.py', 'apps/workbench/tools/agent-work.mjs',
+  'src/lib/jobs/execute.js', 'src/lib/jobs/discovery.js',
   'docs/WORKBENCH-INTEGRATION.md', 'docs/AGENT-WORKFLOW.md',
   'docs/PROJECT-REVIEW-QUICKSTART.md', 'docs/VERIFY-QUICKSTART.md',
 ];
@@ -90,6 +92,7 @@ export function main(argv = process.argv.slice(2)) {
     ['backend regressions', () => npm(['run', 'test:workbench'])],
     ['frontend TypeScript', () => npm(['run', 'typecheck:workbench'])],
     ['frontend production build', () => npm(['run', 'build:workbench'])],
+    ['rendered project assurance workflow', () => npm(['run', 'test:assurance'])],
     ['CLI production dependency audit', () => npm(['audit', '--omit=dev', '--audit-level=high'])],
     ['Workbench production dependency audit', () => npm(['--prefix', 'apps/workbench', 'audit', '--omit=dev', '--audit-level=high'])],
   ];

@@ -50,6 +50,31 @@ test('managed runtime copies only canonical app source, never project evidence o
   assert.equal(fs.existsSync(layout.envFile), false, 'private environment is never imported');
 });
 
+test('installed Review evidence bridge uses the same official registry without credentials or source checkout', t => {
+  const { home } = fixture(t);
+  const layout = reviewLayout({ home, version: '1.0.0' });
+  stageReview(layout);
+  const result = spawnSync(process.execPath, [path.join(layout.root, 'tools/mcp-evidence.mjs')], {
+    cwd: layout.root, input: '{"mode":"status"}', encoding: 'utf8', timeout: 10000, env: {},
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).map(source => source.id), ['github', 'playwright', 'sentry', 'supabase']);
+  assert.ok(JSON.parse(result.stdout).every(source => source.status === 'not_queried'));
+  assert.ok(!layout.sources.files.some(file => /\.env$|\.praxis\/|\.regen\//.test(file.relative)));
+});
+
+test('installed Review coding-agent bridge keeps shared adapters and rejects missing mode permission', t => {
+  const { home } = fixture(t);
+  const layout = reviewLayout({ home, version: '1.0.0' }); stageReview(layout);
+  const result = spawnSync(process.execPath, [path.join(layout.root, 'tools/agent-work.mjs')], {
+    cwd: layout.root, input: '{"operation":"discover"}', encoding: 'utf8', timeout: 10000, env: {},
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout).agents.map(agent => agent.name), ['claude', 'codex', 'gemini', 'opencode']);
+  assert.ok(JSON.parse(result.stdout).agents.every(agent => agent.authentication === 'not_checked'));
+  assert.ok(layout.sources.files.some(file => file.relative === 'tools/agent/execute.js'));
+});
+
 test('upgrades retain one data folder, keep previous releases, and refuse modified managed source', t => {
   const { layout, source, home, write } = fixture(t);
   stageReview(layout);

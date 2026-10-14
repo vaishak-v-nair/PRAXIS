@@ -14,6 +14,7 @@ npm ci --prefix apps/workbench --ignore-scripts
 python -m venv apps/workbench/.venv
 apps/workbench/.venv/Scripts/python.exe -m pip install -r apps/workbench/backend/requirements.txt
 apps/workbench/.venv/Scripts/python.exe -m pip check
+apps/workbench/.venv/Scripts/python.exe -m playwright install chromium
 npm run release:check
 ```
 
@@ -23,13 +24,32 @@ gates, golden evaluations and optional app. Do not run setup while the same
 Workbench environment is serving an active job.
 
 `release:check` checks version/lockfile/release notes, actual packed paths and
-the existing 3.55 MiB budget, the public registry's immutable version list,
+the 3.85 MiB package budget, the public registry's immutable version list,
 core regressions, installed-package smoke, historical and Verify receipts,
 Promptfoo's CONTRADICTED recall/precision gate, backend tests, TypeScript,
-production build and high/critical production npm advisories. It stops on
+production build, rendered true/false workflow and high/critical production npm
+advisories. Install the Workbench Playwright Chromium runtime before the browser
+gate; on Linux use its `playwright install --with-deps chromium` command. It stops on
 failure. It makes no paid model call and does not apply source patches.
 Network access is needed for registry and audit checks. Missing release
 tooling fails honestly; tests are never skipped to publish.
+
+The production dependency audit and development-tooling audit have different
+scopes. The 2026-10-07 full Workbench audit is clear. The root development
+tree still reports three high entries from one unpatched dependency chain,
+`promptfoo -> jks-js -> node-forge@1.4.0`
+([upstream issue](https://github.com/digitalbazaar/forge/issues/1149),
+[proposed fix](https://github.com/digitalbazaar/forge/pull/1152)). This dependency
+does not enter the dependency-free CLI or bundled Workbench runtime. No advisory
+is suppressed, no signature library is stubbed, and no forced Promptfoo
+downgrade is applied. Recheck the full development audit when a vendor patch is
+published. The golden gate uses the project-owned provider rather than JKS
+certificate inputs; that boundary is not a claim that every Promptfoo provider
+is safe. PRAXIS receipt signatures use Node's built-in Ed25519 implementation.
+
+Native desktop artifacts have a separate build and release gate. They never
+enter the npm tarball. See [desktop delivery](../apps/desktop/README.md); signed
+clean-install evidence is required before offering a public installer.
 
 Review the final package before publishing:
 

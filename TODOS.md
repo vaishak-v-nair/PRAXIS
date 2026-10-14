@@ -115,3 +115,32 @@ something only PRAXIS has — a verdict — and it must beat an incumbent with
 - **Effort:** S (founder-only - account creation is a human task).
 - **Priority:** P3
 - **Depends on:** nothing; timing note: before B6.
+
+## Open marketplace follow-ups (2026-10-08 Option C direction; not yet built)
+
+### P2 — Isolated hosted recheck runner after the first paid transaction
+
+- **What:** Run delivered-code checks in a short-lived, permission-bounded runner and attach exact-SHA observations to the order.
+- **Why:** The first concierge pilot can use buyer-initiated local checks, but a self-serve recheck SLA needs an independent service without exposing loopback Workbench.
+- **Pros:** Repeatable checks and fewer buyer setup steps.
+- **Cons:** Untrusted-code execution, secrets/network policy, cost and incident-response burden.
+- **Context:** `docs/designs/PRAXIS-OPEN-OUTCOMES-MARKETPLACE-2026-10-08.md` keeps Workbench and Verify authoritative; a hosted runner must call their tested adapters rather than invent verdicts. Buyer-run local checks in the first paid pilot are independent of the seller, but not public third-party attestation.
+- **Depends on:** accepted `OrderPacketV1`, exact Git SHA capture, paid-order pilot, runner threat model and sandbox tests.
+
+### P3 — Optional Jev routing evaluation
+
+- **What:** Shadow-test a direct TypeSafe Jev adapter for bounded triage/matching decisions, with deterministic/manual fallback.
+- **Why:** It may reduce deep-model spend or latency, but vendor speed and confidence do not establish PRAXIS blocker recall.
+- **Pros:** Lower cost if the labeled evaluation passes.
+- **Cons:** Another provider, privacy boundary and possible missed actionable findings.
+- **Context:** Jev is not a crawler, repair model or verifier; it must never suppress high-severity findings or control payment/evidence verdicts.
+- **Depends on:** API eligibility, consented labeled finding set, non-inferior blocker recall and measured cost/latency win.
+
+### P1 — Open human-and-agent provider supply with category acceptance gates
+
+- **What:** Build self-serve draft listings and transparent eligibility for human, human-led and operated-agent providers. Publish the initial scoped-fix category only when a human and an operated agent can both complete its outcome contract; expand categories through separate acceptance adapters.
+- **Why:** Option C is an open marketplace, not a human-only fix desk. Buyers need real provider choice under the same evidence and recourse contract.
+- **Pros:** Open supply and a repeatable outcome protocol across people and agents.
+- **Cons:** Operator identity, agent permissions, screening, fraud and category-specific false success need explicit tests and operations.
+- **Context:** See `docs/designs/PRAXIS-OPEN-OUTCOMES-MARKETPLACE-2026-10-08.md`. The earlier Option B transaction kernel remains required, but its human-only end state was superseded. Local review stays useful without payment or account.
+- **Depends on:** exact-SHA and privacy-safe work packet; hosted tenancy and seller-of-record; one eligible payment flow; buyer-side recheck; category-specific acceptance oracle. Additional categories require observed demand, two viable providers and unit economics.

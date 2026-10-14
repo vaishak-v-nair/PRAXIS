@@ -66,13 +66,15 @@ test('the guard catches every private shape, whatever it got renamed to', () => 
       '.praxis/memory.md',
       '.claude/settings.local.json',
       'CLAUDE.md',
+      'praxis/Content/WorkingMap.uasset',
+      'praxis blender.blend',
     ],
     { branch: 'main' },
   );
   assert.equal(r.ok, false);
-  assert.equal(r.violations.length, 10, 'every one of them, not just the ones we thought of');
+  assert.equal(r.violations.length, 12, 'every one of them, not just the ones we thought of');
   const rules = new Set(r.violations.map((v) => v.rule));
-  for (const id of ['vault', 'obsidian', 'brand-vault', 'internal-docs', 'local-memory', 'personal-config']) {
+  for (const id of ['vault', 'obsidian', 'brand-vault', 'internal-docs', 'local-memory', 'personal-config', 'local-creative-project']) {
     assert.ok(rules.has(id), `${id} fired`);
   }
   for (const v of r.violations) assert.ok(v.why.length > 20, 'and each one says WHY, not just "blocked"');
@@ -92,6 +94,35 @@ test('the guard does not cry wolf on ordinary source', () => {
     { branch: 'main' },
   );
   assert.equal(r.ok, true, `false positives: ${r.violations.map((v) => v.path).join(', ')}`);
+});
+
+test('the guard catches local review state and credentials at every directory depth', () => {
+  const paths = [
+    '.regen/jobs.sqlite3',
+    'apps/desktop/.regen/endpoint.json',
+    'nested/.REGEN/receipts.json',
+    '.env',
+    'apps/workbench/.env.local',
+    'nested/.ENV.production',
+    'nested/.env.example.local',
+  ];
+  const result = checkTrackedPaths(paths, { branch: 'main' });
+  assert.equal(result.ok, false);
+  assert.equal(result.violations.length, paths.length);
+  assert.deepEqual(result.violations.map((v) => v.rule), [
+    'local-review-state', 'local-review-state', 'local-review-state',
+    'credentials', 'credentials', 'credentials', 'credentials',
+  ]);
+  assert.equal(checkTrackedPaths([
+    '.env.example', 'apps/workbench/.env.example',
+    'docs/environment.md', 'src/regeneration.js', 'fixtures/.regenerate/input.json',
+  ]).ok, true, 'public templates and similarly named source remain allowed');
+});
+
+test('the confidential branch never permits credentials or local review state', () => {
+  const result = checkTrackedPaths(['.regen/jobs.sqlite3', 'nested/.env'], { branch: 'confidential' });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.violations.map((v) => v.rule), ['local-review-state', 'credentials']);
 });
 
 test('on the confidential branch the brand vault is allowed — the personal one never is', () => {

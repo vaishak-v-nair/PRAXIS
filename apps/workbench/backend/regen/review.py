@@ -352,7 +352,9 @@ def assessment(job):
     findings = job.get('findings') or []
     raw_checks = job.get('checks') or []
     current_subject = job.get('fix_path') or job.get('snapshot')
-    stale = bool(raw_checks and job.get('checks_for') and job['checks_for'] != current_subject)
+    scope = job.get('evidence_freshness') or {}
+    stale = (scope.get('freshness') in {'stale', 'unavailable'} or
+             bool(raw_checks and job.get('checks_for') and job['checks_for'] != current_subject))
     checks = [] if stale else raw_checks
     coverage = job.get('coverage') or []
     plan = job.get('plan') or {}
@@ -366,7 +368,8 @@ def assessment(job):
     browser_passed = [check for check in browser if check.get('status') == 'passed']
     browser_failed = [check for check in browser if check.get('status') in FAILURE_STATUSES]
     journey_passed = [check for check in browser_passed if check.get('evidence_scope') == 'user_journey']
-    homepage_passed = [check for check in browser_passed if check.get('evidence_scope') != 'user_journey']
+    interaction_passed = [check for check in browser_passed if check.get('evidence_scope') == 'ui_interaction']
+    homepage_passed = [check for check in browser_passed if check.get('evidence_scope') in {None, 'homepage_smoke'}]
 
     high_findings = [item for item in findings if str(item.get('severity', '')).lower() in {'high', 'critical'}]
     security_findings = [item for item in findings if str(item.get('category', '')).lower() in {'security', 'secrets', 'dependencies'}]
@@ -387,7 +390,8 @@ def assessment(job):
     if not browser_passed:
         gaps.append('No browser smoke or user journey passed against the current source snapshot.')
     elif not journey_passed:
-        gaps.append('The homepage browser smoke passed, but no task-specific user journey was executed.')
+        gaps.append('A UI interaction passed, but backend state and side effects were not checked; no complete user journey was established.'
+                    if interaction_passed else 'The homepage browser smoke passed, but no task-specific user journey was executed.')
     if not plan.get('test_file_count'):
         gaps.append('No conventional test files were found in the bounded source inventory.')
     operations = plan.get('operations') or {}
@@ -425,6 +429,8 @@ def assessment(job):
     if implementation['status'] == 'placeholder_risk':
         blockers += [f"REALITY: {title}" for title in implementation['evidence'][:max(0, 8 - len(blockers))]]
     requirements = []
+    if scope.get('source_freshness') in {'stale', 'unavailable'}:
+        requirements.append('Review the current original project source; this evidence belongs to an earlier local copy.')
     if not (local_source and local_source.get('status') == 'passed'):
         requirements.append('Complete local source inspection without truncation.')
     if not passed_tests:
@@ -530,12 +536,14 @@ def assessment(job):
         _dimension('runtime', 'Automated checks', runtime_status, runtime_detail, runtime_evidence,
                    ['A passing command proves only the command and source snapshot recorded here.'] if checks else []),
         _dimension('e2e', 'User-facing behavior',
-                   'failed' if browser_failed else ('passed' if journey_passed else 'smoke_passed' if homepage_passed else 'not_run'),
+                   'failed' if browser_failed else ('passed' if journey_passed else 'interaction_passed' if interaction_passed else 'smoke_passed' if homepage_passed else 'not_run'),
                    (f'{len(journey_passed)} task-specific user journey(s) passed.' if journey_passed
+                    else f'{len(interaction_passed)} named UI interaction(s) passed; backend state and side effects were not checked.' if interaction_passed
                     else f'{len(homepage_passed)} homepage smoke check(s) passed; no task-specific journey ran.' if homepage_passed
                     else f'{len(browser_failed)} browser check(s) failed.' if browser_failed
                     else 'No browser evidence was recorded for the current snapshot.'),
-                   browser_evidence, ['Homepage reachability does not prove controls, secondary routes, or external side effects.'] if homepage_passed and not journey_passed else []),
+                   browser_evidence, ['A visible UI change does not prove backend state or external side effects.' if interaction_passed
+                                      else 'Homepage reachability does not prove controls, secondary routes, or external side effects.'] if not journey_passed and (homepage_passed or interaction_passed) else []),
         _dimension('reality', 'Implementation reality', implementation['status'], implementation['detail'],
                    reality_evidence, [] if journey_passed else ['A complete user workflow has not been observed.']),
         _dimension('operations', 'Production operations', operation_status, operation_detail,
@@ -550,6 +558,11 @@ def assessment(job):
                                             'Previous passing commands cannot establish behavior for the current repair snapshot.',
                                             'Run checks against the current source before accepting the repair.',
                                             priority='high', source='snapshot binding'))
+    if scope.get('source_freshness') in {'stale', 'unavailable'}:
+        attention_items.insert(0, _attention('source', 'The original project changed or is unavailable',
+                                            'The saved review describes its prepared copy. It cannot establish readiness for the current original project.',
+                                            'Select the current project folder and start a new review, or explicitly relink a moved folder.',
+                                            priority='high', source='original source binding'))
     if job.get('status') not in {'complete', 'error', 'cancelled', 'paused'}:
         status, title = 'in_progress', 'Review in progress'
     elif blockers:

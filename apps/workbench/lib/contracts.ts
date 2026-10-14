@@ -3,7 +3,41 @@ export interface Finding {
   title: string; description: string; why: string;
   location?: { file?: string; line?: number }; evidence?: string; fix?: string; fixable: boolean;
 }
+export interface WorkspaceProjectItem {
+  kind: "project"; id: string; name: string; source_kind: "local" | "github" | "upload";
+  project_revision: number; updated_at: string; activity_at: string; latest_job_id: string | null; open_job_id: string | null; phase: string;
+  freshness: string; source_freshness: string; readiness: string;
+  implementation: string; assessment: string; findings_count: number;
+  checks_passed: number; checks_failed: number;
+}
+export interface WorkspaceLegacyReviewItem {
+  kind: "legacy_review"; id: string; created_at: string | null; phase: string;
+}
+export type WorkspaceItem = WorkspaceProjectItem | WorkspaceLegacyReviewItem;
+export interface WorkspacePage {
+  schema_version: 1; items: WorkspaceItem[]; total: number; next_offset: number | null;
+}
+export interface ProjectStatus {
+  project_id: string; project_revision: number; job_id: string | null;
+  phase: string; freshness: string; source_freshness: string;
+  readiness: string; implementation: string; assessment: string;
+  findings_count: number; checks: { passed: number; failed: number };
+}
 export interface Job {
+  agent_run?: { status: string; tool: string; task_id: string; mode: "plan"; exit_code?: number | null;
+    report?: string; detail?: string; verification: "not_evaluated"; billing: string; work_copy_unchanged?: boolean;
+    source_coverage?: { included_files: number; eligible_files: number; omitted_files: number; truncated_files: number }; shared_context_omitted?: number };
+  evidence_freshness?: { freshness: "current" | "stale" | "unavailable"; source_freshness: "current" | "stale" | "unknown" | "unavailable"; source_available: boolean };
+  project_id?: string; project_snapshot_id?: string;
+  project?: { id: string; revision: number; source_kind: string; name: string; latest_job_id?: string; latest_snapshot_id?: string };
+  coordination?: { revision: number; project_id: string; tasks: Array<{ id: string; title: string; description: string; state: string;
+    depends_on: string[]; assigned_to?: { kind: string; id: string }; share_with_agents: boolean; stale: boolean;
+    completion_report: string; verification: string; completion_is_claim: boolean }>;
+    decisions: Array<{ id: string; kind: string; text: string; share_with_agents: boolean; authority: string }>;
+    handoffs: Array<{ id: string; task_id: string; recipient: { kind: string; id: string }; text: string; share_with_agents: boolean }> };
+  external_evidence?: Array<{ id?: string; vendor?: string; source?: string; status: string; observed_at?: string;
+    detail?: string; limitation?: string; snapshot_ref?: string; source_binding?: string; scope?: Record<string, unknown>;
+    records?: Array<{ tool: string; status: string; query_digest?: string; observed_at?: string; excerpt?: string; detail?: string }> }>;
   review_goal?: string;
   collaboration?: { revision: number; participants: Array<{ session_id: string; name: string }>;
     notes: Array<{ id: string; author: string; kind: string; text: string; assigned_to: string; share_with_agents: boolean; created_at: string }> };

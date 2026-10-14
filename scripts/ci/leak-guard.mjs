@@ -27,6 +27,21 @@ import { spawnSync } from 'node:child_process';
  */
 export const RULES = [
   {
+    id: 'local-review-state',
+    why: '.regen/ contains local project snapshots, job state and service credentials — never source',
+    publicOnly: false,
+    test: (p) => p.split('/').some((part) => part.toLowerCase() === '.regen'),
+  },
+  {
+    id: 'credentials',
+    why: 'an environment credential file — only the explicit .env.example template may be tracked',
+    publicOnly: false,
+    test: (p) => {
+      const name = p.slice(p.lastIndexOf('/') + 1).toLowerCase();
+      return name !== '.env.example' && (name === '.env' || name.startsWith('.env.'));
+    },
+  },
+  {
     id: 'obsidian',
     why: 'an Obsidian vault — personal notes, never public',
     publicOnly: false,
@@ -61,6 +76,12 @@ export const RULES = [
     why: 'machine-local agent config — committing it runs hooks on teammates who never agreed',
     publicOnly: false,
     test: (p) => p.startsWith('.claude/') || p.startsWith('.agents/') || p === '.mcp.json' || p === 'CLAUDE.md',
+  },
+  {
+    id: 'local-creative-project',
+    why: 'the local Unreal project and Blender working file are not PRAXIS public source',
+    publicOnly: false,
+    test: (p) => p === 'praxis blender.blend' || p === 'praxis' || p.startsWith('praxis/'),
   },
 ];
 

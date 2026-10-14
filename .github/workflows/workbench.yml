@@ -3,9 +3,9 @@ name: Workbench quality
 on:
   push:
     branches: [main]
-    paths: ['apps/workbench/**', 'src/commands/workbench.js', 'src/lib/workbench.js', 'test/workbench.test.js', '.github/workflows/workbench.yml']
+    paths: ['apps/workbench/**', 'src/lib/jobs/**', 'src/commands/workbench.js', 'src/commands/review.js', 'src/lib/workbench.js', 'src/lib/review-*.js', 'src/lib/verify/mcp-*.js', 'test/workbench*.test.js', 'test/review-*.test.js', 'test/assurance-pressure.test.js', 'scripts/ci/assurance-*', '.github/workflows/workbench.yml']
   pull_request:
-    paths: ['apps/workbench/**', 'src/commands/workbench.js', 'src/lib/workbench.js', 'test/workbench.test.js', '.github/workflows/workbench.yml']
+    paths: ['apps/workbench/**', 'src/lib/jobs/**', 'src/commands/workbench.js', 'src/commands/review.js', 'src/lib/workbench.js', 'src/lib/review-*.js', 'src/lib/verify/mcp-*.js', 'test/workbench*.test.js', 'test/review-*.test.js', 'test/assurance-pressure.test.js', 'scripts/ci/assurance-*', '.github/workflows/workbench.yml']
   workflow_dispatch:
 
 permissions:
@@ -45,8 +45,55 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
       - run: python -m pip install -r backend/requirements.txt
       - run: python -m pip check
+      - if: runner.os == 'Linux'
+        run: python -m playwright install --with-deps chromium
+      - if: runner.os == 'Windows'
+        run: python -m playwright install chromium
       - run: python -B -m unittest discover -s backend/tests -v
         env:
           PYTHONPATH: backend
+      - name: Real Docker sandbox boundaries
+        if: runner.os == 'Linux'
+        run: |
+          docker pull node:22-bookworm-slim
+          docker pull python:3.12-slim
+          python -B -m unittest discover -s backend/tests -p test_sandbox.py -v
+        env:
+          PYTHONPATH: backend
+          PRAXIS_TEST_DOCKER: '1'
+  assurance:
+    if: github.repository == 'vaishak-v-nair/PRAXIS'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/workbench/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --prefix apps/workbench --ignore-scripts
+      - run: python -m venv apps/workbench/.venv
+      - run: apps/workbench/.venv/bin/python -m pip install -r apps/workbench/backend/requirements.txt
+      - run: apps/workbench/.venv/bin/python -m pip check
+      - run: apps/workbench/.venv/bin/python -m playwright install --with-deps chromium
+      - run: npm run build:workbench
+      - run: npm run test:assurance
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assurance-browser-evidence
+          path: |
+            /tmp/praxis-assurance-qa-*/*.png
+            /tmp/praxis-assurance-qa-*/result.json
+            /tmp/praxis-assurance-qa-*/status.json
+          if-no-files-found: warn
+          retention-days: 7

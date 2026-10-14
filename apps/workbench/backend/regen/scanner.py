@@ -6,6 +6,7 @@ The caller must obtain project trust before calling ``run_checks``.
 from __future__ import annotations
 
 import ast
+from collections import deque
 import hashlib
 import importlib.util
 import io
@@ -14,6 +15,7 @@ import os
 import re
 import shlex
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -38,6 +40,7 @@ EXCLUDED = {'.git', '.hg', '.svn', '.praxis', 'node_modules', '.venv', 'venv', '
 MAX_FILES = 25000
 MAX_FILE_BYTES = 2 * 1024 * 1024
 MAX_TOTAL_BYTES = 100 * 1024 * 1024
+MAX_DISCOVERED_FILES = 100000
 LANGUAGES = {'.py': 'Python', '.js': 'JavaScript', '.jsx': 'JavaScript', '.mjs': 'JavaScript',
              '.ts': 'TypeScript', '.tsx': 'TypeScript', '.go': 'Go', '.rs': 'Rust',
              '.java': 'Java', '.cs': 'C#', '.php': 'PHP', '.rb': 'Ruby'}
@@ -117,7 +120,25 @@ def _env_template(path: Path) -> bool:
     return path.name.startswith('.env.') and path.name.rsplit('.', 1)[-1].lower() in {'example', 'sample', 'template', 'dist'}
 
 
-def _walk(path: Path, include_sensitive: bool = False, stats: dict | None = None) -> Iterator[Path]:
+def _source_priority(file: Path) -> int:
+    """Spend a bounded snapshot on executable source before documentation or media."""
+    name = file.name.casefold()
+    if _dotenv(file) or name in {'package.json', 'package-lock.json', 'pnpm-lock.yaml',
+                                  'yarn.lock', 'pyproject.toml', 'requirements.txt',
+                                  'uv.lock', 'cargo.toml', 'cargo.lock', 'go.mod',
+                                  'go.sum', 'dockerfile', 'compose.yaml', 'compose.yml'}:
+        return 0
+    if file.suffix.casefold() in {*LANGUAGES, '.html', '.vue', '.svelte', '.css',
+                                  '.scss', '.sql', '.sh', '.ps1'}:
+        return 1
+    if file.suffix.casefold() in {'.md', '.txt', '.json', '.jsonc', '.toml',
+                                  '.yaml', '.yml', '.xml', '.ini', '.cfg'}:
+        return 2
+    return 3
+
+
+def _walk(path: Path, include_sensitive: bool = False, stats: dict | None = None,
+          cancelled: threading.Event | None = None) -> Iterator[Path]:
     root = path.resolve()
     stats = stats if stats is not None else {}
     # A PRAXIS checkout contains an ignored personal vault and brand masters.
@@ -131,20 +152,51 @@ def _walk(path: Path, include_sensitive: bool = False, stats: dict | None = None
     except (OSError, ValueError, UnicodeError):
         pass
     private_roots = {'.praxis', '.gstack', '.obsidian', '.agents', '.claude', 'assets'}
-    count = 0
-    total = 0
-    for directory, dirs, names in os.walk(root, followlinks=False):
-        excluded_here = [d for d in dirs if d in EXCLUDED]
-        stats['excluded_agent_tooling_dirs'] = stats.get('excluded_agent_tooling_dirs', 0) + sum(
-            d in AGENT_TOOLING_DIRS for d in excluded_here)
-        dirs[:] = sorted(d for d in dirs if d not in EXCLUDED
-                         and not (praxis_checkout and Path(directory) == root
-                                  and (d in private_roots or d.lower().endswith('intelligence')))
-                         and not (Path(directory) / d / 'pyvenv.cfg').is_file()
-                         and not (Path(directory) / d).is_symlink()
-                         and (Path(directory) / d).resolve().is_relative_to(root))
-        for name in sorted(names):
-            file = Path(directory) / name
+    # Unreal Content is project source; these siblings are generated caches.
+    # Apply this exclusion only within a tree identified by a .uproject file,
+    # so an unrelated application folder named Saved stays eligible.
+    unreal_generated = {'deriveddatacache', 'intermediate', 'saved', 'binaries'}
+    unreal_tree = set()
+    candidates = []
+    queue = deque([root])
+    while queue:
+        if cancelled:
+            _cancel(cancelled)
+        current = queue.popleft()
+        try:
+            with os.scandir(current) as directory:
+                entries = sorted(directory, key=lambda entry: entry.name.casefold())
+        except OSError:
+            stats['unreadable_directories'] = stats.get('unreadable_directories', 0) + 1
+            continue
+        unreal = current.parent in unreal_tree or any(entry.name.lower().endswith('.uproject')
+                                                       and entry.is_file(follow_symlinks=False) for entry in entries)
+        if unreal:
+            unreal_tree.add(current)
+        for entry in entries:
+            if cancelled:
+                _cancel(cancelled)
+            file = current / entry.name
+            if entry.is_dir(follow_symlinks=False):
+                if entry.name in AGENT_TOOLING_DIRS:
+                    stats['excluded_agent_tooling_dirs'] = stats.get('excluded_agent_tooling_dirs', 0) + 1
+                if unreal and entry.name.casefold() in unreal_generated:
+                    stats['excluded_unreal_generated_dirs'] = stats.get('excluded_unreal_generated_dirs', 0) + 1
+                if (entry.name in EXCLUDED or (unreal and entry.name.casefold() in unreal_generated)
+                        or (praxis_checkout and current == root
+                            and (entry.name in private_roots or entry.name.lower().endswith('intelligence')))
+                        or (file / 'pyvenv.cfg').is_file() or file.is_symlink()
+                        or not file.resolve().is_relative_to(root)):
+                    continue
+                # A nested Git checkout is a separate project, even when a parent
+                # repository happens to contain it. Users can review it directly.
+                if (file / '.git').exists():
+                    stats['excluded_nested_repositories'] = stats.get('excluded_nested_repositories', 0) + 1
+                    continue
+                queue.append(file)
+                continue
+            if not entry.is_file(follow_symlinks=False):
+                continue
             if file.is_symlink() or (not include_sensitive and _dotenv(file) and not _env_template(file)):
                 stats['sensitive_or_symlink_files'] = stats.get('sensitive_or_symlink_files', 0) + 1
                 continue
@@ -157,23 +209,38 @@ def _walk(path: Path, include_sensitive: bool = False, stats: dict | None = None
             if size > MAX_FILE_BYTES:
                 stats['oversized_files'] = stats.get('oversized_files', 0) + 1
                 continue
-            count += 1
-            total += size
-            if count > MAX_FILES or total > MAX_TOTAL_BYTES:
+            if len(candidates) >= MAX_DISCOVERED_FILES:
                 stats['truncated'] = True
-                return
-            stats['selected_bytes'] = total
-            yield file
+                stats['discovery_limit_reached'] = True
+                queue.clear()
+                break
+            relative = file.relative_to(root)
+            candidates.append((_source_priority(file), len(relative.parts), relative.as_posix().casefold(), file, size))
+    stats['eligible_files'] = len(candidates)
+    selected = total = 0
+    for _, _, _, file, size in sorted(candidates):
+        if cancelled:
+            _cancel(cancelled)
+        if selected >= MAX_FILES or total + size > MAX_TOTAL_BYTES:
+            stats['truncated'] = True
+            stats['omitted_files'] = stats.get('omitted_files', 0) + 1
+            stats['omitted_bytes'] = stats.get('omitted_bytes', 0) + size
+            continue
+        selected += 1
+        total += size
+        stats['selected_files'] = selected
+        stats['selected_bytes'] = total
+        yield file
 
 
 def safe_files(path: Path) -> Iterator[Path]:
     return _walk(Path(path))
 
 
-def fingerprint(path: Path) -> str:
+def fingerprint(path: Path, cancelled: threading.Event | None = None) -> str:
     digest = hashlib.sha256()
     root = Path(path).resolve()
-    for file in _walk(root, include_sensitive=True):
+    for file in _walk(root, include_sensitive=True, cancelled=cancelled):
         digest.update(file.relative_to(root).as_posix().encode())
         try:
             digest.update(file.read_bytes())
@@ -395,10 +462,11 @@ def prepare_project(source: str, workspace: Path, emit: Callable, cancelled: thr
         if destination.exists():
             raise ValueError('This job workspace already contains a project')
         destination.mkdir()
-        original_fingerprint = fingerprint(original)
+        original_fingerprint = fingerprint(original, cancelled)
         praxis_memory_available = (original / '.praxis' / 'memory.md').is_file()
         _emit(emit, 'Creating an isolated snapshot including local uncommitted files')
-        for file in _walk(original, include_sensitive=True):
+        source_scope = {'truncated': False}
+        for file in _walk(original, include_sensitive=True, stats=source_scope, cancelled=cancelled):
             _cancel(cancelled)
             relative = file.relative_to(original)
             if _dotenv(file):
@@ -415,6 +483,7 @@ def prepare_project(source: str, workspace: Path, emit: Callable, cancelled: thr
         discovered = discover_commands(destination)
         return {'path': str(destination), 'name': github.group(2) if github else original.name,
                 'source': source if github else str(original), 'source_fingerprint': original_fingerprint,
+                'source_scope': source_scope,
                 'praxis_memory_available': praxis_memory_available,
                 'languages': sorted({LANGUAGES[f.suffix] for f in safe_files(destination) if f.suffix in LANGUAGES}),
                 'findings': intake, **discovered}
@@ -588,7 +657,8 @@ def _osv(path: Path, cancelled: threading.Event) -> tuple[list[dict], dict]:
         return findings, {'name': 'OSV dependencies', 'status': 'skipped', 'detail': 'Advisory service unavailable: ' + redact(str(exc))}
 
 
-def scan_project(path: Path, emit: Callable, cancelled: threading.Event, *, external_checks: bool = True) -> dict:
+def scan_project(path: Path, emit: Callable, cancelled: threading.Event, *, external_checks: bool = True,
+                 source_scope: dict | None = None) -> dict:
     """Inspect source. Browser callers disable executable tools and advisory requests.
 
     The default retains the existing local Workbench coverage contract.
@@ -599,6 +669,14 @@ def scan_project(path: Path, emit: Callable, cancelled: threading.Event, *, exte
     coverage = []
     limits = {'max_files': MAX_FILES, 'max_file_bytes': MAX_FILE_BYTES, 'max_total_bytes': MAX_TOTAL_BYTES, 'truncated': False}
     files = list(_walk(path, stats=limits))
+    # The prepared copy may be complete relative to itself while its original
+    # source was bounded. Carry that limit into the assessment gate.
+    source_scope = source_scope or {}
+    snapshot_limited = bool(source_scope.get('truncated') or source_scope.get('excluded_nested_repositories'))
+    if source_scope:
+        limits['snapshot_omitted_files'] = source_scope.get('omitted_files', 0)
+        limits['snapshot_nested_repositories'] = source_scope.get('excluded_nested_repositories', 0)
+        limits['snapshot_discovery_limit_reached'] = bool(source_scope.get('discovery_limit_reached'))
     text_count = python_count = 0
     unsupported = set()
     _emit(emit, f'Inspecting {len(files)} bounded project files')
@@ -649,11 +727,14 @@ def scan_project(path: Path, emit: Callable, cancelled: threading.Event, *, exte
                     'This button is written with a constant disabled value.', 'Visitors cannot use this control; this may be intentional.',
                     relative, number, line.strip()[:250], 'Connect the disabled state to real loading or validation state if the action should work.', confidence='medium'))
     agent_scope = limits.get('excluded_agent_tooling_dirs', 0)
-    coverage.append({'name': 'Local source inspection', 'status': 'limited' if limits['truncated'] else 'passed',
+    scope_detail = (f' The source snapshot omitted {source_scope.get("omitted_files", 0)} bounded files and '
+                    f'excluded {source_scope.get("excluded_nested_repositories", 0)} nested Git repositories; '
+                    'review those separately or narrow the project folder.' if snapshot_limited else '')
+    coverage.append({'name': 'Local source inspection', 'status': 'limited' if limits['truncated'] or snapshot_limited else 'passed',
         'detail': f'{text_count} UTF-8 project files inspected; symlinks, generated dependencies, local credentials, binary and large files excluded.'
                   + (f' {agent_scope} AI-agent tooling director{"y" if agent_scope == 1 else "ies"} excluded from product findings.' if agent_scope else '')
-                  + f' Limits: {MAX_FILES} files, 2 MiB/file, 100 MiB total.', 'limits': limits})
-    coverage.append({'name': 'Built-in secret patterns', 'status': 'limited' if limits['truncated'] else 'passed',
+                  + scope_detail + f' Limits: {MAX_FILES} files, 2 MiB/file, 100 MiB total.', 'limits': limits})
+    coverage.append({'name': 'Built-in secret patterns', 'status': 'limited' if limits['truncated'] or snapshot_limited else 'passed',
         'detail': f'Credential-pattern checks completed across {text_count} inspected UTF-8 files. Matches are reported separately as findings; completion does not prove the absence of every secret.'})
     coverage.append({'name': 'Python syntax', 'status': 'passed' if python_count else 'skipped',
         'detail': f'{python_count} Python files parsed with AST without imports or execution. This checks syntax only; dependencies and runtime behavior need trusted checks.'})
@@ -711,10 +792,19 @@ def scan_project(path: Path, emit: Callable, cancelled: threading.Event, *, exte
             'languages': sorted({LANGUAGES[f.suffix] for f in files if f.suffix in LANGUAGES}), 'files_scanned': len(files)}
 
 
-def _browser_check(path: Path, start: list[str], emit: Callable, cancelled: threading.Event) -> dict:
+def _browser_check(path: Path, start: list[str], emit: Callable, cancelled: threading.Event,
+                   journey_spec: dict | None = None) -> dict:
     if importlib.util.find_spec('playwright') is None:
         return {'name': 'Browser checks', 'kind': 'browser', 'evidence_scope': 'homepage_smoke',
                 'status': 'skipped', 'output': 'Playwright is not installed; runtime UI was not verified.'}
+    # A healthy unrelated app on this port is not evidence for our review copy.
+    # Never terminate or drive an existing listener to make a check pass.
+    try:
+        with socket.create_connection(('127.0.0.1', 4173), timeout=.2):
+            return {'name': 'Browser checks', 'kind': 'browser', 'evidence_scope': 'homepage_smoke',
+                    'status': 'skipped', 'output': 'Local browser port 4173 is already in use. The existing app was preserved and no browser evidence was inferred.'}
+    except (OSError, TimeoutError):
+        pass
     with tempfile.TemporaryFile() as output:
         process = None
         try:
@@ -728,15 +818,19 @@ def _browser_check(path: Path, start: list[str], emit: Callable, cancelled: thre
             with sync_playwright() as runtime:
                 browser = runtime.chromium.launch(headless=True)
                 try:
-                    page = browser.new_page()
+                    page = browser.new_page(service_workers='block')
                     page.on('pageerror', lambda error: issues.append('Browser error: ' + redact(str(error))))
                     page.on('requestfailed', lambda request: issues.append('Failed request: ' + redact(request.url)))
                     ready = False
                     for _ in range(40):
                         _cancel(cancelled)
+                        if process.poll() is not None:
+                            break
                         try:
                             issues.clear()
                             page.goto('http://127.0.0.1:4173', timeout=1500, wait_until='domcontentloaded')
+                            if process.poll() is not None:
+                                break
                             ready = True
                             break
                         except Exception:
@@ -750,6 +844,8 @@ def _browser_check(path: Path, start: list[str], emit: Callable, cancelled: thre
                                 'status': 'failed', 'output': 'App did not become reachable at http://127.0.0.1:4173. Supply a start command using this port.\n' + detail}
                     page.wait_for_timeout(1000)
                     _cancel(cancelled)
+                    if process.poll() is not None:
+                        raise RuntimeError('The owned app process stopped. A reachable listener is not evidence for this review copy.')
                     exceptions = page.locator('[data-testid="stException"]')
                     for index in range(min(exceptions.count(), 10)):
                         if exceptions.nth(index).is_visible():
@@ -764,11 +860,21 @@ def _browser_check(path: Path, start: list[str], emit: Callable, cancelled: thre
                         button = page.locator('button').nth(index)
                         if button.is_visible() and not (button.inner_text().strip() or button.get_attribute('aria-label') or button.get_attribute('title')):
                             issues.append('A visible button has no text or accessible label')
+                    journey_result = None
+                    if journey_spec:
+                        from . import journey
+                        if process.poll() is not None:
+                            raise RuntimeError('The owned app stopped before the requested journey. No user-journey success was inferred.')
+                        journey_result = journey.run(page, journey_spec, cancelled)
+                    if process.poll() is not None:
+                        raise RuntimeError('The owned app stopped during the browser check. No successful evidence was inferred.')
                     return {'name': 'Browser checks', 'kind': 'browser', 'evidence_scope': 'homepage_smoke',
                         'observations': ['home_page_reachable', 'browser_errors', 'failed_requests',
                                          'desktop_mobile_overflow', 'visible_button_names'],
                         'viewports': [1440, 390], 'status': 'failed' if issues else 'passed',
-                        'output': '\n'.join(issues) if issues else 'Homepage reached at 1440px and 390px. Checked browser errors, failed requests, horizontal overflow and visible button names. No controls, secondary routes or external side effects were exercised.'}
+                        'output': '\n'.join(issues) if issues else ('Homepage reached at 1440px and 390px. Checked browser errors, failed requests, horizontal overflow and visible button names. '
+                                                                + ('The interaction is recorded separately; external side effects were not checked.' if journey_spec else 'No controls, secondary routes or external side effects were exercised.')),
+                        **({'journey_result': journey_result} if journey_result else {})}
                 finally:
                     browser.close()
         except Exception as exc:
@@ -789,7 +895,7 @@ def is_setup_command(command):
 
 
 def run_checks(path: Path, commands: list[list[str]], emit: Callable, cancelled: threading.Event,
-               start_command: list[str] | None = None, *, on_result=None) -> list[dict]:
+               start_command: list[str] | None = None, *, journey_spec: dict | None = None, on_result=None) -> list[dict]:
     """Execute trusted commands in a review copy with individual time limits.
 
     Host execution is not an OS sandbox. Commands retain access to host files
@@ -820,7 +926,17 @@ def run_checks(path: Path, commands: list[list[str]], emit: Callable, cancelled:
             break
     if start_command and not cancelled.is_set():
         _emit(emit, 'Checking web interface in desktop and mobile browser viewports')
-        record({'kind': 'browser', **_browser_check(Path(path), start_command, emit, cancelled)})
+        browser = (_browser_check(Path(path), start_command, emit, cancelled, journey_spec)
+                   if journey_spec else _browser_check(Path(path), start_command, emit, cancelled))
+        journey_result = browser.pop('journey_result', None)
+        record({'kind': 'browser', **browser})
+        if journey_spec:
+            record(journey_result or {'name': journey_spec['name'], 'kind': 'browser',
+                   'evidence_scope': 'ui_interaction', 'status': 'skipped',
+                   'output': 'The app or browser did not become available, so the requested journey was not run.'})
+    elif journey_spec:
+        record({'name': journey_spec['name'], 'kind': 'browser', 'evidence_scope': 'ui_interaction',
+                'status': 'skipped', 'output': 'Required project setup failed or execution was cancelled; the journey was not run.'})
     if not results:
         record({'name': 'Project checks', 'status': 'skipped', 'output': 'No supported project checks discovered or approved.'})
     return results

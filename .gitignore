@@ -10,6 +10,7 @@ npm-debug.log*
 
 # Local dogfood artifacts
 .praxis/
+.regen/
 .gstack/
 web/_qa/
 web/dist/
@@ -49,6 +50,10 @@ Personal Intelligence/
 # hyperframes clone (local tool, not part of praxis)
 hyperframes/
 videos/
+
+# Local Unreal/Blender experiments are separate from the PRAXIS product source.
+/praxis/
+/praxis blender.blend
 
 # Optional local workbench: credentials, jobs, backups, and generated files.
 apps/workbench/.env

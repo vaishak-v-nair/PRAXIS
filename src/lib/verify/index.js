@@ -37,14 +37,15 @@ export async function verifyWithMcp(options = {}) {
   if (!options.mcpPolicy) throw new VerifyInputError('mcp-policy-required', 'Official MCP evidence requires --mcp-policy <file>.');
   const mcpPolicy = readMcpEvidencePolicy(options.mcpPolicy);
   const ledger = createLedger(target);
+  // Vendor observations supplement the committed diff and false-success checks
+  // in every mode; authorizing commands must never remove that evidence.
+  runStaticObservers(target, claims, ledger);
   let trustMetadata = {};
   if (options.mode === 'trusted') {
     if (!options.trustPolicy) throw new VerifyInputError('trust-policy-required', 'Trusted mode requires --trust-policy <file>.', 'praxis verify --mode static --claim CLAIM');
     const trust = readTrustPolicy(options.trustPolicy);
     await runTrustedObservers(target, claims, ledger, trust, { signal: options.signal });
     trustMetadata = { trust: { schema: trust.schema, commands: trust.commands, allowedEnv: trust.allowedEnv, network: trust.network } };
-  } else {
-    runStaticObservers(target, claims, ledger);
   }
   await runMcpEvidenceObservers(target, claims, ledger, mcpPolicy, options.mcpRuntime);
   return finish(startedAt, options.mode === 'trusted' ? 'trusted+mcp' : 'static+mcp', target, claims, task, ledger.entries(), ledger, options, {

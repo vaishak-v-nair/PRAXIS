@@ -36,3 +36,32 @@ export function selectedTool(argv) {
   }
   return BUILTIN_AGENTS.find(tool => argv.includes(`--${tool}`)) || 'claude';
 }
+
+export function builtinAdapter(tool) {
+  const adapters = {
+    claude: ['claude', '-p', '--output-format', 'json'],
+    codex: ['codex', 'exec', '--json'],
+    gemini: ['gemini', '-p', 'Complete the task provided on standard input.', '--output-format', 'json'],
+    opencode: ['opencode', 'run', '--format', 'json', '--file', '{taskFile}'],
+  };
+  return Object.hasOwn(adapters, tool) ? [...adapters[tool]] : null;
+}
+
+export function buildAgentArgv(base, { mode = 'plan', extraArgs = [], injected = false } = {}) {
+  if (injected) return [...base];
+  if (base[0] === 'codex') {
+    const sandboxMap = {
+      plan: 'read-only',
+      acceptEdits: 'workspace-write',
+      bypassPermissions: 'danger-full-access',
+    };
+    const sandbox = sandboxMap[mode] || 'read-only';
+    return [...base, ...extraArgs, '--sandbox', sandbox, '-'];
+  }
+  if (base[0] === 'gemini') {
+    const approval = { plan: 'plan', acceptEdits: 'auto_edit', bypassPermissions: 'yolo' }[mode] || 'plan';
+    return [...base, ...extraArgs, '--approval-mode', approval];
+  }
+  if (base[0] === 'opencode') return [...base, ...extraArgs, '--agent', mode === 'plan' ? 'plan' : 'build', 'Complete the task in the attached task file.'];
+  return [...base, ...extraArgs, '--permission-mode', mode];
+}

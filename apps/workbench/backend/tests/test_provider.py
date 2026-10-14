@@ -85,6 +85,39 @@ class PayloadRetryModel:
 
 
 class ProviderSafetyTests(unittest.TestCase):
+    def test_captured_goal_reaches_primary_and_each_independent_model_as_redacted_data(self):
+        prompts = []
+        class GoalModel(DeepReviewModel):
+            def call(self, messages, tools=None, max_tokens=2200):
+                prompts.append(messages[-1]['content'])
+                return {'content': '{"findings":[],"journeys":[],"gaps":[]}'}
+        secret = 'sk-proj-' + 'x' * 32
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'client.py').write_text('verify=False\n')
+            with patch('regen.provider.Model', GoalModel), patch('regen.provider.configured_provider_selections',
+                    return_value=[{'provider': 'fixture', 'model': 'goal-model'}]):
+                result = analyze_deep(root, {'findings': [], 'coverage': [],
+                    'review_goal': 'Protect checkout. ' + secret}, lambda _: None, threading.Event(), Budget(2))
+        self.assertEqual(len(prompts), 4)
+        for prompt in prompts:
+            self.assertIn('REVIEW_GOAL_DATA', prompt)
+            self.assertIn('Protect checkout. [REDACTED]', prompt)
+            self.assertNotIn(secret, prompt)
+        self.assertEqual(result['findings'], [])
+
+    def test_missing_findings_field_cannot_be_reported_as_a_completed_model_review(self):
+        class EmptyModel(DeepReviewModel):
+            def call(self, messages, tools=None, max_tokens=2200):
+                return {'content': '{"summary":"Everything is perfect"}'}
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'client.py').write_text('verify=False\n')
+            scan = {'findings': [], 'coverage': []}
+            with patch('regen.provider.Model', EmptyModel), self.assertRaises(ProviderError):
+                analyze(root, scan, lambda _: None, threading.Event(), Budget(1))
+        self.assertEqual(scan['coverage'], [])
+
     def test_ai_finding_requires_real_line_and_token_bounded_nearby_evidence(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

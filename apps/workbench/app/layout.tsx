@@ -3,14 +3,17 @@ import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./product.css";
+import "./workspace.css";
+import "./aurora.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist", display: "swap" });
 const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "PRAXIS · Project Review",
-  description: "Inspect your project locally, understand source-backed findings, and choose optional checks or an agent handoff.",
+  title: "PRAXIS · AI Project Engineer",
+  description: "Understand a real project, inspect evidence-backed findings, run authorized checks, and plan the next engineering step locally.",
   icons: { icon: "/praxis-mark.png" },
+  other: { "praxis-review-surface": "workbench-v1" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
